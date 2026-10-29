@@ -1,0 +1,44 @@
+{
+  "fetchedAt": null,
+  "source": "네이버 금융 ETF 목록 (비공식)",
+  "status": "unavailable",
+  "notes": "아직 시가총액, NAV 데이터가 수집되지 않았습니다.",
+  "items": [
+    {
+      "id": "reit",
+      "code": "329200",
+      "ok": false,
+      "reason": "수집 대기"
+    },
+    {
+      "id": "robot",
+      "code": "469070",
+      "ok": false,
+      "reason": "수집 대기"
+    },
+    {
+      "id": "space",
+      "code": "0131V0",
+      "ok": false,
+      "reason": "수집 대기"
+    },
+    {
+      "id": "sofr",
+      "code": "455030",
+      "ok": false,
+      "reason": "수집 대기"
+    },
+    {
+      "id": "tr",
+      "code": "278530",
+      "ok": false,
+      "reason": "수집 대기"
+    },
+    {
+      "id": "sol",
+      "code": "0167B0",
+      "ok": false,
+      "reason": "수집 대기"
+    }
+  ]
+}
