@@ -51,6 +51,28 @@ details[open]>summary{margin-bottom:12px}
 .card-detail{font-size:.77rem;color:#abbdd7;margin-top:5px}
 @media(max-width:560px){.pos-row{grid-template-columns:1fr 1fr}.pos-name{grid-column:1/-1}}
 
+
+/* Important material changes; display text, not decorative flashing badges. */
+#changes-panel{border-color:#667c99}
+.change-feed{display:grid;gap:0;margin:8px 0 12px}
+.change-item{display:block;border-bottom:1px solid #34455e;padding:10px 6px 10px 12px;border-left:3px solid #546a89;line-height:1.4;font-size:.86rem}
+.change-item small{display:block;color:#aab8cb;font-size:.76rem;margin-top:3px}
+.change-risk{border-left-color:#ff697b}
+.change-opportunity{border-left-color:#60a5fa}
+.change-normal{border-left-color:#73859c}
+.change-mini{border-top:1px solid #364862;margin-top:8px;padding-top:7px;color:#b9d0fa;font-size:.75rem;line-height:1.4}
+.change-mini strong{font-weight:750}
+#sol-panel a{color:#a7caff;text-decoration:underline}
+.sol-inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sol-input-label{max-width:340px;margin-top:10px}
+.sol-data{font-size:.86rem;margin:9px 0}
+.sol-warning{font-size:.81rem;color:#ffb3b8;margin:12px 0}
+.sol-progress{height:10px;border:1px solid #435978;border-radius:6px;overflow:hidden;background:#1b2a40;margin:7px 0}
+.sol-progress div{height:100%;background:#5e9be7}
+.sol-dist-row{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #35435a;font-size:.84rem}
+.sol-dist-row small{color:#a9b8cc;display:block;font-size:.72rem}
+.sol-dist-row button{font-size:.75rem;padding:7px 9px;background:#33415a}
+@media(max-width:560px){.sol-inputs{grid-template-columns:1fr}}
 </style></head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel flex"><div><b>마지막 게시 시세 확인</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div></div><button id="reload">↻ 자료 확인</button></section>
@@ -281,6 +303,7 @@ function render(){
  '<div class="divider"></div><label>키움 확인 가격 직접 입력 (선택)<input type="number" id="manual" min="1" step="1" placeholder="입력하면 참고 계산, 5·20일선은 기존 종가" value="'+(valid(manual[f.id])?manual[f.id]:'')+'"></label>'+
  '<p class="fieldset-note">수동 가격은 5·20일선 계산을 바꾸지 않습니다. 수동 가격 입력 시 신규 매수 신호는 보수적으로 대기 처리합니다.</p>';
  el('manual').onchange=function(ev){if(valid(ev.target.value))manual[f.id]=Number(ev.target.value);else delete manual[f.id];render();};
+ document.dispatchEvent(new Event('isa-rendered'));
 }
 async function refresh(){
  var button=el('reload'),oldSignature=dataSignature,oldFetchedAt=loadTime;
@@ -369,4 +392,4 @@ var reload=document.getElementById('reload');
 if(reload)reload.addEventListener('click',update);
 update();
 })();
-</script></body></html>
+</script><script src="./insights.js" defer></script></body></html>
