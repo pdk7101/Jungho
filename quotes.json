@@ -1,0 +1,73 @@
+{
+  "fetchedAt": null,
+  "source": "네이버 금융 일봉 (비공식)",
+  "officialConfirmed": false,
+  "items": [
+    {
+      "id": "reit",
+      "code": "329200",
+      "ok": false,
+      "date": null,
+      "close": null,
+      "low20": null,
+      "high20": null,
+      "bars": [],
+      "error": "첫 시세 수집 대기"
+    },
+    {
+      "id": "robot",
+      "code": "469070",
+      "ok": false,
+      "date": null,
+      "close": null,
+      "low20": null,
+      "high20": null,
+      "bars": [],
+      "error": "첫 시세 수집 대기"
+    },
+    {
+      "id": "space",
+      "code": "0131V0",
+      "ok": false,
+      "date": null,
+      "close": null,
+      "low20": null,
+      "high20": null,
+      "bars": [],
+      "error": "첫 시세 수집 대기"
+    },
+    {
+      "id": "sofr",
+      "code": "455030",
+      "ok": false,
+      "date": null,
+      "close": null,
+      "low20": null,
+      "high20": null,
+      "bars": [],
+      "error": "첫 시세 수집 대기"
+    },
+    {
+      "id": "tr",
+      "code": "278530",
+      "ok": false,
+      "date": null,
+      "close": null,
+      "low20": null,
+      "high20": null,
+      "bars": [],
+      "error": "첫 시세 수집 대기"
+    },
+    {
+      "id": "sol",
+      "code": "0167B0",
+      "ok": false,
+      "date": null,
+      "close": null,
+      "low20": null,
+      "high20": null,
+      "bars": [],
+      "error": "첫 시세 수집 대기"
+    }
+  ]
+}
