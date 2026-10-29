@@ -34,7 +34,7 @@ footer{font-size:.77rem;color:#a8b5ce;line-height:1.5;margin-top:16px}
 @media(max-width:560px){.funds{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}header{align-items:flex-start}}
 </style></head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">같은 주소에서 가격과 판단만 갱신</div></div><span class="pill" id="signal">조회 전</span></header>
-<section class="panel flex"><div><b>종가·20거래일 갱신</b><div id="updated">마지막 게시 데이터 확인 중</div></div><button id="reload">↻ 갱신</button></section>
+<section class="panel flex"><div><b>마지막 게시 시세 확인</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div></div><button id="reload">↻ 자료 확인</button></section>
 <div id="alert">공식 확정 종가가 아닌 공개 일봉 자료를 확인합니다. 검증 실패 시 미확인으로 표시합니다.</div>
 <div class="legend"><span class="state-stop"><b>●</b> 매수 중단</span><span class="state-buy"><b>●</b> 매수 유지</span><span class="state-wait"><b>●</b> 대기·미확인</span></div>
 <section id="funds" class="funds"></section>
@@ -45,7 +45,7 @@ footer{font-size:.77rem;color:#a8b5ce;line-height:1.5;margin-top:16px}
 <label>SOL 상한 (원)<input id="solCap" type="number" value="10000"></label>
 <label>200TR 감시기준 (원)<input id="trBase" type="number" value="31150"></label>
 </div><label>20거래일 박스권 하단 관심 비율 <b id="ratioLabel">30%</b><input type="range" id="ratio" min="15" max="50" value="30" step="5"></label><p class="sub">리츠 매 거래일 3주, SOFR 기존 적립 유지. 로봇·우주항공이 상한 초과한 날 SOL을 하루 최대 1주 대체 검토합니다. 입력 설정은 기기별로 저장됩니다.</p></section>
-<footer><b>가격 정확성 안내</b><p>제공처: 네이버 금융 일봉(비공식). 한국거래소 공식 확정 종가와 다를 수 있습니다. 실제 주문 전 키움증권에서 종가를 대조하세요. 갱신 버튼은 마지막 자동 수집·게시된 자료를 다시 읽으며 실시간 거래소 조회가 아닙니다. 데이터가 없거나 오래되면 매수 신호를 표시하지 않습니다. 자동주문은 지원하지 않습니다.</p></footer>
+<footer><b>가격 정확성 안내</b><p>제공처: 네이버 금융 일봉(비공식). 한국거래소 공식 확정 종가와 다를 수 있습니다. 실제 주문 전 키움증권에서 종가를 대조하세요. 갱신 버튼은 마지막 자동 수집·게시된 자료를 다시 읽습니다. 눌러도 새 일봉 수집 작업이 시작되지는 않으며 실시간 거래소 조회가 아닙니다. 데이터가 없거나 오래되면 매수 신호를 표시하지 않습니다. 자동주문은 지원하지 않습니다.</p></footer>
 </main>
 <script>
 (function(){
@@ -60,7 +60,7 @@ var FUNDS=[
 ];
 var settings={robotCap:9500,spaceCap:9700,solCap:10000,trBase:31150,ratio:30};
 try{var saved=JSON.parse(localStorage.getItem('isa-rules')||'{}');Object.keys(settings).forEach(function(k){if(saved[k]!=null&&isFinite(Number(saved[k])))settings[k]=Number(saved[k]);});}catch(e){}
-var byId={},selected='sol',manual={},loadTime=null;
+var byId={},selected='sol',manual={},loadTime=null,dataSignature=null;
 var el=function(x){return document.getElementById(x);};
 var money=function(n){return Number(n).toLocaleString('ko-KR')+'원';};
 var valid=function(n){return n!==null&&n!==undefined&&String(n).trim()!==''&&Number.isFinite(Number(n))&&Number(n)>0;};
@@ -113,18 +113,38 @@ function render(){
  el('manual').onchange=function(ev){if(valid(ev.target.value))manual[f.id]=Number(ev.target.value);else delete manual[f.id];render();};
 }
 async function refresh(){
- el('reload').disabled=true;el('signal').textContent='갱신 중';
+ var button=el('reload'),oldSignature=dataSignature,oldFetchedAt=loadTime;
+ button.disabled=true;button.textContent='확인 중...';el('signal').textContent='게시 자료 확인 중';
  try{
- var res=await fetch('./quotes.json?t='+Date.now(),{cache:'no-store'});if(!res.ok)throw Error('HTTP '+res.status);
- var data=await res.json();if(!Array.isArray(data.items))throw Error('잘못된 자료 형식');
- byId={};data.items.forEach(function(x){if(FUNDS.some(function(f){return f.id===x.id;}))byId[x.id]=x;});
- manual={};loadTime=data.fetchedAt||null;
- var count=FUNDS.filter(function(f){return has20(q(f.id))&&!stale(q(f.id));}).length;
- el('signal').textContent=count+'/6 유효';el('updated').textContent='자료 수집: '+(loadTime?new Date(loadTime).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'아직 없음');
- el('alert').textContent='저장된 최신 일봉 자료를 화면에 반영했습니다. '+(6-count)+'종목은 미확인/지연 상태입니다. 종가는 비공식 자료이므로 실제 주문 전 키움과 대조하세요.';
- render();
- }catch(err){el('signal').textContent='갱신 실패';el('alert').textContent='조회 실패: '+String(err.message||err)+'. 기존 화면 값을 새 종가로 간주하지 마세요.';}
- finally{el('reload').disabled=false;}
+  var res=await fetch('./quotes.json?nocache='+Date.now(),{cache:'no-store'});
+  if(!res.ok)throw Error('HTTP '+res.status);
+  var data=await res.json();
+  if(!Array.isArray(data.items))throw Error('잘못된 자료 형식');
+  var next={};data.items.forEach(function(x){if(FUNDS.some(function(f){return f.id===x.id;}))next[x.id]=x;});
+  if(!FUNDS.every(function(f){return !!next[f.id];}))throw Error('일부 종목 자료가 누락됐습니다');
+  var newSignature=JSON.stringify(FUNDS.map(function(f){
+   var x=next[f.id];return [x.ok,x.date,x.close,x.low20,x.high20,x.rangeStart,x.rangeEnd];
+  }));
+  byId=next;
+  loadTime=data.fetchedAt||null;
+  var first=oldSignature===null,priceChanged=!first&&newSignature!==oldSignature,collectionChanged=!first&&loadTime!==oldFetchedAt;
+  dataSignature=newSignature;
+  var count=FUNDS.filter(function(f){return has20(q(f.id))&&!stale(q(f.id));}).length;
+  var lastDates=FUNDS.map(function(f){return q(f.id);}).filter(has20).map(function(x){return x.date;}).sort();
+  var lastDay=lastDates.length?day(lastDates[lastDates.length-1]):'미확인';
+  var checkedTime=new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  var fetchedTime=loadTime?new Date(loadTime).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'수집 시각 미확인';
+  var changeText=first?'앱에서 처음 자료를 확인했습니다.':priceChanged?'종가 또는 20거래일 자료가 변경됐습니다.':collectionChanged?'새로 수집된 자료를 확인했으나 종가와 20거래일 범위는 동일합니다.':'변경된 게시 자료가 없습니다. 이전에 확인한 종가와 동일합니다.';
+  el('signal').textContent=count+'/6 유효';
+  el('updated').textContent='마지막 자동 수집: '+fetchedTime+' · 최신 일봉: '+lastDay;
+  el('checked').textContent='화면 확인 완료: '+checkedTime+' · '+(priceChanged?'새 가격 반영':collectionChanged?'재수집 확인':'새 가격 없음');
+  el('alert').textContent=changeText+' 확인한 시각은 '+checkedTime+'입니다. 이 버튼은 저장된 자료를 재확인하며 실시간 조회가 아닙니다. '+(6-count)+'종목이 미확인/오래된 자료 상태입니다. 주문 전 키움증권 시세를 대조하세요.';
+  render();
+ }catch(err){
+  el('signal').textContent='자료 확인 실패';
+  el('checked').textContent='마지막 재확인 실패: '+new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'});
+  el('alert').textContent='갱신 실패: '+String(err.message||err)+'. 표시 중인 기존 자료를 최신 종가로 간주하지 마세요.';
+ }finally{button.disabled=false;button.textContent='↻ 자료 확인';}
 }
 FUNDS.forEach(function(f){var o=document.createElement('option');o.value=f.id;o.textContent=f.name;el('selection').appendChild(o);});
 el('selection').value=selected;el('selection').onchange=function(){selected=this.value;render();};
