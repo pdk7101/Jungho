@@ -34,7 +34,6 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add data/metric-history.json
             git commit -m "data: capture ETF market-cap and NAV snapshot"
-            git pull --rebase origin main
             git push origin HEAD:main || echo "Warning: historic metric snapshot push failed; retry on next run"
           fi
       - name: Prepare static site
