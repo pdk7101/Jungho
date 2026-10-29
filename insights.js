@@ -54,6 +54,11 @@ function signalsFor(id,bars,rules,hold){
   const a=stateAt(bars,i-1,id,rules,h),b=stateAt(bars,i,id,rules,h);
   if(!a||!b)continue;
   const d=b.date;
+  const dailyMove=(b.close/a.close-1)*100;
+  if(Math.abs(dailyMove)>=4){
+   results.push(event(id,d,dailyMove<0?'risk':'normal','일일 종가 '+(dailyMove>0?'급등':'급락')+' '+pct(dailyMove),
+    money(a.close)+' → '+money(b.close)+' · 단기 변동 주의'));
+  }
   if(['robot','space','sol'].includes(id)&&a.cap!==b.cap){
    results.push(event(id,d,b.cap?'risk':'opportunity',b.cap?'매수 상한 신규 초과':'매수 상한 이내 재진입',money(a.close)+' → '+money(b.close)));
   }
@@ -98,6 +103,16 @@ function metricSignals(){
    const low=Number(x.tradingValueKRW)<5e7,was=Number(old.tradingValueKRW)<5e7;
    if(low!==was)out.push(event(x.id,x.date,low?'risk':'normal',low?'거래대금 5천만원 미만':'거래대금 5천만원 이상 회복','해당 거래일 비공식 거래대금'));
   }
+  if(num(old.marketCapKRW)>0&&num(x.marketCapKRW)>0){
+   const changed=(Number(x.marketCapKRW)/Number(old.marketCapKRW)-1)*100;
+   if(Math.abs(changed)>=5)out.push(event(x.id,x.date,'normal','시가총액 1거래일 큰 변동 '+pct(changed),
+      'ETF 시가총액의 변화일 뿐 실제 순유입·환매 확정 신호 아님'));
+  }
+  if(num(old.nav)>0&&num(x.nav)>0){
+   const changed=(Number(x.nav)/Number(old.nav)-1)*100;
+   if(Math.abs(changed)>=4)out.push(event(x.id,x.date,changed<0?'risk':'normal','NAV 1거래일 큰 변동 '+pct(changed),
+      '분배락·시장변동 확인 필요 · NAV 변화만으로 분배금 포함 수익률 판단 금지'));
+  }
   if(x.shares5&&Number.isFinite(x.shares5.value)){
    const drop=x.shares5.value<=-10;
    if(drop)out.push(event(x.id,x.date,'risk','추정 좌수 5거래일 -10% 이상',pct(x.shares5.value)+' · 실제 설정·환매 확인 필요'));
@@ -110,6 +125,17 @@ function allSignals(){
  const r=vars(),h=holdings(),out=[];
  for(const x of quotes.items)if(x.ok&&Array.isArray(x.bars))out.push(...signalsFor(x.id,x.bars,r,h));
  out.push(...metricSignals());
+ const distNote=getSaved('isa-sol-dist-edit-v1');
+ const latestDate=quotes.items.filter(x=>x.ok).map(x=>x.date).sort().at(-1);
+ if(distNote&&distNote.date===latestDate&&distNote.month&&num(distNote.amount)!==null){
+  const comp=distEntries.slice().sort((a,b)=>b.month.localeCompare(a.month));
+  const curr=comp.find(x=>x.month===distNote.month),prior=comp.filter(x=>x.month<distNote.month)[0];
+  if(curr&&prior&&prior.amount>0){
+   const changed=(curr.amount/prior.amount-1)*100;
+   out.push(event('sol',latestDate,changed<=-10?'risk':'normal','확인 입력한 분배금 '+pct(changed),
+     curr.month+' '+money(curr.amount)+'/주 · '+prior.month+' 대비 · 수동 입력 기록'));
+  }
+ }
  return out.sort((a,b)=>b.date.localeCompare(a.date)||({risk:0,opportunity:1,normal:2}[a.level]-{risk:0,opportunity:1,normal:2}[b.level]));
 }
 function alertLabel(s){
@@ -234,7 +260,10 @@ function mount(){
   const old=distEntries.find(r=>r.month===month);
   if(old)old.amount=amount,old.source='직접 입력';
   else distEntries.push({month,amount,source:'직접 입력'});
-  distEntries.sort((a,b)=>a.month.localeCompare(b.month));saveDists();updateSol();updateAlerts();
+  distEntries.sort((a,b)=>a.month.localeCompare(b.month));saveDists();
+  const latestDate=quotes?.items?.filter(x=>x.ok).map(x=>x.date).sort().at(-1);
+  writeSaved('isa-sol-dist-edit-v1',{date:latestDate,month,amount});
+  updateSol();updateAlerts();
   $('sol-msg').textContent='해당 기기에 분배금 기록을 저장했습니다. 공식 공시와 금액을 대조하세요.';
  };
  $('sol-sim-shares').onchange=function(){
