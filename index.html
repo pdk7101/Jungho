@@ -32,117 +32,247 @@ svg{display:block;width:100%;height:105px}.long{height:auto}
 #alert{background:#23334c;border-radius:10px;padding:10px;font-size:.82rem;margin:10px 0}
 footer{font-size:.77rem;color:#a8b5ce;line-height:1.5;margin-top:16px}
 @media(max-width:560px){.funds{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}header{align-items:flex-start}}
+
+details>summary{cursor:pointer;font-weight:700;line-height:1.5}
+details[open]>summary{margin-bottom:12px}
+.pos-row{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr) minmax(0,1fr);gap:9px;align-items:end;padding:10px 0;border-bottom:1px solid #35435a}
+.pos-row:last-child{border-bottom:0}
+.pos-name{font-size:.84rem;font-weight:650;line-height:1.4}
+.pos-sub{font-size:.73rem;color:#98aac6}
+.pos-row label{margin-bottom:0}
+.pos-row input{font-size:.88rem;padding:9px}
+.band-tag{display:inline-block;border:1px solid #546984;border-radius:6px;padding:2px 6px;font-size:.74rem;margin:4px 5px 2px 0;color:#b8d0ff}
+.band20{border-color:#467ca8;color:#81c7ff}
+.avg-down{color:#78b0ff}.avg-up{color:#f4b6ba}
+.notice-block{background:#121f34;border-left:3px solid #7c92b8;padding:10px 12px;border-radius:7px;font-size:.84rem;line-height:1.5;margin:10px 0}
+.small-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.fieldset-note{font-size:.78rem;color:#b7c5da;line-height:1.55}
+#summary{line-height:1.6}
+.card-detail{font-size:.77rem;color:#abbdd7;margin-top:5px}
+@media(max-width:560px){.pos-row{grid-template-columns:1fr 1fr}.pos-name{grid-column:1/-1}}
+
 </style></head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel flex"><div><b>마지막 게시 시세 확인</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div></div><button id="reload">↻ 자료 확인</button></section>
 <div id="alert">공식 확정 종가가 아닌 공개 일봉 자료를 확인합니다. 검증 실패 시 미확인으로 표시합니다.</div>
-<div class="legend"><span class="state-stop"><b>●</b> 매수 중단</span><span class="state-buy"><b>●</b> 적립 유지·매수 검토</span><span class="state-wait"><b>●</b> 돌파 확인 대기·감시</span></div>
+<div class="legend"><span class="state-stop"><b>●</b> 매수 중단 · 상한 초과</span><span class="state-buy"><b>●</b> 정기 적립 · 분할매수 검토</span><span class="state-wait"><b>●</b> 대기 · 감시 · 자료 미확인</span></div>
+<section class="panel" id="summary"><b>오늘의 매수계획 점검</b><p class="sub">게시된 일봉으로 계산한 계획이며 실제 주문을 실행하지 않습니다.</p><div id="plan">시세 확인 중</div></section>
 <section id="funds" class="funds"></section>
-<section class="detail" id="detail"><h2>종목별 차트 · 종가·5일선·20일선</h2><select id="selection"></select><div id="details"></div></section>
-<section class="panel"><h2>매수 기준</h2><div class="grid">
-<label>AI&로봇 상한 (원)<input id="robotCap" type="number" value="9500"></label>
-<label>우주항공 상한 (원)<input id="spaceCap" type="number" value="9700"></label>
-<label>SOL 상한 (원)<input id="solCap" type="number" value="10000"></label>
-<label>200TR 감시기준 (원)<input id="trBase" type="number" value="31150"></label>
-</div><label>20거래일 박스권 하단 관심 비율 <b id="ratioLabel">30%</b><input type="range" id="ratio" min="15" max="50" value="30" step="5"></label><p class="sub">리츠는 기본 매 거래일 1주, 로봇과 우주항공이 둘 다 상한을 초과해 빨간색 중단일 때만 3주입니다. 회색 대기는 중단으로 간주하지 않습니다. 5일선이 20일선을 상향 교차하면 골든크로스, 하향 교차하면 데드크로스입니다. 로봇·우주항공·SOL은 상한 이내, 종가 20일선 위 2일 유지와 5일선 우위를 추세 확인 조건으로 사용합니다. 리츠와 SOFR은 단기 이평선 이탈만으로 정기 적립을 중단하지 않습니다. 200TR은 기존 -5% 감시를 우선합니다.</p></section>
-<footer><b>가격 정확성 안내</b><p>제공처: 네이버 금융 일봉(비공식). 한국거래소 공식 확정 종가와 다를 수 있습니다. 실제 주문 전 키움증권에서 종가를 대조하세요. 갱신 버튼은 마지막 자동 수집·게시된 자료를 다시 읽습니다. 눌러도 새 일봉 수집 작업이 시작되지는 않으며 실시간 거래소 조회가 아닙니다. 데이터가 없거나 오래되면 매수 신호를 표시하지 않습니다. 자동주문은 지원하지 않습니다.</p></footer>
+<section class="detail" id="detail">
+  <h2>종목별 차트 · 종가 / 5일선 / 20일선</h2>
+  <select id="selection"></select>
+  <div id="details"></div>
+</section>
+<section class="panel">
+  <details id="posDetails">
+    <summary>내 보유 평단가 · 수량 입력 <span class="pill">기기 안에만 저장</span></summary>
+    <p class="fieldset-note">키움 ISA의 매입가(평단가)와 보유수량을 입력하세요. 입력값은 이 브라우저에만 저장되고 공개 GitHub에는 전송되지 않습니다. 휴대전화·태블릿 간에는 자동 동기화되지 않으며, 보유량이 변하면 갱신해야 합니다. 미보유는 수량 0으로 적고 평단은 비워두세요.</p>
+    <div id="positions"></div>
+    <p id="positionMessage" class="fieldset-note">평단가를 입력하면 박스권 30%·20% 매수 기회와 예상 매수 후 평단가를 볼 수 있습니다.</p>
+  </details>
+</section>
+<section class="panel">
+ <h2>가격 상한 · 하루 예산</h2>
+ <div class="grid">
+  <label>AI&로봇 상한 (원)<input id="robotCap" type="number" min="1" step="1" value="9500"></label>
+  <label>우주항공 상한 (원)<input id="spaceCap" type="number" min="1" step="1" value="9700"></label>
+  <label>SOL 상한 (원)<input id="solCap" type="number" min="1" step="1" value="10000"></label>
+  <label>KODEX 200TR 감시 기준 (원)<input id="trBase" type="number" min="1" step="1" value="31150"></label>
+ </div>
+ <label>하루 투자 가능 예산 (원 · 선택)<input id="dailyBudget" type="number" min="0" step="1000" placeholder="입력 시 추천 수량 예산 초과 확인"></label>
+ <div class="notice-block">**박스권 하단 30%**는 저가 관심, **하단 20%**는 더 낮은 저가 우선 검토구간입니다. 평단가보다 낮더라도 하락 추세가 지속될 수 있으며, 매수 상한과 예산 조건을 우선합니다.</div>
+ <p class="fieldset-note">리츠는 기본 매 거래일 1주, 로봇과 우주항공 모두 빨간색 매수 중단일 때만 3주입니다. SOFR은 기존 정기 적립 유지(수량은 사용자가 직접 결정). 200TR은 31,150원 대비 -5% 감시 우선. SOL은 로봇·우주항공 중 하나 이상 상한 초과 시 대체 1주 검토. 이동평균은 모두 참고하지만 저가 구간의 평단 인하 기회를 별도로 계산합니다.</p>
+</section>
+<footer><b>가격 정확성 안내</b><p>제공처: 네이버 금융 일봉(비공식). 한국거래소 공식 확정 종가와 다를 수 있습니다. 실제 주문 전 키움증권에서 종가를 대조하세요. 갱신 버튼은 마지막 자동 수집·게시된 자료를 다시 읽습니다. 눌러도 새 일봉 수집 작업이 시작되지는 않으며 실시간 거래소 조회가 아닙니다. 시세가 오래되거나 계산값이 부족하면 매수 판단을 보류합니다. 평단가와 보유수량은 해당 브라우저의 로컬 저장소에만 기록됩니다. 표시는 참고용이며 자동주문은 지원하지 않습니다.</p></footer>
 </main>
 <script>
 (function(){
 'use strict';
 var FUNDS=[
-{id:'reit',name:'TIGER 리츠부동산인프라',code:'329200',plan:'기본 1주 · 로봇·우주항공 모두 매수 중단 시 3주'},
-{id:'robot',name:'RISE AI&로봇',code:'469070',plan:'상한 이내 매일 최대 1주'},
-{id:'space',name:'1Q 미국우주항공테크',code:'0131V0',plan:'상한 이내 매일 최대 1주'},
-{id:'sofr',name:'KODEX 미국달러SOFR',code:'455030',plan:'기존 적립'},
-{id:'tr',name:'KODEX 200TR',code:'278530',plan:'-5% 하락 감시'},
+{id:'reit',name:'TIGER 리츠부동산인프라',code:'329200',plan:'기본 1주 / 두 종목 모두 중단 시 3주'},
+{id:'robot',name:'RISE AI&로봇',code:'469070',plan:'9,500원 상한 · 소액 분할 검토'},
+{id:'space',name:'1Q 미국우주항공테크',code:'0131V0',plan:'9,700원 상한 · 소액 분할 검토'},
+{id:'sofr',name:'KODEX 미국달러SOFR',code:'455030',plan:'기존 정기 적립 유지'},
+{id:'tr',name:'KODEX 200TR',code:'278530',plan:'기준가 대비 -5% 감시'},
 {id:'sol',name:'SOL 200타겟위클리커버드콜',code:'0167B0',plan:'대체매수 최대 1주'}
 ];
-var settings={robotCap:9500,spaceCap:9700,solCap:10000,trBase:31150,ratio:30};
-try{var saved=JSON.parse(localStorage.getItem('isa-rules')||'{}');Object.keys(settings).forEach(function(k){if(saved[k]!=null&&isFinite(Number(saved[k])))settings[k]=Number(saved[k]);});}catch(e){}
-var byId={},selected='sol',manual={},loadTime=null,dataSignature=null;
+var defaults={robotCap:9500,spaceCap:9700,solCap:10000,trBase:31150,dailyBudget:''},settings=Object.assign({},defaults);
+var positions={},byId={},selected='reit',manual={},loadTime=null,dataSignature=null;
 var el=function(x){return document.getElementById(x);};
-var money=function(n){return Number(n).toLocaleString('ko-KR')+'원';};
 var valid=function(n){return n!==null&&n!==undefined&&String(n).trim()!==''&&Number.isFinite(Number(n))&&Number(n)>0;};
+var qtyValid=function(n){return Number.isInteger(Number(n))&&Number(n)>=0&&String(n).trim()!=='';};
+var money=function(n){return Number(n).toLocaleString('ko-KR',{maximumFractionDigits:0})+'원';};
+var avgMoney=function(n){return Number(n).toLocaleString('ko-KR',{maximumFractionDigits:2})+'원';};
 var day=function(s){return /^\d{8}$/.test(String(s))?s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8):'미확인';};
 var round5=function(n){return Math.floor(n/5)*5;};
-var safe=function(s){return String(s||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
-var has20=function(x){return x&&x.ok&&Array.isArray(x.bars)&&x.bars.length>=40&&x.trend&&valid(x.trend.ma5)&&valid(x.trend.previousMa5)&&valid(x.trend.ma20)&&valid(x.trend.previousMa20)&&valid(x.low20)&&valid(x.high20)&&Number(x.high20)>Number(x.low20)&&valid(x.close)&&/^\d{8}$/.test(x.date);};
-var stale=function(x){if(!has20(x))return true;var d=new Date(x.date.slice(0,4)+'-'+x.date.slice(4,6)+'-'+x.date.slice(6,8)+'T00:00:00Z');return !isFinite(d.getTime())||(Date.now()-d.getTime()>12*86400000);};
-var q=function(id){return byId[id];};
-var price=function(id){return valid(manual[id])?Number(manual[id]):q(id).close;};
-var capStop=function(id){var c=Number(settings[id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap']);return has20(q(id))&&!stale(q(id))&&valid(c)&&Number(price(id))>c;};
-function trendView(x){
- if(!has20(x))return {title:'5·20일선 미확인',detail:'40거래일 검증 필요',tone:'wait'};
- var t=x.trend,up=Number(x.close)>Number(t.ma20);
- if(t.goldenCross)return {title:'골든크로스 발생',detail:'5일선이 20일선을 위로 교차 · 안착 확인 필요',tone:'good'};
- if(t.deadCross)return {title:'데드크로스 발생',detail:'5일선이 20일선을 아래로 교차 · 경계',tone:'warn'};
- if(t.crossUp)return {title:'종가 20일선 상향 돌파',detail:'돌파 첫날 · 추가 유지 확인',tone:'wait'};
- if(t.crossDown)return {title:'종가 20일선 재이탈',detail:'20일선 아래로 재이탈',tone:'warn'};
- if(t.twoDaysAbove&&t.maRising&&t.ma5Above20)return {title:'5·20일선 추세 확인',detail:'종가 20일선 위 2일 유지 · 5일선 우위',tone:'good'};
- if(t.twoDaysAbove)return {title:'20일선 위 · 추가 확인',detail:'5일선 우위 또는 20일선 방향 미확인',tone:'wait'};
- if(!up)return {title:'20일선 아래 · 대기',detail:'20일선 회복 미확인',tone:'wait'};
- return {title:'20일선 상단 첫날 · 대기',detail:'추가 안착 확인',tone:'wait'};
+var safe=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+function readLocal(key){try{return JSON.parse(localStorage.getItem(key)||'null')}catch(e){return null}}
+function persist(){try{localStorage.setItem('isa-rules',JSON.stringify(settings));localStorage.setItem('isa-private-positions-v1',JSON.stringify(positions));}catch(e){el('positionMessage').textContent='기기 저장소를 사용할 수 없습니다. 새로고침 시 입력이 사라질 수 있습니다.';}}
+var saved=readLocal('isa-rules');if(saved){Object.keys(defaults).forEach(function(k){if(saved[k]!==undefined){if(k==='dailyBudget')settings[k]=valid(saved[k])?Number(saved[k]):'';else if(valid(saved[k]))settings[k]=Number(saved[k]);}});}
+var savedPositions=readLocal('isa-private-positions-v1');if(savedPositions&&typeof savedPositions==='object')FUNDS.forEach(function(f){var v=savedPositions[f.id];if(v&&qtyValid(v.qty)){positions[f.id]={qty:Number(v.qty),avg:valid(v.avg)?Number(v.avg):''};}});
+function hasBars(x){return !!(x&&x.ok&&Array.isArray(x.bars)&&x.bars.length>=40&&x.trend&&valid(x.trend.ma5)&&valid(x.trend.previousMa5)&&valid(x.trend.ma20)&&valid(x.trend.previousMa20)&&valid(x.low20)&&valid(x.high20)&&Number(x.high20)>Number(x.low20)&&valid(x.close)&&/^\d{8}$/.test(x.date));}
+function stale(x){if(!hasBars(x))return true;var d=new Date(x.date.slice(0,4)+'-'+x.date.slice(4,6)+'-'+x.date.slice(6,8)+'T00:00:00Z');return !isFinite(d.getTime())||(Date.now()-d.getTime()>12*86400000);}
+function current(x,id){return valid(manual[id])?Number(manual[id]):Number(x.close);}
+function verified(id){return !!(hasBars(byId[id])&&!stale(byId[id]));}
+function capStop(id){
+ var cap=settings[id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap'];
+ return verified(id)&&valid(cap)&&current(byId[id],id)>cap;
 }
 function reitCount(){return capStop('robot')&&capStop('space')?3:1;}
+function band(x,p){
+ var lo=Number(x.low20),hi=Number(x.high20);
+ var b30=round5(lo+(hi-lo)*0.30),b20=round5(lo+(hi-lo)*0.20);
+ return {b20:b20,b30:b30,name:p<=b20?'하단 20%':p<=b30?'하단 30%':'일반 가격대',low:p<=b30};
+}
+function trend(x){
+ var t=x.trend;
+ if(t.goldenCross)return '골든크로스 발생 · 5일선이 20일선을 상향 교차';
+ if(t.deadCross)return '데드크로스 발생 · 5일선이 20일선을 하향 교차';
+ if(t.crossUp)return '20일선 위로 첫 돌파 · 안착 확인 필요';
+ if(t.crossDown)return '20일선 아래 재이탈 · 주의';
+ if(t.twoDaysAbove&&t.maRising&&t.ma5Above20)return '5·20일선 추세 확인 · 20일선 위 2거래일 유지';
+ if(t.twoDaysAbove)return '20일선 위 유지 · 5일선/20일선 방향 확인';
+ if(Number(x.close)<Number(t.ma20))return '20일선 아래 · 하락 위험 점검';
+ return '20일선 위 · 추가 유지 확인';
+}
+function holding(id,p){
+ var h=positions[id];if(!h||!qtyValid(h.qty)||!valid(h.avg)||Number(h.qty)<=0)return null;
+ var avg=Number(h.avg),qty=Number(h.qty);
+ return {avg:avg,qty:qty,discount:(p/avg-1)*100,canLower:p<avg};
+}
+function projected(id,p,buyQty){
+ var h=holding(id,p);if(!h||!Number.isInteger(buyQty)||buyQty<=0)return null;
+ var next=(h.avg*h.qty+p*buyQty)/(h.qty+buyQty);
+ return {next:next,lower:h.avg-next,lowerPct:(1-next/h.avg)*100,total:buyQty*p};
+}
 function verdict(f){
- var x=q(f.id);
- if(!has20(x))return {type:'wait',title:'가격·20일선 미확인',info:'정확한 40거래일 일봉과 20일 이동평균이 확인되지 않아 매수 신호를 보류합니다.'};
- if(stale(x))return {type:'wait',title:'자료 오래됨',info:'마지막 일봉 '+day(x.date)+' · 현재 가격 대조 필요. 오래된 자료로 매수 판단하지 않습니다.'};
- var p=Number(price(f.id)),t=x.trend,tv=trendView(x);
- var manualNote=valid(manual[f.id])?' (직접 입력 가격은 상한 비교에만 사용, 이동평균선은 저장된 일봉 기준)':'';
- var band=round5(Number(x.low20)+(Number(x.high20)-Number(x.low20))*settings.ratio/100);
- if(['robot','space','sol'].includes(f.id)){
-  var limit=settings[f.id==='robot'?'robotCap':f.id==='space'?'spaceCap':'solCap'];
-  if(!valid(limit))return {type:'wait',title:'상한 미설정',info:'매수 상한을 입력하세요.'};
-  if(p>limit)return {type:'stop',title:'매수 중단',info:'기존 매수 상한 '+money(limit)+' 초과. 20일선 돌파 여부와 무관하게 추격매수를 중단합니다.'+manualNote};
+ var id=f.id,x=byId[id];
+ if(!hasBars(x))return {type:'wait',title:'가격·이평선 미확인',info:'40거래일 실제 일봉이 부족합니다. 가격을 추정하지 않습니다.',qty:0};
+ if(stale(x))return {type:'wait',title:'오래된 시세 · 확인',info:'마지막 일봉 '+day(x.date)+'. 주문 전 최신 종가를 확인하세요.',qty:0};
+ var p=current(x,id),t=x.trend,b=band(x,p),h=holding(id,p);
+ var goodTrend=!!(t.twoDaysAbove&&t.maRising&&t.ma5Above20);
+ var decline=Number(x.close)<Number(t.ma20)||!t.maRising;
+ if(['robot','space','sol'].includes(id)){
+  var cap=settings[id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap'];
+  if(!valid(cap))return {type:'wait',title:'상한 미설정',info:'먼저 상한을 입력하세요.',qty:0};
+  if(p>cap)return {type:'stop',title:'매수 중단',info:'기존 매수 상한 '+money(cap)+' 초과. 박스권 저가 여부와 관계없이 추격매수 중단.',qty:0};
  }
- if(f.id==='reit'||f.id==='sofr'){
-  var plan=f.id==='reit'?('기본 1주, 로봇·우주항공 모두 상한 초과 시 3주. 현재 제안 수량: '+reitCount()+'주.'):'기존 SOFR 정기 적립 유지.';
-  var note=(t.twoDaysAbove&&t.maRising&&t.ma5Above20)?'5·20일선 추세는 우호적입니다.':'5·20일선 상태는 '+tv.title+'입니다. 정기 적립은 유지하되 확대는 신중히 판단하세요.';
-  return {type:'buy',title:f.id==='reit'?('리츠 '+reitCount()+'주 검토'):'정기 적립 유지',info:plan+' '+note+' '+(f.id==='sofr'?'SOFR은 금리형 ETF이므로 단순 기술적 신호의 중요도가 상대적으로 낮습니다.':'리츠의 배당·금리·가격 변동성도 함께 점검하세요.')+manualNote};
+ if(id==='reit'){
+  var n=reitCount(),reason=n===3?'로봇·우주항공 모두 상한 초과로 3주 검토.':'기본 적립 1주 유지.';
+  return {type:'buy',title:'리츠 '+n+'주 적립 검토',qty:n,info:reason+' 5·20일선은 참고하며 이탈만으로 적립을 중단하지 않습니다.'+(decline?' 단, 약세에서 추가적인 확대는 주의.':'')};
  }
- if(f.id==='tr'){
-  if(!valid(settings.trBase))return {type:'wait',title:'기준가 미입력',info:'200TR 하락 감시 기준을 입력하세요.'};
-  var target=round5(settings.trBase*.95);
-  return p<=target?{type:'wait',title:'매수 조건 검토',info:'-5% 기준 '+money(target)+' 도달. '+tv.title+' · 기존 주문 체결 여부와 하락 원인 확인.'+manualNote}:{type:'wait',title:'하락 감시',info:'1차 감시 '+money(target)+' 이하를 우선. 20일선 참고: '+tv.title+'.'+manualNote};
+ if(id==='sofr')return {type:'buy',title:'정기 적립 유지',qty:0,info:'기존 SOFR 정기 적립을 유지합니다. 5·20일선과 평단가는 참고만 하며, 자동 추천 수량은 정하지 않습니다.'};
+ if(id==='tr'){
+  var target=round5(Number(settings.trBase)*.95);
+  if(!valid(settings.trBase))return {type:'wait',title:'감시 기준 미입력',info:'기준가를 입력해야 -5% 감시가격을 계산할 수 있습니다.',qty:0};
+  return p<=target?{type:'wait',title:'-5% 도달 · 검토',info:'감시가격 '+money(target)+' 이하입니다. 기존 주문 체결 여부 및 급락 원인 확인. 5·20일선: '+trend(x),qty:0}:{type:'wait',title:'-5% 하락 감시',info:'감시가격 '+money(target)+' 이하에 도달했는지 확인. 5·20일선: '+trend(x),qty:0};
  }
- if(p<Number(x.low20))return {type:'wait',title:'저점 이탈 · 관찰',info:'20거래일 최저가보다 낮은 입력 가격입니다. 급락 원인을 먼저 확인하세요.'+manualNote};
- var confirmed=!!(t.twoDaysAbove&&t.maRising&&t.ma5Above20);
- if(f.id==='sol'){
-  if(!(capStop('robot')||capStop('space')))return {type:'wait',title:'대체매수 대기',info:'로봇·우주항공 매수 상한 초과가 없으므로 SOL 대체매수는 기다립니다. 20일선: '+tv.title+'.'+manualNote};
-  if(!confirmed)return {type:'wait',title:'20일선 확인 대기',info:'SOL 대체매수 조건은 있으나 '+tv.title+'입니다. 20일선 위 2거래일 유지와 5일선 우위 확인 후 최대 1주 검토.'+manualNote};
-  return {type:'buy',title:'대체 1주 검토',info:'로봇 또는 우주항공 상한 초과 + SOL 20일선 상단 2일 유지 + 5일선 우위. 하루 최대 1주, 예산과 분배금 지속성 확인.'+manualNote};
+ if(id==='sol'&&!capStop('robot')&&!capStop('space'))return {type:'wait',title:'대체매수 대기',info:'로봇·우주항공의 상한 초과가 없어 SOL 대체매수는 대기합니다.',qty:0};
+ if(valid(manual[id]))return {type:'wait',title:'수동 가격 · 재확인',info:'직접 입력 가격으로 상한과 박스권은 비교할 수 있지만 5·20일선은 이전 종가이므로 신규매수 결정 전 다시 확인하세요.',qty:0};
+ if(h&&h.canLower&&b.low){
+  var at20=p<=b.b20;
+  return {type:'buy',title:at20?'평단인하 저가 우선 검토':'평단인하 분할 검토',
+  info:b.name+'이며 내 평단 '+avgMoney(h.avg)+'보다 낮아 평단을 낮출 수 있습니다. '+(decline?'20일선 아래/약세 가능성: 첫 매수는 소액으로 제한하고 추가 하락 가능성을 확인.':'5·20일선 추세도 확인.')+' 매수 상한·예산 우선.',qty:1};
  }
- if(!confirmed)return {type:'wait',title:t.crossUp?'돌파 첫날 · 대기':'20일선 확인 대기',info:'상한 이내이지만 '+tv.title+'입니다. 2거래일 상단 유지와 5일·20일선 방향을 확인하세요.'+(p<=band?' 현재는 20일 박스권 하단 저가 관심구간입니다.':'')+manualNote};
- return {type:'buy',title:'추세 확인 · 매수 유지',info:'상한 이내 + 20일선 위 2거래일 유지 + 5일선이 20일선 위 + 20일선 상승·횡보. 계획된 1주 범위에서 매수 검토.'+manualNote};
+ if(id==='sol'&&b.low){
+  return {type:'buy',title:'저가 대체 1주 검토',info:b.name+'이며 로봇·우주항공 상한 초과로 SOL 대체매수를 소액 검토합니다. '+(decline?'하락 추세 위험 및 분배금 지속 여부 점검.':'추세도 함께 점검.')+' 하루 최대 1주.',qty:1};
+ }
+ if(goodTrend){
+  return {type:'buy',title:'추세 전환 매수 검토',info:'종가 20일선 위 2일 유지, 5일선 우위, 20일선 상승·횡보. '+(h&&!h.canLower?'현재가가 평단보다 높아 평균단가는 오를 수 있습니다. ':'')+'기존 상한·예산 안에서 최대 1주 검토.',qty:1};
+ }
+ if(b.low&&!h)return {type:'wait',title:'저가 관심 · 평단 입력',info:b.name+'입니다. 평단가를 입력하면 실제 평단 인하 효과를 확인할 수 있습니다. 5·20일선: '+trend(x),qty:0};
+ return {type:'wait',title:b.low?'저가·추세 확인 대기':'추세/가격 조건 대기',info:(h&&!h.canLower?'현재가가 평단보다 높아 평단 인하가 되지 않습니다. ':'')+b.name+' · '+trend(x)+'. 30%·20% 가격대가 아니더라도 상승 전환 시 재검토.',qty:0};
 }
 function chart(bars){
  var last=bars.slice(-20),all=last.map(function(x){return Number(x.close);});
- var ma20s=last.map(function(x,i){var w=bars.slice(i+1,i+21);return w.reduce(function(s,b){return s+Number(b.close);},0)/20;});
- var ma5s=last.map(function(x,i){var w=bars.slice(i+16,i+21);return w.reduce(function(s,b){return s+Number(b.close);},0)/5;});
+ var ma20s=last.map(function(x,i){return bars.slice(i+1,i+21).reduce(function(s,b){return s+Number(b.close);},0)/20;});
+ var ma5s=last.map(function(x,i){return bars.slice(i+16,i+21).reduce(function(s,b){return s+Number(b.close);},0)/5;});
  var lo=Math.min.apply(null,all.concat(ma5s,ma20s)),hi=Math.max.apply(null,all.concat(ma5s,ma20s)),diff=Math.max(1,hi-lo);
  var plot=function(values){return values.map(function(v,i){return (12+i*276/(values.length-1)).toFixed(1)+','+(83-68*(v-lo)/diff).toFixed(1);}).join(' ');};
- return '<svg viewBox="0 0 300 100" aria-label="최근 20거래일 종가 파랑, 5일 이동평균 초록, 20일 이동평균 노랑"><line x1="12" y1="83" x2="288" y2="83" stroke="#52627a"/><polyline points="'+plot(all)+'" fill="none" stroke="#60a5fa" stroke-width="2.8"/><polyline points="'+plot(ma5s)+'" fill="none" stroke="#24bf9a" stroke-width="2.3"/><polyline points="'+plot(ma20s)+'" fill="none" stroke="#eab308" stroke-width="2.3"/></svg>';
+ return '<svg viewBox="0 0 300 100" aria-label="20거래일 종가 파랑, 5일선 초록, 20일선 노랑"><line x1="12" y1="83" x2="288" y2="83" stroke="#52627a"/><polyline points="'+plot(all)+'" fill="none" stroke="#60a5fa" stroke-width="2.8"/><polyline points="'+plot(ma5s)+'" fill="none" stroke="#24bf9a" stroke-width="2.3"/><polyline points="'+plot(ma20s)+'" fill="none" stroke="#eab308" stroke-width="2.3"/></svg>';
+}
+function renderPositions(){
+ var place=el('positions');
+ place.innerHTML=FUNDS.map(function(f){
+  var h=positions[f.id]||{},avg=valid(h.avg)?h.avg:'',qty=qtyValid(h.qty)?h.qty:'';
+  return '<div class="pos-row"><div class="pos-name">'+safe(f.name)+'<div class="pos-sub">'+f.code+'</div></div><label>평단가 (원)<input data-pos="'+f.id+'" data-kind="avg" type="number" min="0" step="0.01" placeholder="평균매수가" value="'+avg+'"></label><label>보유 수량 (주)<input data-pos="'+f.id+'" data-kind="qty" type="number" min="0" step="1" placeholder="수량" value="'+qty+'"></label></div>';
+ }).join('');
+ Array.from(place.querySelectorAll('input')).forEach(function(input){
+  input.addEventListener('change',function(){
+   var id=this.dataset.pos,kind=this.dataset.kind;
+   var h=positions[id]||{avg:'',qty:''},v=this.value.trim();
+   if(kind==='avg')h.avg=valid(v)?Number(v):'';
+   else h.qty=qtyValid(v)?Number(v):'';
+   positions[id]=h;persist();render();
+   el('positionMessage').textContent='이 기기에 보유 정보가 저장됐습니다. 실제 체결 후 평단가·수량을 다시 입력하세요.';
+  });
+ });
+}
+function renderPlan(){
+ var vals=FUNDS.map(function(f){return {f:f,x:byId[f.id],v:verdict(f)};});
+ var total=0,pieces=[],unavailable=false;
+ vals.forEach(function(item){
+  if(item.v.type==='buy'&&item.v.qty>0){
+   if(verified(item.f.id)){
+    var cost=current(item.x,item.f.id)*item.v.qty;
+    total+=cost;pieces.push(safe(item.f.name)+' '+item.v.qty+'주 ('+money(cost)+')');
+   }else unavailable=true;
+  }
+ });
+ var reit=vals.find(function(x){return x.f.id==='reit';});
+ var sol=vals.find(function(x){return x.f.id==='sol';});
+ var clash=!!(reit.v.type==='buy'&&reit.v.qty===3&&sol.v.type==='buy'&&sol.v.qty===1);
+ var budget=valid(settings.dailyBudget)?Number(settings.dailyBudget):null;
+ var message='<p><b>현재 매수 검토:</b> '+(pieces.length?pieces.join(' · '):'조건을 충족한 수량 확인 없음')+'</p>';
+ message+='<p><b>검토 수량 예상 비용:</b> '+(unavailable?'일부 가격 미확인 · ':'')+money(total)+' <small>(SOFR 정기 적립, 200TR 조건부 주문은 제외)</small></p>';
+ if(budget!==null)message+='<p class="'+(total>budget?'error':'good')+'"><b>입력 예산:</b> '+money(budget)+' · '+(total>budget?'예상 비용이 예산을 초과합니다. 수량 조정 필요.':'현재 계산한 검토 비용은 예산 이내입니다.')+'</p>';
+ else message+='<p class="sub">하루 예산이 미입력입니다. 주문 전 기존 SOFR 적립액과 미체결 주문까지 합산해 확인하세요.</p>';
+ if(clash)message+='<p class="error"><b>예산 중복 가능성:</b> 리츠 3주와 SOL 1주가 동시에 검토됩니다. 같은 대체매수 여유자금을 중복 사용하지 마세요.</p>';
+ el('plan').innerHTML=message;
 }
 function render(){
- var list=el('funds');list.innerHTML=FUNDS.map(function(f){
- var x=q(f.id),v=verdict(f),tv=trendView(x),close=has20(x)?money(price(f.id)):'미확인',date=has20(x)?day(x.date):'조회 불가';
- return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+f.name+'</div><small>'+f.code+' · '+f.plan+'</small><strong>'+close+'</strong><small>일봉 기준 '+date+'</small><div class="status state-'+v.type+'">'+v.title+'</div><div class="trendline">5·20일선 · '+safe(tv.title)+'</div></div>';
+ renderPlan();
+ var list=el('funds');
+ list.innerHTML=FUNDS.map(function(f){
+  var x=byId[f.id],v=verdict(f),p=hasBars(x)?current(x,f.id):null,h=p?holding(f.id,p):null,b=hasBars(x)?band(x,p):null;
+  var tag=b?'<span class="band-tag '+(b.name==='하단 20%'?'band20':'')+'">'+b.name+'</span>':'';
+  var avgText=h?'<div class="card-detail '+(h.canLower?'avg-down':'avg-up')+'">평단 '+avgMoney(h.avg)+' 대비 '+(h.discount>=0?'+':'')+h.discount.toFixed(2)+'%</div>':'<div class="card-detail">평단가 미입력 / 미보유</div>';
+  return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+safe(f.plan)+'</small><strong>'+(p?money(p):'미확인')+'</strong><small>일봉 '+(hasBars(x)?day(x.date):'확인 불가')+'</small>'+avgText+tag+'<div class="status state-'+v.type+'">'+safe(v.title)+'</div><div class="trendline">'+(hasBars(x)?safe(trend(x)):'5·20일선 계산 불가')+'</div></div>';
  }).join('');
- Array.from(list.querySelectorAll('[data-id]')).forEach(function(node){node.onclick=function(){selected=node.dataset.id;render();};node.onkeydown=function(ev){if(ev.key==='Enter'){selected=node.dataset.id;render();}};});
- var f=FUNDS.find(function(x){return x.id===selected;}),x=q(f.id),v=verdict(f),d=el('details');
- if(!has20(x)){d.innerHTML='<p class="sub">이 종목은 최신 20개 일봉이 미확인입니다. 가격을 추정하지 않습니다.</p>';return;}
- var low=Number(x.low20),high=Number(x.high20),px=Number(price(f.id)),target=round5(low+(high-low)*settings.ratio/100);
- var pos=Math.max(0,Math.min(100,(px-low)/(high-low)*100)),t=x.trend,tv=trendView(x),ma20=Number(t.ma20),ma5=Number(t.ma5),diffPct=(Number(x.close)/ma20-1)*100,volumeRatio=valid(t.avgVolume20)&&t.avgVolume20>0&&valid(t.volumeToday)?(t.volumeToday/t.avgVolume20).toFixed(2)+'배':'미확인';
- var extra=f.id==='tr'?'<p>-5% 감시가격: <b>'+money(round5(settings.trBase*.95))+'</b></p>':'';
- d.innerHTML='<div class="divider"></div><div class="flex"><strong>'+money(px)+'</strong><span class="status state-'+v.type+'">'+safe(v.title)+'</span></div><p class="sub">일봉 '+day(x.date)+' · 20거래일 '+day(x.rangeStart)+'~'+day(x.rangeEnd)+'</p>'+chart(x.bars)+
- '<div class="leg20"><span><i class="legend-dot" style="background:#60a5fa"></i>종가</span><span><i class="legend-dot" style="background:#24bf9a"></i>5일 이동평균선</span><span><i class="legend-dot" style="background:#eab308"></i>20일 이동평균선</span></div>'+
- '<p class="context">5일선 <b>'+money(Math.round(ma5))+'</b> · 20일선 <b>'+money(Math.round(ma20))+'</b> · 종가-20일선 <b>'+(diffPct>=0?'+':'')+diffPct.toFixed(2)+'%</b></p>'+
- '<p class="context">5일선 방향: '+(t.ma5Rising?'상승·횡보':'하락')+' · 20일선 방향: '+(t.maRising?'상승·횡보':'하락')+'</p>'+
- '<p class="context">교차·추세: <b>'+safe(tv.title)+'</b> · 거래량 (전 20일 평균 대비): '+volumeRatio+'</p>'+'<div class="range"><span class="low" style="width:'+settings.ratio+'%"></span><span class="point" style="left:'+pos+'%"></span></div>'+
- '<div class="metrics"><div><small>20일 최저가</small><strong>'+money(low)+'</strong></div><div><small>20일 최고가</small><strong>'+money(high)+'</strong></div><div><small>하단 '+settings.ratio+'% 관심가</small><strong>'+money(target)+'</strong></div></div>'+
- '<p>'+safe(v.info)+'</p>'+extra+'<div class="divider"></div><label>키움 확인 가격 직접 비교 (선택)<input type="number" id="manual" min="1" placeholder="직접 입력하면 판단 갱신" value="'+(manual[f.id]||'')+'"></label><p class="sub">직접 입력값은 현재 화면의 판단에만 사용되며, 수집된 일봉 데이터는 변경하지 않습니다.</p>';
+ Array.from(list.querySelectorAll('[data-id]')).forEach(function(node){
+  node.onclick=function(){selected=node.dataset.id;el('selection').value=selected;render();};
+  node.onkeydown=function(ev){if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selected=node.dataset.id;el('selection').value=selected;render();}};
+ });
+ var f=FUNDS.find(function(x){return x.id===selected;}),x=byId[f.id],v=verdict(f),d=el('details');
+ if(!hasBars(x)){d.innerHTML='<p class="sub">정확한 일봉이 확인되지 않아 이동평균과 평단 인하 효과를 계산하지 않습니다.</p>';return;}
+ var p=current(x,f.id),b=band(x,p),h=holding(f.id,p);
+ var t=x.trend,low=Number(x.low20),high=Number(x.high20);
+ var pos=Math.max(0,Math.min(100,(p-low)/(high-low)*100));
+ var ratio=(Number(x.close)/Number(t.ma20)-1)*100;
+ var projectedQty=v.qty>0?v.qty:1,proposal=projected(f.id,p,projectedQty);
+ var costText='';
+ if(h){
+  costText='<p class="'+(h.canLower?'avg-down':'avg-up')+'">보유 '+h.qty+'주 · 평단 '+avgMoney(h.avg)+' · 현재가 대비 '+(h.discount>=0?'+':'')+h.discount.toFixed(2)+'%</p>';
+  if(proposal){
+   costText+='<p>현재가에 '+projectedQty+'주 추가 시 추정 평단: <b>'+avgMoney(proposal.next)+'</b> ('+(proposal.lower>=0?'인하 ':'상승 ')+avgMoney(Math.abs(proposal.lower))+') · 예상 매수금액 '+money(proposal.total)+'</p>';
+  }
+  if(f.id==='reit'){
+   var p1=projected(f.id,p,1),p3=projected(f.id,p,3);
+   if(p1&&p3)costText+='<p>리츠 1주 매수 후: <b>'+avgMoney(p1.next)+'</b> / 3주 매수 후: <b>'+avgMoney(p3.next)+'</b></p>';
+  }
+ }else costText='<p class="sub">보유 평단가와 수량을 입력하면 평단 인하 여부 및 예상 매수 후 평단을 계산합니다. 수량 0이면 미보유로 처리합니다.</p>';
+ var vol=valid(t.avgVolume20)&&t.avgVolume20>0&&Number.isFinite(t.volumeToday)?(t.volumeToday/t.avgVolume20).toFixed(2)+'배':'미확인';
+ d.innerHTML='<div class="divider"></div><div class="flex"><strong>'+money(p)+'</strong><span class="status state-'+v.type+'">'+safe(v.title)+'</span></div>'+
+ '<p class="sub">일봉 '+day(x.date)+' · 20거래일 '+day(x.rangeStart)+'~'+day(x.rangeEnd)+'</p>'+
+ chart(x.bars)+
+ '<div class="leg20"><span><i class="legend-dot" style="background:#60a5fa"></i>종가</span><span><i class="legend-dot" style="background:#24bf9a"></i>5일선</span><span><i class="legend-dot" style="background:#eab308"></i>20일선</span></div>'+
+ '<div class="metrics"><div><small>20거래일 저가</small><strong>'+money(low)+'</strong></div><div><small>20거래일 고가</small><strong>'+money(high)+'</strong></div><div><small>하단 30% 기준</small><strong>'+money(b.b30)+'</strong></div><div><small>하단 20% 기준</small><strong>'+money(b.b20)+'</strong></div><div><small>5일 이동평균</small><strong>'+avgMoney(t.ma5)+'</strong></div><div><small>20일 이동평균</small><strong>'+avgMoney(t.ma20)+'</strong></div></div>'+
+ '<p class="context">현재 '+safe(b.name)+' · 종가와 20일선 차이 '+(ratio>=0?'+':'')+ratio.toFixed(2)+'% · 거래량(이전 20일 평균 대비) '+vol+'</p>'+
+ '<p class="context"><b>이동평균 해석:</b> '+safe(trend(x))+' · 5일선 '+(t.ma5Rising?'상승·횡보':'하락')+' / 20일선 '+(t.maRising?'상승·횡보':'하락')+'</p>'+
+ '<div class="range"><span class="low" style="width:30%"></span><span class="point" style="left:'+pos+'%"></span></div>'+
+ '<div class="notice-block">'+safe(v.info)+'</div>'+costText+
+ '<div class="divider"></div><label>키움 확인 가격 직접 입력 (선택)<input type="number" id="manual" min="1" step="1" placeholder="입력하면 참고 계산, 5·20일선은 기존 종가" value="'+(valid(manual[f.id])?manual[f.id]:'')+'"></label>'+
+ '<p class="fieldset-note">수동 가격은 5·20일선 계산을 바꾸지 않습니다. 수동 가격 입력 시 신규 매수 신호는 보수적으로 대기 처리합니다.</p>';
  el('manual').onchange=function(ev){if(valid(ev.target.value))manual[f.id]=Number(ev.target.value);else delete manual[f.id];render();};
 }
 async function refresh(){
@@ -151,38 +281,34 @@ async function refresh(){
  try{
   var res=await fetch('./quotes.json?nocache='+Date.now(),{cache:'no-store'});
   if(!res.ok)throw Error('HTTP '+res.status);
-  var data=await res.json();
-  if(!Array.isArray(data.items))throw Error('잘못된 자료 형식');
+  var data=await res.json();if(!Array.isArray(data.items))throw Error('잘못된 자료 형식');
   var next={};data.items.forEach(function(x){if(FUNDS.some(function(f){return f.id===x.id;}))next[x.id]=x;});
-  if(!FUNDS.every(function(f){return !!next[f.id];}))throw Error('일부 종목 자료가 누락됐습니다');
-  var newSignature=JSON.stringify(FUNDS.map(function(f){
-   var x=next[f.id];return [x.ok,x.date,x.close,x.low20,x.high20,x.rangeStart,x.rangeEnd,x.trend&&x.trend.ma5,x.trend&&x.trend.previousMa5,x.trend&&x.trend.ma20,x.trend&&x.trend.previousMa20,x.trend&&x.trend.twoDaysAbove];
-  }));
-  byId=next;
-  loadTime=data.fetchedAt||null;
+  if(!FUNDS.every(function(f){return !!next[f.id];}))throw Error('일부 종목 데이터 누락');
+  var newSignature=JSON.stringify(FUNDS.map(function(f){var x=next[f.id];return [x.ok,x.date,x.close,x.low20,x.high20,x.trend&&x.trend.ma5,x.trend&&x.trend.ma20];}));
+  byId=next;loadTime=data.fetchedAt||null;
   var first=oldSignature===null,priceChanged=!first&&newSignature!==oldSignature,collectionChanged=!first&&loadTime!==oldFetchedAt;
   dataSignature=newSignature;
-  var count=FUNDS.filter(function(f){return has20(q(f.id))&&!stale(q(f.id));}).length;
-  var lastDates=FUNDS.map(function(f){return q(f.id);}).filter(has20).map(function(x){return x.date;}).sort();
+  var count=FUNDS.filter(function(f){return verified(f.id);}).length;
+  var lastDates=FUNDS.map(function(f){return byId[f.id];}).filter(hasBars).map(function(x){return x.date;}).sort();
   var lastDay=lastDates.length?day(lastDates[lastDates.length-1]):'미확인';
-  var checkedTime=new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  var fetchedTime=loadTime?new Date(loadTime).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'수집 시각 미확인';
-  var changeText=first?'앱에서 처음 자료를 확인했습니다.':priceChanged?'종가 또는 20거래일 자료가 변경됐습니다.':collectionChanged?'새로 수집된 자료를 확인했으나 종가와 20거래일 범위는 동일합니다.':'변경된 게시 자료가 없습니다. 이전에 확인한 종가와 동일합니다.';
+  var checkedTime=new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour12:false});
+  var fetchedTime=loadTime?new Date(loadTime).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour12:false}):'미확인';
   el('signal').textContent=count+'/6 유효';
   el('updated').textContent='마지막 자동 수집: '+fetchedTime+' · 최신 일봉: '+lastDay;
-  el('checked').textContent='화면 확인 완료: '+checkedTime+' · '+(priceChanged?'새 가격 반영':collectionChanged?'재수집 확인':'새 가격 없음');
-  el('alert').textContent=changeText+' 확인한 시각은 '+checkedTime+'입니다. 이 버튼은 저장된 자료를 재확인하며 실시간 조회가 아닙니다. '+(6-count)+'종목이 미확인/오래된 자료 상태입니다. 주문 전 키움증권 시세를 대조하세요.';
-  render();
+  el('checked').textContent='화면 확인: '+checkedTime+' · '+(priceChanged?'새 가격 반영':collectionChanged?'재수집 확인':'새 가격 없음');
+  el('alert').textContent=(first?'최초 게시 자료 확인.':priceChanged?'새로운 일봉 자료를 반영했습니다.':collectionChanged?'자료 수집 시각만 바뀌고 종가·이평선은 동일합니다.':'게시된 종가·이평선은 이전 확인과 동일합니다.')+' 시세 재확인은 실시간 조회가 아닙니다. '+(6-count)+'종목이 미확인/오래된 상태입니다. 실제 주문 전 키움증권과 대조하세요.';
+  manual={};render();
  }catch(err){
   el('signal').textContent='자료 확인 실패';
-  el('checked').textContent='마지막 재확인 실패: '+new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'});
-  el('alert').textContent='갱신 실패: '+String(err.message||err)+'. 표시 중인 기존 자료를 최신 종가로 간주하지 마세요.';
+  el('checked').textContent='화면 확인 실패: '+new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'});
+  el('alert').textContent='조회 실패: '+String(err.message||err)+'. 기존 게시 자료를 최신 종가로 간주하지 마세요.';
  }finally{button.disabled=false;button.textContent='↻ 자료 확인';}
 }
 FUNDS.forEach(function(f){var o=document.createElement('option');o.value=f.id;o.textContent=f.name;el('selection').appendChild(o);});
 el('selection').value=selected;el('selection').onchange=function(){selected=this.value;render();};
-['robotCap','spaceCap','solCap','trBase','ratio'].forEach(function(k){el(k).value=settings[k];el(k).oninput=function(){settings[k]=Number(this.value)||0;el('ratioLabel').textContent=settings.ratio+'%';try{localStorage.setItem('isa-rules',JSON.stringify(settings));}catch(e){}render();};});
-el('ratioLabel').textContent=settings.ratio+'%';
-el('reload').onclick=refresh;refresh();
+Object.keys(defaults).forEach(function(k){el(k).value=settings[k];el(k).onchange=function(){var v=this.value.trim();settings[k]=k==='dailyBudget'?(valid(v)?Number(v):''):(valid(v)?Number(v):defaults[k]);persist();render();};});
+renderPositions();
+el('reload').onclick=refresh;
+refresh();
 })();
 </script></body></html>
