@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101827">
+<title>ISA ETF 6종목 매수판단</title>
+<style>
+:root{font-family:system-ui,-apple-system,'Noto Sans KR',sans-serif;color-scheme:dark;background:#0e1627;color:#eaf0fb}
+*{box-sizing:border-box}body{margin:0;padding:0}main{max-width:900px;margin:auto;padding:20px 13px 60px}
+h1{font-size:1.55rem;margin:4px 0}h2{font-size:1.05rem;margin:0 0 12px}p{margin:6px 0;line-height:1.5}
+small,.sub{font-size:.81rem;color:#a8b5ce}.pill{border-radius:999px;padding:5px 10px;font-size:.77rem;background:#20304a}
+header,.flex{display:flex;justify-content:space-between;align-items:center;gap:12px}
+header{margin-bottom:16px}button{border:0;border-radius:11px;background:#2563eb;color:white;padding:12px 14px;font-weight:700;font-size:.95rem;cursor:pointer}
+button:disabled{opacity:.5}.outline{background:#273650}.panel,.fund,.detail{background:#19253a;border:1px solid #35435a;border-radius:15px;padding:15px;margin-bottom:12px}
+#updated{font-size:.82rem;color:#b5c3d8;margin-top:5px}#notice{font-size:.82rem;color:#b7c9e0;margin:10px 0 14px}
+.error{color:#fda4af!important}.good{color:#73a9ff!important}.wait{color:#bbc5d6!important}
+.legend{font-size:.82rem;display:flex;gap:14px;margin-bottom:13px;flex-wrap:wrap}
+.legend b{font-size:1rem}.funds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.fund{margin:0;padding:13px;cursor:pointer}
+.fund.selected{outline:2px solid #709dff}.fund strong{display:block;font-size:1.05rem;margin:6px 0}.title{font-size:.89rem;font-weight:700}
+.status{display:inline-block;font-size:.85rem;font-weight:800;margin-top:5px}
+.state-stop{color:#ff697b}.state-buy{color:#70a7ff}.state-wait{color:#acb7c9}
+.detail{margin-top:15px}select,input{width:100%;background:#101b2e;color:#fff;border:1px solid #596a85;border-radius:10px;padding:11px;font-size:1rem;min-width:0}
+label{font-size:.82rem;color:#b9c6db;display:block;margin-bottom:8px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.metrics div{padding:10px;background:#101b2e;border-radius:10px}
+.metrics small{display:block;font-size:.71rem}.metrics strong{font-size:.98rem}
+svg{display:block;width:100%;height:105px}.long{height:auto}
+.divider{height:1px;background:#35435a;margin:14px 0}
+.range{height:10px;border-radius:6px;background:#556176;position:relative;margin:16px 4px}
+.range .low{background:#0ea37f;height:100%;position:absolute;left:0;border-radius:6px}
+.range .point{height:24px;width:4px;background:#60a5fa;position:absolute;top:-7px}
+#alert{background:#23334c;border-radius:10px;padding:10px;font-size:.82rem;margin:10px 0}
+footer{font-size:.77rem;color:#a8b5ce;line-height:1.5;margin-top:16px}
+@media(max-width:560px){.funds{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}header{align-items:flex-start}}
+</style></head><body><main>
+<header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">같은 주소에서 가격과 판단만 갱신</div></div><span class="pill" id="signal">조회 전</span></header>
+<section class="panel flex"><div><b>종가·20거래일 갱신</b><div id="updated">마지막 게시 데이터 확인 중</div></div><button id="reload">↻ 갱신</button></section>
+<div id="alert">공식 확정 종가가 아닌 공개 일봉 자료를 확인합니다. 검증 실패 시 미확인으로 표시합니다.</div>
+<div class="legend"><span class="state-stop"><b>●</b> 매수 중단</span><span class="state-buy"><b>●</b> 매수 유지</span><span class="state-wait"><b>●</b> 대기·미확인</span></div>
+<section id="funds" class="funds"></section>
+<section class="detail" id="detail"><h2>종목별 차트</h2><select id="selection"></select><div id="details"></div></section>
+<section class="panel"><h2>매수 기준</h2><div class="grid">
+<label>AI&로봇 상한 (원)<input id="robotCap" type="number" value="9500"></label>
+<label>우주항공 상한 (원)<input id="spaceCap" type="number" value="9700"></label>
+<label>SOL 상한 (원)<input id="solCap" type="number" value="10000"></label>
+<label>200TR 감시기준 (원)<input id="trBase" type="number" value="31150"></label>
+</div><label>20거래일 박스권 하단 관심 비율 <b id="ratioLabel">30%</b><input type="range" id="ratio" min="15" max="50" value="30" step="5"></label><p class="sub">리츠 매 거래일 3주, SOFR 기존 적립 유지. 로봇·우주항공이 상한 초과한 날 SOL을 하루 최대 1주 대체 검토합니다. 입력 설정은 기기별로 저장됩니다.</p></section>
+<footer><b>가격 정확성 안내</b><p>제공처: 네이버 금융 일봉(비공식). 한국거래소 공식 확정 종가와 다를 수 있습니다. 실제 주문 전 키움증권에서 종가를 대조하세요. 갱신 버튼은 마지막 자동 수집·게시된 자료를 다시 읽으며 실시간 거래소 조회가 아닙니다. 데이터가 없거나 오래되면 매수 신호를 표시하지 않습니다. 자동주문은 지원하지 않습니다.</p></footer>
+</main>
+<script>
+(function(){
+'use strict';
+var FUNDS=[
+{id:'reit',name:'TIGER 리츠부동산인프라',code:'329200',plan:'매 거래일 3주'},
+{id:'robot',name:'RISE AI&로봇',code:'469070',plan:'상한 이내 매일 최대 1주'},
+{id:'space',name:'1Q 미국우주항공테크',code:'0131V0',plan:'상한 이내 매일 최대 1주'},
+{id:'sofr',name:'KODEX 미국달러SOFR',code:'455030',plan:'기존 적립'},
+{id:'tr',name:'KODEX 200TR',code:'278530',plan:'-5% 하락 감시'},
+{id:'sol',name:'SOL 200타겟위클리커버드콜',code:'0167B0',plan:'대체매수 최대 1주'}
+];
+var settings={robotCap:9500,spaceCap:9700,solCap:10000,trBase:31150,ratio:30};
+try{var saved=JSON.parse(localStorage.getItem('isa-rules')||'{}');Object.keys(settings).forEach(function(k){if(saved[k]!=null&&isFinite(Number(saved[k])))settings[k]=Number(saved[k]);});}catch(e){}
+var byId={},selected='sol',manual={},loadTime=null;
+var el=function(x){return document.getElementById(x);};
+var money=function(n){return Number(n).toLocaleString('ko-KR')+'원';};
+var valid=function(n){return n!==null&&n!==undefined&&String(n).trim()!==''&&Number.isFinite(Number(n))&&Number(n)>0;};
+var day=function(s){return /^\d{8}$/.test(String(s))?s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8):'미확인';};
+var round5=function(n){return Math.floor(n/5)*5;};
+var safe=function(s){return String(s||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+var has20=function(x){return x&&x.ok&&Array.isArray(x.bars)&&x.bars.length===20&&valid(x.low20)&&valid(x.high20)&&Number(x.high20)>Number(x.low20)&&valid(x.close)&&/^\d{8}$/.test(x.date);};
+var stale=function(x){if(!has20(x))return true;var d=new Date(x.date.slice(0,4)+'-'+x.date.slice(4,6)+'-'+x.date.slice(6,8)+'T00:00:00Z');return !isFinite(d.getTime())||(Date.now()-d.getTime()>12*86400000);};
+var q=function(id){return byId[id];};
+var price=function(id){return valid(manual[id])?Number(manual[id]):q(id).close;};
+var capStop=function(id){var c=Number(settings[id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap']);return has20(q(id))&&!stale(q(id))&&valid(c)&&Number(price(id))>c;};
+function verdict(f){
+ var x=q(f.id);if(!has20(x))return {type:'wait',title:'가격 미확인',info:'실제 20거래일 고가·저가를 확인할 수 없습니다. 매수 신호 보류.'};
+ if(stale(x))return {type:'wait',title:'자료 오래됨',info:'마지막 일봉 '+day(x.date)+'. 최근 거래 여부 확인 필요.'};
+ var p=Number(price(f.id)),band=round5(Number(x.low20)+(Number(x.high20)-Number(x.low20))*settings.ratio/100);
+ if(['robot','space','sol'].includes(f.id)){
+  var limit=settings[f.id==='robot'?'robotCap':f.id==='space'?'spaceCap':'solCap'];
+  if(!valid(limit))return {type:'wait',title:'상한 미설정',info:'매수 상한을 입력하세요.'};
+  if(p>limit)return {type:'stop',title:'매수 중단',info:'매수 상한 '+money(limit)+' 초과. 상한을 자동 상향하지 않습니다.'};
+ }
+ if(f.id==='tr'){
+  if(!valid(settings.trBase))return {type:'wait',title:'기준가 미입력',info:'200TR 하락 감시 기준을 입력하세요.'};
+  var target=round5(settings.trBase*.95);
+  return p<=target?{type:'wait',title:'매수 조건 검토',info:'-5% 기준 '+money(target)+' 도달. 기존 체결 여부와 급락 원인 확인.'}:{type:'wait',title:'하락 감시',info:'-5% 목표가 '+money(target)+' 이하인지 확인.'};
+ }
+ if(p<Number(x.low20))return {type:'wait',title:'신저가 · 원인 점검',info:'20거래일 최저가 이탈. 추가매수 보류.'};
+ if(f.id==='sol')return (capStop('robot')||capStop('space'))?{type:'buy',title:'대체 1주 검토',info:'로봇/우주항공 상한 초과. 하루 최대 1주, 예산 확인.'}:{type:'wait',title:'대체매수 대기',info:'로봇/우주항공 상한 초과 시 SOL 1주 검토.'};
+ return {type:'buy',title:'매수 유지',info:f.plan+(p<=band?' · 박스권 저가 관심':' · 추가매수 추격 자제')};
+}
+function chart(bars){
+ var closes=bars.map(function(x){return Number(x.close);}),lo=Math.min.apply(null,closes),hi=Math.max.apply(null,closes),diff=Math.max(1,hi-lo);
+ var pts=closes.map(function(v,i){return (12+i*276/(closes.length-1)).toFixed(1)+','+(83-68*(v-lo)/diff).toFixed(1);}).join(' ');
+ return '<svg viewBox="0 0 300 100" aria-label="최근 20거래일 종가 꺾은선 그래프"><line x1="12" y1="83" x2="288" y2="83" stroke="#52627a"/><polyline points="'+pts+'" fill="none" stroke="#60a5fa" stroke-width="2.8"/></svg>';
+}
+function render(){
+ var list=el('funds');list.innerHTML=FUNDS.map(function(f){
+ var x=q(f.id),v=verdict(f),close=has20(x)?money(price(f.id)):'미확인',date=has20(x)?day(x.date):'조회 불가';
+ return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+f.name+'</div><small>'+f.code+' · '+f.plan+'</small><strong>'+close+'</strong><small>일봉 기준 '+date+'</small><div class="status state-'+v.type+'">'+v.title+'</div></div>';
+ }).join('');
+ Array.from(list.querySelectorAll('[data-id]')).forEach(function(node){node.onclick=function(){selected=node.dataset.id;render();};node.onkeydown=function(ev){if(ev.key==='Enter'){selected=node.dataset.id;render();}};});
+ var f=FUNDS.find(function(x){return x.id===selected;}),x=q(f.id),v=verdict(f),d=el('details');
+ if(!has20(x)){d.innerHTML='<p class="sub">이 종목은 최신 20개 일봉이 미확인입니다. 가격을 추정하지 않습니다.</p>';return;}
+ var low=Number(x.low20),high=Number(x.high20),px=Number(price(f.id)),target=round5(low+(high-low)*settings.ratio/100);
+ var pos=Math.max(0,Math.min(100,(px-low)/(high-low)*100));
+ var extra=f.id==='tr'?'<p>-5% 감시가격: <b>'+money(round5(settings.trBase*.95))+'</b></p>':'';
+ d.innerHTML='<div class="divider"></div><div class="flex"><strong>'+money(px)+'</strong><span class="status state-'+v.type+'">'+safe(v.title)+'</span></div><p class="sub">일봉 '+day(x.date)+' · 20거래일 '+day(x.rangeStart)+'~'+day(x.rangeEnd)+'</p>'+chart(x.bars)+
+ '<div class="range"><span class="low" style="width:'+settings.ratio+'%"></span><span class="point" style="left:'+pos+'%"></span></div>'+
+ '<div class="metrics"><div><small>20일 최저가</small><strong>'+money(low)+'</strong></div><div><small>20일 최고가</small><strong>'+money(high)+'</strong></div><div><small>하단 '+settings.ratio+'% 관심가</small><strong>'+money(target)+'</strong></div></div>'+
+ '<p>'+safe(v.info)+'</p>'+extra+'<div class="divider"></div><label>키움 확인 가격 직접 비교 (선택)<input type="number" id="manual" min="1" placeholder="직접 입력하면 판단 갱신" value="'+(manual[f.id]||'')+'"></label><p class="sub">직접 입력값은 현재 화면의 판단에만 사용되며, 수집된 일봉 데이터는 변경하지 않습니다.</p>';
+ el('manual').onchange=function(ev){if(valid(ev.target.value))manual[f.id]=Number(ev.target.value);else delete manual[f.id];render();};
+}
+async function refresh(){
+ el('reload').disabled=true;el('signal').textContent='갱신 중';
+ try{
+ var res=await fetch('./quotes.json?t='+Date.now(),{cache:'no-store'});if(!res.ok)throw Error('HTTP '+res.status);
+ var data=await res.json();if(!Array.isArray(data.items))throw Error('잘못된 자료 형식');
+ byId={};data.items.forEach(function(x){if(FUNDS.some(function(f){return f.id===x.id;}))byId[x.id]=x;});
+ manual={};loadTime=data.fetchedAt||null;
+ var count=FUNDS.filter(function(f){return has20(q(f.id))&&!stale(q(f.id));}).length;
+ el('signal').textContent=count+'/6 유효';el('updated').textContent='자료 수집: '+(loadTime?new Date(loadTime).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'아직 없음');
+ el('alert').textContent='저장된 최신 일봉 자료를 화면에 반영했습니다. '+(6-count)+'종목은 미확인/지연 상태입니다. 종가는 비공식 자료이므로 실제 주문 전 키움과 대조하세요.';
+ render();
+ }catch(err){el('signal').textContent='갱신 실패';el('alert').textContent='조회 실패: '+String(err.message||err)+'. 기존 화면 값을 새 종가로 간주하지 마세요.';}
+ finally{el('reload').disabled=false;}
+}
+FUNDS.forEach(function(f){var o=document.createElement('option');o.value=f.id;o.textContent=f.name;el('selection').appendChild(o);});
+el('selection').value=selected;el('selection').onchange=function(){selected=this.value;render();};
+['robotCap','spaceCap','solCap','trBase','ratio'].forEach(function(k){el(k).value=settings[k];el(k).oninput=function(){settings[k]=Number(this.value)||0;el('ratioLabel').textContent=settings.ratio+'%';try{localStorage.setItem('isa-rules',JSON.stringify(settings));}catch(e){}render();};});
+el('ratioLabel').textContent=settings.ratio+'%';
+el('reload').onclick=refresh;refresh();
+})();
+</script></body></html>
