@@ -29,6 +29,12 @@ async function getFund([id,code]){
   const avg=(a)=>a.reduce((sum,x)=>sum+x.close,0)/a.length;
   const ma20=avg(bars.slice(-20));
   const previousMa20=avg(bars.slice(-21,-1));
+  const ma5=avg(bars.slice(-5));
+  const previousMa5=avg(bars.slice(-6,-1));
+  const ma5Rising=ma5>=previousMa5;
+  const goldenCross=previousMa5<=previousMa20&&ma5>ma20;
+  const deadCross=previousMa5>=previousMa20&&ma5<ma20;
+  const ma5Above20=ma5>ma20;
   const day2Ma20=avg(bars.slice(-22,-2));
   const previousClose=bars[bars.length-2].close;
   const day2Close=bars[bars.length-3].close;
@@ -41,9 +47,9 @@ async function getFund([id,code]){
   const volumeToday=Number.isFinite(last20[19].volume)?last20[19].volume:null;
   const priorVolume=bars.slice(-21,-1).map(x=>x.volume);
   const avgVolume20=priorVolume.every(Number.isFinite)?priorVolume.reduce((a,b)=>a+b,0)/20:null;
-  if(!(close>0&&high20>low20&&low20>0&&ma20>0&&previousMa20>0))throw Error('가격·이동평균 검증 실패');
-  const trend={ma20,previousMa20,previousClose,day2Close,day2Ma20,crossUp,crossDown,twoDaysAbove,twoDaysBelow,twoDayUpBreakout,maRising,volumeToday,avgVolume20};
-  console.log(code,last20[19].date,close,'MA20',ma20.toFixed(1),'crossUp',crossUp,'twoDaysAbove',twoDaysAbove);
+  if(!(close>0&&high20>low20&&low20>0&&ma20>0&&previousMa20>0&&ma5>0&&previousMa5>0))throw Error('가격·이동평균 검증 실패');
+  const trend={ma5,previousMa5,ma5Rising,goldenCross,deadCross,ma5Above20,ma20,previousMa20,previousClose,day2Close,day2Ma20,crossUp,crossDown,twoDaysAbove,twoDaysBelow,twoDayUpBreakout,maRising,volumeToday,avgVolume20};
+  console.log(code,last20[19].date,close,'MA5',ma5.toFixed(1),'MA20',ma20.toFixed(1),'goldenCross',goldenCross,'twoDaysAbove',twoDaysAbove);
   return {id,code,ok:true,date:last20[19].date,close,low20,high20,rangeStart:last20[0].date,rangeEnd:last20[19].date,bars,trend};
  }catch(e){console.error(code,e.message);return {id,code,ok:false,error:'일봉 미확인: '+e.message,date:null,close:null,low20:null,high20:null,bars:[]};}
 }
