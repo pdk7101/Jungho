@@ -2,12 +2,14 @@ name: Free ISA ETF daily update and GitHub Pages deploy
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'data/metric-history.json'
   workflow_dispatch:
   schedule:
     - cron: '25 08 * * 1-5'
     - cron: '15 09 * * 1-5'
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 concurrency:
@@ -23,10 +25,22 @@ jobs:
           node-version: '22'
       - name: Obtain latest published daily bars (unofficial)
         run: node scripts/update-quotes.js
+      - name: Collect ETF market cap, NAV and trade metrics
+        run: node scripts/update-metrics.js
+      - name: Save dated ETF metric snapshots to repository
+        run: |
+          if ! git diff --quiet -- data/metric-history.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/metric-history.json
+            git commit -m "data: capture ETF market-cap and NAV snapshot"
+            git pull --rebase origin main
+            git push origin HEAD:main || echo "Warning: historic metric snapshot push failed; retry on next run"
+          fi
       - name: Prepare static site
         run: |
           mkdir -p site
-          cp index.html quotes.json site/
+          cp index.html quotes.json metrics.json site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
