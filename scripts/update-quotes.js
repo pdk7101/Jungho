@@ -10,10 +10,10 @@ function parse(raw){
  const matcher=/<item\s+data\s*=\s*["']([^"']+)["'][^>]*\/?>/gi;
  while((m=matcher.exec(raw))!==null){
    const parts=m[1].split('|');if(parts.length<5)continue;
-   const date=parts[0],O=Number(parts[1]),H=Number(parts[2]),L=Number(parts[3]),C=Number(parts[4]);
+   const date=parts[0],O=Number(parts[1]),H=Number(parts[2]),L=Number(parts[3]),C=Number(parts[4]),V=parts.length>=6?Number(parts[5]):NaN;
    if(!/^\d{8}$/.test(date)||![O,H,L,C].every(Number.isFinite)||Math.min(O,H,L,C)<=0||H<Math.max(O,C)||L>Math.min(O,C)||seen.has(date))continue;
    if(date>currentDay||(date===currentDay&&minute<16*60+30))continue;
-   seen.add(date);rows.push({date,open:O,high:H,low:L,close:C});
+   seen.add(date);rows.push({date,open:O,high:H,low:L,close:C,volume:Number.isFinite(V)&&V>=0?V:null});
  }
  return rows.sort((a,b)=>a.date.localeCompare(b.date));
 }
@@ -22,12 +22,29 @@ async function getFund([id,code]){
   const endpoint='https://fchart.stock.naver.com/sise.nhn?symbol='+encodeURIComponent(code)+'&timeframe=day&count=70&requestType=0';
   const resp=await fetch(endpoint,{headers:{Accept:'application/xml,text/xml,*/*','User-Agent':'Mozilla/5.0 (compatible; ISA-ETF-Watchlist/1.0)',Referer:'https://finance.naver.com/'},signal:AbortSignal.timeout(18000)});
   if(!resp.ok)throw Error('HTTP '+resp.status);
-  const rows=parse(await resp.text()),bars=rows.slice(-20);
-  if(bars.length!==20)throw Error('최근 일봉 20개 미달');
-  const close=bars[19].close,low20=Math.min(...bars.map(x=>x.low)),high20=Math.max(...bars.map(x=>x.high));
-  if(!(close>0&&high20>low20&&low20>0))throw Error('가격 검증 실패');
-  console.log(code,bars[19].date,close,low20,high20);
-  return {id,code,ok:true,date:bars[19].date,close,low20,high20,rangeStart:bars[0].date,rangeEnd:bars[19].date,bars};
+  const rows=parse(await resp.text()),bars=rows.slice(-40);
+  if(bars.length!==40)throw Error('20일선 계산을 위한 일봉 40개 미달');
+  const last20=bars.slice(-20);
+  const close=last20[19].close,low20=Math.min(...last20.map(x=>x.low)),high20=Math.max(...last20.map(x=>x.high));
+  const avg=(a)=>a.reduce((sum,x)=>sum+x.close,0)/a.length;
+  const ma20=avg(bars.slice(-20));
+  const previousMa20=avg(bars.slice(-21,-1));
+  const day2Ma20=avg(bars.slice(-22,-2));
+  const previousClose=bars[bars.length-2].close;
+  const day2Close=bars[bars.length-3].close;
+  const crossUp=previousClose<=previousMa20&&close>ma20;
+  const crossDown=previousClose>=previousMa20&&close<ma20;
+  const twoDaysAbove=previousClose>previousMa20&&close>ma20;
+  const twoDaysBelow=previousClose<previousMa20&&close<ma20;
+  const twoDayUpBreakout=day2Close<=day2Ma20&&previousClose>previousMa20&&close>ma20;
+  const maRising=ma20>=previousMa20;
+  const volumeToday=Number.isFinite(last20[19].volume)?last20[19].volume:null;
+  const priorVolume=bars.slice(-21,-1).map(x=>x.volume);
+  const avgVolume20=priorVolume.every(Number.isFinite)?priorVolume.reduce((a,b)=>a+b,0)/20:null;
+  if(!(close>0&&high20>low20&&low20>0&&ma20>0&&previousMa20>0))throw Error('가격·이동평균 검증 실패');
+  const trend={ma20,previousMa20,previousClose,day2Close,day2Ma20,crossUp,crossDown,twoDaysAbove,twoDaysBelow,twoDayUpBreakout,maRising,volumeToday,avgVolume20};
+  console.log(code,last20[19].date,close,'MA20',ma20.toFixed(1),'crossUp',crossUp,'twoDaysAbove',twoDaysAbove);
+  return {id,code,ok:true,date:last20[19].date,close,low20,high20,rangeStart:last20[0].date,rangeEnd:last20[19].date,bars,trend};
  }catch(e){console.error(code,e.message);return {id,code,ok:false,error:'일봉 미확인: '+e.message,date:null,close:null,low20:null,high20:null,bars:[]};}
 }
 const items=await Promise.all(funds.map(getFund));
