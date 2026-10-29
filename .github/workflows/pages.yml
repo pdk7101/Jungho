@@ -1,0 +1,36 @@
+name: Free ISA ETF daily update and GitHub Pages deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '25 08 * * 1-5'
+    - cron: '15 09 * * 1-5'
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Obtain latest published daily bars (unofficial)
+        run: node scripts/update-quotes.js
+      - name: Prepare static site
+        run: |
+          mkdir -p site
+          cp index.html quotes.json site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - name: Deploy to Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
