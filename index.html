@@ -58,6 +58,13 @@ details[open]>summary{margin-bottom:12px}
 <div class="legend"><span class="state-stop"><b>●</b> 매수 중단 · 상한 초과</span><span class="state-buy"><b>●</b> 정기 적립 · 분할매수 검토</span><span class="state-wait"><b>●</b> 대기 · 감시 · 자료 미확인</span></div>
 <section class="panel" id="summary"><b>오늘의 매수계획 점검</b><p class="sub">게시된 일봉으로 계산한 계획이며 실제 주문을 실행하지 않습니다.</p><div id="plan">시세 확인 중</div></section>
 <section id="funds" class="funds"></section>
+<section class="panel" id="etf-flow-panel">
+ <h2>ETF 규모 · 유동성 · NAV 보조지표</h2>
+ <p class="fieldset-note">시가총액은 순자산총액(AUM)과 다릅니다. 아래 '추정 AUM'과 '추정 좌수'는 비공식 시가총액 및 NAV를 이용한 근삿값입니다. 공식 발행좌수·정확한 AUM으로 오인하지 마세요. 단순 규모 증감은 순유입·순유출을 확정하지 못합니다.</p>
+ <div id="etf-flow-status" class="context">규모·NAV 데이터 확인 중</div>
+ <div id="etf-flow-list" class="funds"></div>
+ <p class="fieldset-note">5일·20일 증감은 이 앱이 저장한 실제 거래일별 스냅샷이 6개·21개 쌓인 후에만 표시합니다. 시장가격과 NAV의 기준 시점이 다를 수 있으며, 해외자산 ETF는 괴리율 해석에 특히 주의가 필요합니다. 괴리율·유동성 경고는 보조 확인 신호이며 기존 매수 상한과 수량을 자동 변경하지 않습니다.</p>
+</section>
 <section class="detail" id="detail">
   <h2>종목별 차트 · 종가 / 5일선 / 20일선</h2>
   <select id="selection"></select>
@@ -310,5 +317,56 @@ Object.keys(defaults).forEach(function(k){el(k).value=settings[k];el(k).onchange
 renderPositions();
 el('reload').onclick=refresh;
 refresh();
+})();
+</script><script>
+(function(){
+'use strict';
+var names={reit:'TIGER 리츠',robot:'RISE AI&로봇',space:'1Q 우주항공',sofr:'KODEX SOFR',tr:'KODEX 200TR',sol:'SOL 위클리커버드콜'};
+var fmt=function(n,d){return Number(n).toLocaleString('ko-KR',{minimumFractionDigits:d||0,maximumFractionDigits:d||0});};
+var valid=function(n){return n!==null&&n!==undefined&&Number.isFinite(Number(n))&&Number(n)>0;};
+function rate(c,label){
+ if(!c||typeof c.value!=='number'||!Number.isFinite(c.value))return '<span class="sub">'+label+' 자료 축적 중'+(c&&c.count?(' ('+c.count+'/'+(c.needed||'?')+'회)'):'')+'</span>';
+ return '<span class="'+(c.value<0?'error':'good')+'">'+label+' '+(c.value>=0?'+':'')+fmt(c.value,2)+'%</span>';
+}
+function formatKrw(n){if(!valid(n))return '미확인';return fmt(n/1e8,1)+'억원';}
+function show(data){
+ var status=document.getElementById('etf-flow-status'),list=document.getElementById('etf-flow-list');
+ if(!status||!list)return;
+ if(!data||!Array.isArray(data.items)){status.textContent='자료 형식 확인 실패';list.innerHTML='';return;}
+ var stamp=data.fetchedAt?new Date(data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'미확인';
+ status.textContent='비공식 ETF 목록 · 수집 '+stamp+' · '+(data.status==='ok'?'6종목 확인':data.status==='partial'?'일부 종목 자료 확인':'조회 실패 (기존 가격 판단과 별도)');
+ list.innerHTML=data.items.map(function(x){
+   var title=names[x.id]||x.code;
+   if(!x.ok)return '<div class="fund"><div class="title">'+title+'</div><p class="error">규모·NAV 확인 불가</p><p class="sub">'+String(x.reason||'수집 불가').replace(/[&<>]/g,'')+'</p></div>';
+   var alerts=[];
+   if(Number.isFinite(x.divergencePct)&&Math.abs(x.divergencePct)>=1.5)alerts.push('NAV 괴리율 1.5% 이상 · 기준시각 확인');
+   if(valid(x.tradingValueKRW)&&x.tradingValueKRW<50000000)alerts.push('거래대금 적음 · 호가·체결 확인');
+   if(x.shares5&&Number.isFinite(x.shares5.value)&&x.shares5.value<=-10)alerts.push('추정 좌수 5일 급감 · 실제 설정·환매 확인');
+   return '<div class="fund"><div class="title">'+title+' <span class="sub">'+x.code+'</span></div>'+
+    '<p><b>시가총액 '+fmt(x.marketCap100m)+'억원</b></p>'+
+    '<p class="card-detail">추정 순자산규모(AUM 대용): '+formatKrw(x.estimatedAUMKRW)+'</p>'+
+    '<p class="card-detail">추정 발행좌수: '+fmt(x.impliedShares)+'좌 · 공식 발행좌수 아님</p>'+
+    '<p class="card-detail">NAV: '+fmt(x.nav,2)+'원 / 괴리율(참고): <b class="'+(Math.abs(x.divergencePct)>=1.5?'error':'')+'">'+(x.divergencePct>=0?'+':'')+fmt(x.divergencePct,2)+'%</b></p>'+
+    '<p class="card-detail">거래량: '+(x.volume===null?'미확인':fmt(x.volume))+'좌 / 거래대금(비공식): '+formatKrw(x.tradingValueKRW)+'</p>'+
+    '<div class="divider"></div><p class="card-detail">시가총액: '+rate(x.cap5,'5거래일')+' · '+rate(x.cap20,'20거래일')+'</p>'+
+    '<p class="card-detail">추정 좌수: '+rate(x.shares5,'5거래일')+' · '+rate(x.shares20,'20거래일')+'</p>'+
+    (alerts.length?'<p class="error card-detail">'+alerts.join(' · ')+'</p>':'<p class="sub">추가 위험 경고 없음 (안전 보장 아님)</p>')+
+    '<p class="sub">기준 일봉: '+String(x.date||'미확인')+'</p></div>';
+ }).join('');
+}
+async function update(){
+ var status=document.getElementById('etf-flow-status');
+ if(status)status.textContent='ETF 규모·NAV 데이터 확인 중';
+ try{
+  var r=await fetch('./metrics.json?noCache='+Date.now(),{cache:'no-store'});
+  if(!r.ok)throw Error('HTTP '+r.status);
+  show(await r.json());
+ }catch(e){
+  if(status)status.textContent='ETF 규모·NAV 정보 확인 실패: '+String(e.message||e);
+ }
+}
+var reload=document.getElementById('reload');
+if(reload)reload.addEventListener('click',update);
+update();
 })();
 </script></body></html>
