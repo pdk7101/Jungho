@@ -33,25 +33,25 @@ svg{display:block;width:100%;height:105px}.long{height:auto}
 footer{font-size:.77rem;color:#a8b5ce;line-height:1.5;margin-top:16px}
 @media(max-width:560px){.funds{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}header{align-items:flex-start}}
 </style></head><body><main>
-<header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">20일 이동평균선·돌파 확인 · 같은 주소로 시세 확인</div></div><span class="pill" id="signal">조회 전</span></header>
+<header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel flex"><div><b>마지막 게시 시세 확인</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div></div><button id="reload">↻ 자료 확인</button></section>
 <div id="alert">공식 확정 종가가 아닌 공개 일봉 자료를 확인합니다. 검증 실패 시 미확인으로 표시합니다.</div>
 <div class="legend"><span class="state-stop"><b>●</b> 매수 중단</span><span class="state-buy"><b>●</b> 적립 유지·매수 검토</span><span class="state-wait"><b>●</b> 돌파 확인 대기·감시</span></div>
 <section id="funds" class="funds"></section>
-<section class="detail" id="detail"><h2>종목별 차트 · 종가와 20일선</h2><select id="selection"></select><div id="details"></div></section>
+<section class="detail" id="detail"><h2>종목별 차트 · 종가·5일선·20일선</h2><select id="selection"></select><div id="details"></div></section>
 <section class="panel"><h2>매수 기준</h2><div class="grid">
 <label>AI&로봇 상한 (원)<input id="robotCap" type="number" value="9500"></label>
 <label>우주항공 상한 (원)<input id="spaceCap" type="number" value="9700"></label>
 <label>SOL 상한 (원)<input id="solCap" type="number" value="10000"></label>
 <label>200TR 감시기준 (원)<input id="trBase" type="number" value="31150"></label>
-</div><label>20거래일 박스권 하단 관심 비율 <b id="ratioLabel">30%</b><input type="range" id="ratio" min="15" max="50" value="30" step="5"></label><p class="sub">20일선은 최근 20거래일 종가의 평균입니다. 2거래일 연속 상단 유지 + 20일선 상승·횡보를 추세 확인으로 봅니다. 로봇·우주항공·SOL은 매수 상한을 우선합니다. 리츠(매일 3주), SOFR(기존 정기 적립)은 20일선 이탈만으로 중단하지 않고 추가매수 확대를 경계합니다. 200TR은 -5% 감시를 우선합니다. 설정은 기기별로 저장됩니다.</p></section>
+</div><label>20거래일 박스권 하단 관심 비율 <b id="ratioLabel">30%</b><input type="range" id="ratio" min="15" max="50" value="30" step="5"></label><p class="sub">리츠는 기본 매 거래일 1주, 로봇과 우주항공이 둘 다 상한을 초과해 빨간색 중단일 때만 3주입니다. 회색 대기는 중단으로 간주하지 않습니다. 5일선이 20일선을 상향 교차하면 골든크로스, 하향 교차하면 데드크로스입니다. 로봇·우주항공·SOL은 상한 이내, 종가 20일선 위 2일 유지와 5일선 우위를 추세 확인 조건으로 사용합니다. 리츠와 SOFR은 단기 이평선 이탈만으로 정기 적립을 중단하지 않습니다. 200TR은 기존 -5% 감시를 우선합니다.</p></section>
 <footer><b>가격 정확성 안내</b><p>제공처: 네이버 금융 일봉(비공식). 한국거래소 공식 확정 종가와 다를 수 있습니다. 실제 주문 전 키움증권에서 종가를 대조하세요. 갱신 버튼은 마지막 자동 수집·게시된 자료를 다시 읽습니다. 눌러도 새 일봉 수집 작업이 시작되지는 않으며 실시간 거래소 조회가 아닙니다. 데이터가 없거나 오래되면 매수 신호를 표시하지 않습니다. 자동주문은 지원하지 않습니다.</p></footer>
 </main>
 <script>
 (function(){
 'use strict';
 var FUNDS=[
-{id:'reit',name:'TIGER 리츠부동산인프라',code:'329200',plan:'매 거래일 3주'},
+{id:'reit',name:'TIGER 리츠부동산인프라',code:'329200',plan:'기본 1주 · 로봇·우주항공 모두 매수 중단 시 3주'},
 {id:'robot',name:'RISE AI&로봇',code:'469070',plan:'상한 이내 매일 최대 1주'},
 {id:'space',name:'1Q 미국우주항공테크',code:'0131V0',plan:'상한 이내 매일 최대 1주'},
 {id:'sofr',name:'KODEX 미국달러SOFR',code:'455030',plan:'기존 적립'},
@@ -67,28 +67,30 @@ var valid=function(n){return n!==null&&n!==undefined&&String(n).trim()!==''&&Num
 var day=function(s){return /^\d{8}$/.test(String(s))?s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8):'미확인';};
 var round5=function(n){return Math.floor(n/5)*5;};
 var safe=function(s){return String(s||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
-var has20=function(x){return x&&x.ok&&Array.isArray(x.bars)&&x.bars.length>=40&&x.trend&&valid(x.trend.ma20)&&valid(x.trend.previousMa20)&&valid(x.low20)&&valid(x.high20)&&Number(x.high20)>Number(x.low20)&&valid(x.close)&&/^\d{8}$/.test(x.date);};
+var has20=function(x){return x&&x.ok&&Array.isArray(x.bars)&&x.bars.length>=40&&x.trend&&valid(x.trend.ma5)&&valid(x.trend.previousMa5)&&valid(x.trend.ma20)&&valid(x.trend.previousMa20)&&valid(x.low20)&&valid(x.high20)&&Number(x.high20)>Number(x.low20)&&valid(x.close)&&/^\d{8}$/.test(x.date);};
 var stale=function(x){if(!has20(x))return true;var d=new Date(x.date.slice(0,4)+'-'+x.date.slice(4,6)+'-'+x.date.slice(6,8)+'T00:00:00Z');return !isFinite(d.getTime())||(Date.now()-d.getTime()>12*86400000);};
 var q=function(id){return byId[id];};
 var price=function(id){return valid(manual[id])?Number(manual[id]):q(id).close;};
 var capStop=function(id){var c=Number(settings[id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap']);return has20(q(id))&&!stale(q(id))&&valid(c)&&Number(price(id))>c;};
 function trendView(x){
- if(!has20(x))return {title:'20일선 미확인',detail:'40거래일 일봉이 필요합니다.',tone:'wait'};
- var t=x.trend,up=Number(x.close)>Number(t.ma20),slope=t.maRising?'상승·횡보':'하락';
- if(t.twoDayUpBreakout&&t.maRising)return {title:'돌파 후 2일 유지',detail:'최근 20일선 상향 돌파 후 2거래일 유지, 이동평균 '+slope,tone:'good'};
- if(t.crossUp)return {title:'20일선 상향 돌파 첫날',detail:'첫날 돌파 · 다음 거래일 유지 여부 확인',tone:'wait'};
- if(t.crossDown)return {title:'20일선 아래 재이탈',detail:'당일 재이탈 · 추가매수 확대 주의',tone:'warn'};
- if(t.twoDaysAbove&&t.maRising)return {title:'20일선 위 2일 유지',detail:'20일선 상단에서 2거래일 이상 유지 · 평균선 '+slope,tone:'good'};
- if(t.twoDaysAbove)return {title:'20일선 위 · 평균선 하락',detail:'주가는 상단이나 20일선은 '+slope+' · 확인 대기',tone:'wait'};
- if(!up)return {title:'20일선 아래',detail:'상승 돌파 미확인 · 추세 약세 가능성',tone:'wait'};
- return {title:'20일선 위 첫날',detail:'상단 안착 여부는 다음 거래일 확인',tone:'wait'};
+ if(!has20(x))return {title:'5·20일선 미확인',detail:'40거래일 검증 필요',tone:'wait'};
+ var t=x.trend,up=Number(x.close)>Number(t.ma20);
+ if(t.goldenCross)return {title:'골든크로스 발생',detail:'5일선이 20일선을 위로 교차 · 안착 확인 필요',tone:'good'};
+ if(t.deadCross)return {title:'데드크로스 발생',detail:'5일선이 20일선을 아래로 교차 · 경계',tone:'warn'};
+ if(t.crossUp)return {title:'종가 20일선 상향 돌파',detail:'돌파 첫날 · 추가 유지 확인',tone:'wait'};
+ if(t.crossDown)return {title:'종가 20일선 재이탈',detail:'20일선 아래로 재이탈',tone:'warn'};
+ if(t.twoDaysAbove&&t.maRising&&t.ma5Above20)return {title:'5·20일선 추세 확인',detail:'종가 20일선 위 2일 유지 · 5일선 우위',tone:'good'};
+ if(t.twoDaysAbove)return {title:'20일선 위 · 추가 확인',detail:'5일선 우위 또는 20일선 방향 미확인',tone:'wait'};
+ if(!up)return {title:'20일선 아래 · 대기',detail:'20일선 회복 미확인',tone:'wait'};
+ return {title:'20일선 상단 첫날 · 대기',detail:'추가 안착 확인',tone:'wait'};
 }
+function reitCount(){return capStop('robot')&&capStop('space')?3:1;}
 function verdict(f){
  var x=q(f.id);
  if(!has20(x))return {type:'wait',title:'가격·20일선 미확인',info:'정확한 40거래일 일봉과 20일 이동평균이 확인되지 않아 매수 신호를 보류합니다.'};
  if(stale(x))return {type:'wait',title:'자료 오래됨',info:'마지막 일봉 '+day(x.date)+' · 현재 가격 대조 필요. 오래된 자료로 매수 판단하지 않습니다.'};
  var p=Number(price(f.id)),t=x.trend,tv=trendView(x);
- var manualNote=valid(manual[f.id])?' (직접 입력 가격은 상한 비교에만 사용, 20일선은 저장된 일봉 기준)':'';
+ var manualNote=valid(manual[f.id])?' (직접 입력 가격은 상한 비교에만 사용, 이동평균선은 저장된 일봉 기준)':'';
  var band=round5(Number(x.low20)+(Number(x.high20)-Number(x.low20))*settings.ratio/100);
  if(['robot','space','sol'].includes(f.id)){
   var limit=settings[f.id==='robot'?'robotCap':f.id==='space'?'spaceCap':'solCap'];
@@ -96,9 +98,9 @@ function verdict(f){
   if(p>limit)return {type:'stop',title:'매수 중단',info:'기존 매수 상한 '+money(limit)+' 초과. 20일선 돌파 여부와 무관하게 추격매수를 중단합니다.'+manualNote};
  }
  if(f.id==='reit'||f.id==='sofr'){
-  var plan=f.id==='reit'?'기존 매 거래일 3주 적립 유지.':'기존 SOFR 정기 적립 유지.';
-  var note=(t.twoDaysAbove&&t.maRising)?'20일선 위에서 추세 유지. 기준 수량 외 추가매수는 별도 검토.':'20일선 '+(Number(x.close)<t.ma20?'아래':'돌파 확인 중')+'입니다. 정기 적립을 일괄 중단하지 않되 추가 수량 확대는 신중히 판단.';
-  return {type:'buy',title:'정기 적립 유지',info:plan+' '+note+' '+(f.id==='sofr'?'SOFR은 금리형 ETF이므로 단순 기술적 신호의 중요도가 상대적으로 낮습니다.':'리츠의 배당·금리·가격 변동성도 함께 점검하세요.')+manualNote};
+  var plan=f.id==='reit'?('기본 1주, 로봇·우주항공 모두 상한 초과 시 3주. 현재 제안 수량: '+reitCount()+'주.'):'기존 SOFR 정기 적립 유지.';
+  var note=(t.twoDaysAbove&&t.maRising&&t.ma5Above20)?'5·20일선 추세는 우호적입니다.':'5·20일선 상태는 '+tv.title+'입니다. 정기 적립은 유지하되 확대는 신중히 판단하세요.';
+  return {type:'buy',title:f.id==='reit'?('리츠 '+reitCount()+'주 검토'):'정기 적립 유지',info:plan+' '+note+' '+(f.id==='sofr'?'SOFR은 금리형 ETF이므로 단순 기술적 신호의 중요도가 상대적으로 낮습니다.':'리츠의 배당·금리·가격 변동성도 함께 점검하세요.')+manualNote};
  }
  if(f.id==='tr'){
   if(!valid(settings.trBase))return {type:'wait',title:'기준가 미입력',info:'200TR 하락 감시 기준을 입력하세요.'};
@@ -106,32 +108,33 @@ function verdict(f){
   return p<=target?{type:'wait',title:'매수 조건 검토',info:'-5% 기준 '+money(target)+' 도달. '+tv.title+' · 기존 주문 체결 여부와 하락 원인 확인.'+manualNote}:{type:'wait',title:'하락 감시',info:'1차 감시 '+money(target)+' 이하를 우선. 20일선 참고: '+tv.title+'.'+manualNote};
  }
  if(p<Number(x.low20))return {type:'wait',title:'저점 이탈 · 관찰',info:'20거래일 최저가보다 낮은 입력 가격입니다. 급락 원인을 먼저 확인하세요.'+manualNote};
- var confirmed=!!(t.twoDaysAbove&&t.maRising);
+ var confirmed=!!(t.twoDaysAbove&&t.maRising&&t.ma5Above20);
  if(f.id==='sol'){
   if(!(capStop('robot')||capStop('space')))return {type:'wait',title:'대체매수 대기',info:'로봇·우주항공 매수 상한 초과가 없으므로 SOL 대체매수는 기다립니다. 20일선: '+tv.title+'.'+manualNote};
-  if(!confirmed)return {type:'wait',title:'20일선 확인 대기',info:'SOL 대체매수 조건은 있으나 '+tv.title+'입니다. 2거래일 상단 유지와 이동평균선 방향 확인 후 최대 1주 검토.'+manualNote};
-  return {type:'buy',title:'대체 1주 검토',info:'로봇·우주항공 상한 초과 + SOL 20일선 상단 2일 유지. 하루 최대 1주, 예산과 분배금 지속성 확인.'+manualNote};
+  if(!confirmed)return {type:'wait',title:'20일선 확인 대기',info:'SOL 대체매수 조건은 있으나 '+tv.title+'입니다. 20일선 위 2거래일 유지와 5일선 우위 확인 후 최대 1주 검토.'+manualNote};
+  return {type:'buy',title:'대체 1주 검토',info:'로봇 또는 우주항공 상한 초과 + SOL 20일선 상단 2일 유지 + 5일선 우위. 하루 최대 1주, 예산과 분배금 지속성 확인.'+manualNote};
  }
- if(!confirmed)return {type:'wait',title:t.crossUp?'돌파 첫날 · 대기':'20일선 확인 대기',info:'상한 이내이지만 '+tv.title+'입니다. 2거래일 상단 유지와 평균선 방향을 확인하세요.'+(p<=band?' 현재는 20일 박스권 하단 저가 관심구간입니다.':'')+manualNote};
- return {type:'buy',title:'추세 확인 · 매수 유지',info:'상한 이내 + 20일선 위 2거래일 유지 + 이동평균선 상승·횡보. 계획된 1주 범위 내에서 매수 검토.'+manualNote};
+ if(!confirmed)return {type:'wait',title:t.crossUp?'돌파 첫날 · 대기':'20일선 확인 대기',info:'상한 이내이지만 '+tv.title+'입니다. 2거래일 상단 유지와 5일·20일선 방향을 확인하세요.'+(p<=band?' 현재는 20일 박스권 하단 저가 관심구간입니다.':'')+manualNote};
+ return {type:'buy',title:'추세 확인 · 매수 유지',info:'상한 이내 + 20일선 위 2거래일 유지 + 5일선이 20일선 위 + 20일선 상승·횡보. 계획된 1주 범위에서 매수 검토.'+manualNote};
 }
 function chart(bars){
  var last=bars.slice(-20),all=last.map(function(x){return Number(x.close);});
- var mas=last.map(function(x,i){var w=bars.slice(i+1,i+21);return w.reduce(function(s,b){return s+Number(b.close);},0)/20;});
- var lo=Math.min.apply(null,all.concat(mas)),hi=Math.max.apply(null,all.concat(mas)),diff=Math.max(1,hi-lo);
+ var ma20s=last.map(function(x,i){var w=bars.slice(i+1,i+21);return w.reduce(function(s,b){return s+Number(b.close);},0)/20;});
+ var ma5s=last.map(function(x,i){var w=bars.slice(i+16,i+21);return w.reduce(function(s,b){return s+Number(b.close);},0)/5;});
+ var lo=Math.min.apply(null,all.concat(ma5s,ma20s)),hi=Math.max.apply(null,all.concat(ma5s,ma20s)),diff=Math.max(1,hi-lo);
  var plot=function(values){return values.map(function(v,i){return (12+i*276/(values.length-1)).toFixed(1)+','+(83-68*(v-lo)/diff).toFixed(1);}).join(' ');};
- return '<svg viewBox="0 0 300 100" aria-label="최근 20거래일 종가 파란선과 20일 이동평균 노란선"><line x1="12" y1="83" x2="288" y2="83" stroke="#52627a"/><polyline points="'+plot(all)+'" fill="none" stroke="#60a5fa" stroke-width="2.8"/><polyline points="'+plot(mas)+'" fill="none" stroke="#eab308" stroke-width="2.3"/></svg>';
+ return '<svg viewBox="0 0 300 100" aria-label="최근 20거래일 종가 파랑, 5일 이동평균 초록, 20일 이동평균 노랑"><line x1="12" y1="83" x2="288" y2="83" stroke="#52627a"/><polyline points="'+plot(all)+'" fill="none" stroke="#60a5fa" stroke-width="2.8"/><polyline points="'+plot(ma5s)+'" fill="none" stroke="#24bf9a" stroke-width="2.3"/><polyline points="'+plot(ma20s)+'" fill="none" stroke="#eab308" stroke-width="2.3"/></svg>';
 }
 function render(){
  var list=el('funds');list.innerHTML=FUNDS.map(function(f){
  var x=q(f.id),v=verdict(f),tv=trendView(x),close=has20(x)?money(price(f.id)):'미확인',date=has20(x)?day(x.date):'조회 불가';
- return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+f.name+'</div><small>'+f.code+' · '+f.plan+'</small><strong>'+close+'</strong><small>일봉 기준 '+date+'</small><div class="status state-'+v.type+'">'+v.title+'</div><div class="trendline">20일선 · '+safe(tv.title)+'</div></div>';
+ return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+f.name+'</div><small>'+f.code+' · '+f.plan+'</small><strong>'+close+'</strong><small>일봉 기준 '+date+'</small><div class="status state-'+v.type+'">'+v.title+'</div><div class="trendline">5·20일선 · '+safe(tv.title)+'</div></div>';
  }).join('');
  Array.from(list.querySelectorAll('[data-id]')).forEach(function(node){node.onclick=function(){selected=node.dataset.id;render();};node.onkeydown=function(ev){if(ev.key==='Enter'){selected=node.dataset.id;render();}};});
  var f=FUNDS.find(function(x){return x.id===selected;}),x=q(f.id),v=verdict(f),d=el('details');
  if(!has20(x)){d.innerHTML='<p class="sub">이 종목은 최신 20개 일봉이 미확인입니다. 가격을 추정하지 않습니다.</p>';return;}
  var low=Number(x.low20),high=Number(x.high20),px=Number(price(f.id)),target=round5(low+(high-low)*settings.ratio/100);
- var pos=Math.max(0,Math.min(100,(px-low)/(high-low)*100)),t=x.trend,tv=trendView(x),ma20=Number(t.ma20),diffPct=(Number(x.close)/ma20-1)*100,volumeRatio=valid(t.avgVolume20)&&t.avgVolume20>0&&valid(t.volumeToday)?(t.volumeToday/t.avgVolume20).toFixed(2)+'배':'미확인';
+ var pos=Math.max(0,Math.min(100,(px-low)/(high-low)*100)),t=x.trend,tv=trendView(x),ma20=Number(t.ma20),ma5=Number(t.ma5),diffPct=(Number(x.close)/ma20-1)*100,volumeRatio=valid(t.avgVolume20)&&t.avgVolume20>0&&valid(t.volumeToday)?(t.volumeToday/t.avgVolume20).toFixed(2)+'배':'미확인';
  var extra=f.id==='tr'?'<p>-5% 감시가격: <b>'+money(round5(settings.trBase*.95))+'</b></p>':'';
  d.innerHTML='<div class="divider"></div><div class="flex"><strong>'+money(px)+'</strong><span class="status state-'+v.type+'">'+safe(v.title)+'</span></div><p class="sub">일봉 '+day(x.date)+' · 20거래일 '+day(x.rangeStart)+'~'+day(x.rangeEnd)+'</p>'+chart(x.bars)+
  '<div class="leg20"><span><i class="legend-dot" style="background:#60a5fa"></i>종가</span><span><i class="legend-dot" style="background:#eab308"></i>20일 이동평균선</span></div><p class="context">20일선: <b>'+money(Math.round(ma20))+'</b> / 종가 대비 <b>'+(diffPct>=0?'+':'')+diffPct.toFixed(2)+'%</b> · '+safe(tv.title)+'</p><p class="context">20일선 방향: '+(t.maRising?'상승·횡보':'하락')+' · 거래량(전 20일 평균 대비): '+volumeRatio+'</p>'+'<div class="range"><span class="low" style="width:'+settings.ratio+'%"></span><span class="point" style="left:'+pos+'%"></span></div>'+
@@ -150,7 +153,7 @@ async function refresh(){
   var next={};data.items.forEach(function(x){if(FUNDS.some(function(f){return f.id===x.id;}))next[x.id]=x;});
   if(!FUNDS.every(function(f){return !!next[f.id];}))throw Error('일부 종목 자료가 누락됐습니다');
   var newSignature=JSON.stringify(FUNDS.map(function(f){
-   var x=next[f.id];return [x.ok,x.date,x.close,x.low20,x.high20,x.rangeStart,x.rangeEnd,x.trend&&x.trend.ma20,x.trend&&x.trend.previousMa20,x.trend&&x.trend.twoDaysAbove];
+   var x=next[f.id];return [x.ok,x.date,x.close,x.low20,x.high20,x.rangeStart,x.rangeEnd,x.trend&&x.trend.ma5,x.trend&&x.trend.previousMa5,x.trend&&x.trend.ma20,x.trend&&x.trend.previousMa20,x.trend&&x.trend.twoDaysAbove];
   }));
   byId=next;
   loadTime=data.fetchedAt||null;
