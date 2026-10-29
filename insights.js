@@ -274,13 +274,17 @@ function mount(){
 async function reloadAll(){
  if(!loaded)return; // only bootstrap after mount
  try{
-  const files=await Promise.all(['quotes.json','metrics.json','metric-history.json'].map(async file=>{
+  const files=await Promise.allSettled(['quotes.json','metrics.json','metric-history.json'].map(async file=>{
    const r=await fetch('./'+file+'?t='+Date.now(),{cache:'no-store'});
    if(!r.ok)throw Error(file+' '+r.status);
    return r.json();
   }));
-  quotes=files[0];metrics=files[1];metricHistory=files[2];
+  quotes=files[0].status==='fulfilled'?files[0].value:null;
+  metrics=files[1].status==='fulfilled'?files[1].value:null;
+  metricHistory=files[2].status==='fulfilled'?files[2].value:null;
   updateAlerts();updateSol();
+  if(!quotes&&$('important-changes'))$('important-changes').textContent='일봉을 확인할 수 없어 새로운 매수판단 변화는 표시하지 않습니다.';
+  if(!metrics&&$('sol-summary'))$('sol-summary').insertAdjacentHTML('afterbegin','<p class="sol-warning">현재 NAV 자료 확인 실패 · 공개 분배금 기록과 목표 계산만 표시합니다.</p>');
  }catch(e){
   const s=$('important-changes');
   if(s)s.textContent='변화 분석 데이터를 확인하지 못했습니다: '+String(e.message||e);
