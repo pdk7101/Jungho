@@ -44,7 +44,7 @@ jobs:
       - name: Prepare static site
         run: |
           mkdir -p site
-          cp index.html insights.js live-prices.js us-dashboard.js quotes.json metrics.json us-quotes.json site/
+          cp index.html insights.js live-prices.js us-dashboard.js us-krw.js quotes.json metrics.json us-quotes.json site/
           cp data/metric-history.json site/metric-history.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
