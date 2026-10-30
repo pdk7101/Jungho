@@ -9,8 +9,8 @@
         "estimatedAUMKRW": 1564896291640,
         "nav": 3905,
         "divergencePct": 0.1280409731113874,
-        "volume": 1454989,
-        "tradingValueKRW": 5712000000
+        "volume": 1474078,
+        "tradingValueKRW": 5786000000
       }
     ],
     "robot": [
@@ -33,7 +33,7 @@
         "estimatedAUMKRW": 321182008712,
         "nav": 9928,
         "divergencePct": -1.8936341659951617,
-        "volume": 62605,
+        "volume": 62631,
         "tradingValueKRW": 609000000
       }
     ],
@@ -45,7 +45,7 @@
         "estimatedAUMKRW": 530736479950,
         "nav": 11450,
         "divergencePct": 0.08733624454149158,
-        "volume": 24274,
+        "volume": 24280,
         "tradingValueKRW": 278000000
       }
     ],
