@@ -8,6 +8,9 @@ on:
   schedule:
     - cron: '25 08 * * 1-5'
     - cron: '15 09 * * 1-5'
+    # New York 16:00 close (both daylight saving and standard time): next day Korea morning.
+    - cron: '35 22 * * 1-5'
+    - cron: '15 23 * * 1-5'
 permissions:
   contents: write
   pages: write
@@ -27,6 +30,8 @@ jobs:
         run: node scripts/update-quotes.js
       - name: Collect ETF market cap, NAV and trade metrics
         run: node scripts/update-metrics.js
+      - name: Collect US market completed daily bars and dividend/split events
+        run: node scripts/update-us.js
       - name: Save dated ETF metric snapshots to repository
         run: |
           if ! git diff --quiet -- data/metric-history.json; then
@@ -39,7 +44,7 @@ jobs:
       - name: Prepare static site
         run: |
           mkdir -p site
-          cp index.html insights.js live-prices.js quotes.json metrics.json site/
+          cp index.html insights.js live-prices.js us-dashboard.js quotes.json metrics.json us-quotes.json site/
           cp data/metric-history.json site/metric-history.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
