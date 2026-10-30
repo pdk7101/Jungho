@@ -88,7 +88,7 @@ function cards(){
  const cony=f.id==='cony'&&x?.splits?.length?'<span class="us-chip us-alert">주식분할·병합 이벤트 점검</span>':'';
  return '<button class="us-card '+(selected===f.id?'us-selected':'')+'" type="button" data-us="'+f.id+'">'+
  '<strong>'+f.ticker+'</strong><span class="us-small">'+text(f.type)+'</span>'+
- '<span class="us-price">'+main+'</span>'+avg+'<span class="us-small">'+text(status)+'</span>'+bands+cony+'</button>';
+ '<span class="us-price">'+main+'</span>'+(window.ISA_US_KRW?.cardLine?.(f.id,px)||'')+avg+'<span class="us-small">'+text(status)+'</span>'+bands+cony+'</button>';
  }).join('');
  host.querySelectorAll('[data-us]').forEach(btn=>btn.onclick=()=>{selected=btn.dataset.us;render();});
 }
@@ -150,6 +150,7 @@ function details(){
  if(f.id==='spym')section+='<p class="us-small">SPYM은 State Street SPDR Portfolio S&P 500 ETF의 현재 티커입니다. 배당수익보다 지수 추적·총수익률 중심으로 점검합니다.</p>';
  section+='<label>가격 직접 비교 (USD, 화면 한정)<input id="us-manual" type="number" min="0" step="0.01" placeholder="확정 일봉 대체가 아닌 가정 가격" value="'+(valid(manual[f.id])?manual[f.id]:'')+'"></label>'+
  '<p class="us-small">직접 입력은 가정 가격입니다. 이동평균선은 확정 일봉 기준이며, 실제 주문가격이나 실시간 조회가격으로 오인하지 마세요.</p>';
+ section+=(window.ISA_US_KRW?.detailLine?.(f.id,px)||'');
  host.innerHTML=section;
  $('us-manual').onchange=function(){const v=Number(this.value);if(this.value.trim()!==''&&Number.isFinite(v)&&v>0)manual[f.id]=v;else delete manual[f.id];render();};
 }
@@ -168,7 +169,22 @@ async function refresh(){
   el.textContent='미국장 완료 일봉 '+count+'/4 · 마지막 수집 '+time+' · USD · 실시간 호가 아님';
  }catch(e){data=null;if(el)el.textContent='미국장 자료 확인 실패: '+String(e.message||e);}
  render();
+ window.dispatchEvent(new Event('isa-us-quotes-refreshed'));
 }
+window.ISA_US_APP={
+ getData:()=>data,
+ getPrice:id=>{const f=FUNDS.find(x=>x.id===id);return f?price(f):null;},
+ getPosition:id=>positions[id]||{},
+ applyFromLocal:function(){
+  const all=read('isa-us-holdings-v1')||{};
+  for(const f of FUNDS){
+   const p=all[f.id]||{};
+   positions[f.id]={qty:valid(p.qty)?Number(p.qty):'',avg:valid(p.avg)?Number(p.avg):'',net:typeof p.net==='number'&&Number.isFinite(p.net)&&p.net>=0?p.net:''};
+  }
+  renderPositionEditor();render();
+ },
+ rerender:()=>render()
+};
 function mount(){
  const p=$('us-panel');if(!p)return;
  const sel=$('us-selector');
