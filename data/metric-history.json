@@ -6,11 +6,11 @@
         "date": "20261029",
         "marketCapKRW": 1566900000000,
         "impliedShares": 400741688,
-        "estimatedAUMKRW": 1565697775016,
-        "nav": 3907,
-        "divergencePct": 0.07678525723060492,
-        "volume": 1444915,
-        "tradingValueKRW": 5672000000
+        "estimatedAUMKRW": 1564896291640,
+        "nav": 3905,
+        "divergencePct": 0.1280409731113874,
+        "volume": 1454989,
+        "tradingValueKRW": 5712000000
       }
     ],
     "robot": [
@@ -28,13 +28,13 @@
     "space": [
       {
         "date": "20261029",
-        "marketCapKRW": 314900000000,
-        "impliedShares": 32347201,
-        "estimatedAUMKRW": 321304747533,
-        "nav": 9933,
-        "divergencePct": -1.9933554817275767,
-        "volume": 62466,
-        "tradingValueKRW": 607000000
+        "marketCapKRW": 315100000000,
+        "impliedShares": 32351129,
+        "estimatedAUMKRW": 321182008712,
+        "nav": 9928,
+        "divergencePct": -1.8936341659951617,
+        "volume": 62605,
+        "tradingValueKRW": 609000000
       }
     ],
     "sofr": [
@@ -42,11 +42,11 @@
         "date": "20261029",
         "marketCapKRW": 531200000000,
         "impliedShares": 46352531,
-        "estimatedAUMKRW": 531014595136,
-        "nav": 11456,
-        "divergencePct": 0.034916201117307644,
-        "volume": 24251,
-        "tradingValueKRW": 277000000
+        "estimatedAUMKRW": 530736479950,
+        "nav": 11450,
+        "divergencePct": 0.08733624454149158,
+        "volume": 24274,
+        "tradingValueKRW": 278000000
       }
     ],
     "tr": [
