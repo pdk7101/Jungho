@@ -103,7 +103,7 @@ function importHoldings(){
   h[id]={...(h[id]||{}),qty,krwAvg:avg,krwCurrent:current,krwDay:day()};
   good++;
  }
- if(!good){msg.textContent='형식 확인: SCHD 23.6 47860 47950 (티커 수량 평단원 현재가원)';return;}
+ if(!good){msg.textContent='형식 확인: SCHD 10 50000 49000 (티커 수량 평단원 현재가원)';return;}
  write('isa-us-holdings-v1',h);
  field.value='';renderForm();window.ISA_US_APP?.applyFromLocal?.();
  msg.textContent=good+'종목을 이 기기에 저장했습니다.'+(bad?' 형식 불일치 '+bad+'줄 제외.':'')+' 분배금은 별도 입력하세요.';
@@ -127,7 +127,7 @@ function mount(){
  '<label>선택: 직접 적용할 USD/KRW 환율 (원)<input id="us-krw-fx" type="number" min="700" max="3000" step="0.01" placeholder="비워두면 수집한 참고 환율 사용" value="'+(manualFx||'')+'"></label>'+
  '<details id="us-krw-details"><summary>토스 보유수량·원화 평단·현재가 입력</summary>'+
  '<p class="us-small">현재가는 입력 당일에만 사용하고 다음 날에는 만료합니다. 1줄에 티커 / 수량 / 원화 평단 / 현재가 순으로 붙여넣으면 한 번에 저장할 수 있습니다.</p>'+
- '<textarea id="us-krw-import" rows="5" placeholder="SCHD 23.668787 47860 47950&#10;SPYM 2.648193 125797 119789"></textarea>'+
+ '<textarea id="us-krw-import" rows="5" placeholder="SCHD 10 50000 49000&#10;SPYM 5 120000 118000"></textarea>'+
  '<button type="button" id="us-krw-import-button" class="us-header-button">입력한 4종목 저장</button>'+
  '<div id="us-krw-editor"></div>'+
  '<p class="us-small" id="us-krw-message">누적 세후 분배금은 실수령액을 따로 입력해 주세요.</p></details>';
