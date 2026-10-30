@@ -73,6 +73,45 @@ details[open]>summary{margin-bottom:12px}
 .sol-dist-row small{color:#a9b8cc;display:block;font-size:.72rem}
 .sol-dist-row button{font-size:.75rem;padding:7px 9px;background:#33415a}
 @media(max-width:560px){.sol-inputs{grid-template-columns:1fr}}
+
+/* Independent four-symbol US watchlist (USD, not mixed with Kiwoom ISA KRW). */
+#us-panel{border-color:#4c6e9c}
+.us-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.us-head h2{margin:0}
+.us-header-button{padding:9px 12px;font-size:.82rem}
+.us-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0}
+.us-card{min-width:0;text-align:left;background:#14223b;border:1px solid #40526c;color:#eaf0fb;border-radius:12px;padding:12px;display:flex;align-items:flex-start;flex-direction:column;gap:5px;font-size:.84rem;font-weight:400}
+.us-card.us-selected{border:2px solid #77a9ff}
+.us-card strong{font-size:1.1rem}
+.us-price{font-size:1.2rem;font-weight:800}
+.us-price small{display:block;font-size:.69rem;font-weight:400;color:#bac8dd;margin-top:3px}
+.us-small{font-size:.78rem;color:#b7c8de;line-height:1.55;margin:4px 0}
+.us-positive{color:#ffadbb}.us-negative{color:#87b4ff}
+.us-chip{font-size:.7rem;border-radius:7px;border:1px solid #5d7291;padding:2px 6px;color:#aed7ff}
+.us-alert{color:#ffb4bd;border-color:#a55a64}
+.us-detail{border-radius:11px;background:#101e35;padding:13px;margin:12px 0}
+.us-detail h3{font-size:1.05rem;margin:0 0 8px}
+.us-statgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:11px 0}
+.us-statgrid>div{background:#1c2d48;border-radius:8px;padding:9px 8px;font-size:.74rem;color:#adbfda}
+.us-statgrid strong{display:block;color:#eaf0fb;font-size:.87rem;margin-top:5px}
+.us-legend{font-size:.73rem;color:#bbcadc}
+.us-ledger,.us-cony{border:1px solid #455e7b;padding:11px;border-radius:10px;margin:10px 0;line-height:1.5}
+.us-cony{border-color:#90734f}
+.us-cony a{color:#b4d8ff}
+.us-ledger p,.us-cony p{font-size:.83rem;margin:8px 0}
+.us-pos-row{display:grid;grid-template-columns:75px repeat(3,minmax(0,1fr));gap:8px;align-items:end;margin:7px 0;padding:10px 0;border-bottom:1px solid #3b516b}
+.us-pos-row strong{font-size:.85rem;padding-bottom:12px}
+.us-pos-row label{font-size:.73rem;margin:0}
+.us-pos-row input{font-size:.81rem;padding:9px 8px}
+.us-progress{height:9px;background:#344867;border-radius:10px;overflow:hidden}
+.us-progress span{height:100%;background:#70a9e7;display:block}
+#us-panel select{margin-top:10px}
+#us-panel a{color:#afcffc}
+@media(max-width:620px){
+ .us-pos-row{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .us-pos-row>strong{grid-column:1/-1;padding:0}
+ .us-statgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 </style><script src="./live-prices.js"></script></head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel flex"><div><b>현재가 재조회 · 마지막 게시 일봉과 구분</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
@@ -80,6 +119,22 @@ details[open]>summary{margin-bottom:12px}
 <div class="legend"><span class="state-stop"><b>●</b> 매수 중단 · 상한 초과</span><span class="state-buy"><b>●</b> 정기 적립 · 분할매수 검토</span><span class="state-wait"><b>●</b> 대기 · 감시 · 자료 미확인</span></div>
 <section class="panel" id="summary"><b>오늘의 매수계획 점검</b><p class="sub">게시된 일봉으로 계산한 계획이며 실제 주문을 실행하지 않습니다.</p><div id="plan">시세 확인 중</div></section>
 <section id="funds" class="funds"></section>
+<section id="us-panel" class="panel">
+ <div class="us-head">
+  <div><h2>미국장 4종목 · SCHD / AGNC / SPYM / CONY</h2><p class="sub">미국장 확정 종가 · USD 기준 · ISA 6종목과 별도 관리</p></div>
+  <button class="us-header-button" id="us-refresh" type="button">↻ 미국장 자료 확인</button>
+ </div>
+ <p class="sub" id="us-updated">미국장 최신 게시 일봉 확인 중</p>
+ <div class="us-cards" id="us-cards"></div>
+ <label>미국주식 자세히 보기<select id="us-selector"></select></label>
+ <div class="us-detail" id="us-details"></div>
+ <details id="us-holdings-details">
+  <summary>미국주식 내 보유수량·평단·세후 배당금 입력 <span class="pill">기기 내 저장</span></summary>
+  <p class="sub">개인 보유수량·평단가는 달러로 입력합니다. 누적 세후 배당금은 실제 계좌에서 수령한 금액을 입력하세요. 미국주식 평단가에 원화 금액을 입력하지 마세요. 입력 정보는 기기의 브라우저에만 저장되며 GitHub에는 게시되지 않습니다.</p>
+  <div id="us-positions"></div><p class="sub" id="us-store-msg">미보유 종목은 수량 0으로 기록할 수 있습니다. 추가매수·분배금 재투자·주식병합 후에는 직접 갱신해야 합니다.</p>
+ </details>
+ <p class="sub">SCHD·SPYM은 ETF, AGNC는 모기지 리츠 개별주, CONY는 고위험 커버드콜 ETF입니다. 거래일마다 미국장 마감 일봉을 수집합니다. 여기의 가격은 공식 실시간 호가가 아니며, 배당 이벤트는 제공처에 따라 미제공일 수 있습니다.</p>
+</section>
 <section class="panel" id="etf-flow-panel">
  <h2>ETF 규모 · 유동성 · NAV 보조지표</h2>
  <p class="fieldset-note">시가총액은 순자산총액(AUM)과 다릅니다. 아래 '추정 AUM'과 '추정 좌수'는 비공식 시가총액 및 NAV를 이용한 근삿값입니다. 공식 발행좌수·정확한 AUM으로 오인하지 마세요. 단순 규모 증감은 순유입·순유출을 확정하지 못합니다.</p>
@@ -428,4 +483,4 @@ var reload=document.getElementById('reload');
 if(reload)reload.addEventListener('click',update);
 update();
 })();
-</script><script src="./insights.js" defer></script></body></html>
+</script><script src="./insights.js" defer></script><script src="./us-dashboard.js" defer></script></body></html>
