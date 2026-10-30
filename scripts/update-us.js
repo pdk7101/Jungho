@@ -72,8 +72,28 @@ async function eachFund(f){
   return {id,ticker,ok:false,reason:String(e.message||e),date:null,close:null,currency:'USD',bars:[],dividends:[],splits:[]};
  }
 }
+async function readFx(){
+ const errors=[];
+ for(const host of ['query2.finance.yahoo.com','query1.finance.yahoo.com']){
+  try{
+   const url='https://'+host+'/v8/finance/chart/KRW%3DX?range=5d&interval=1d';
+   const r=await fetch(url,{signal:AbortSignal.timeout(10000),headers:{Accept:'application/json','User-Agent':'ISA-Research-Daily-Watchlist/1.0'}});
+   if(!r.ok)throw Error('HTTP '+r.status);
+   const j=await r.json(),v=j?.chart?.result?.[0],q=v?.indicators?.quote?.[0],times=v?.timestamp;
+   if(!v||!Array.isArray(times)||!Array.isArray(q?.close))throw Error('환율 일봉 미확인');
+   const rows=times.map((t,i)=>({time:new Date(t*1000).toISOString(),rate:q.close[i]})).filter(x=>x.rate>700&&x.rate<3000&&Number.isFinite(x.rate));
+   if(!rows.length)throw Error('유효 환율 값 없음');
+   const last=rows.at(-1);
+   if(Date.now()-new Date(last.time).getTime()>8*86400000)throw Error('환율 자료가 너무 오래됨');
+   return {ok:true,usdKrw:last.rate,observedAt:last.time,source:'Yahoo Finance KRW=X (비공식 환율 일봉)',realTime:false};
+  }catch(e){errors.push(host+': '+String(e.message||e));}
+ }
+ console.warn('USD/KRW 환율 조회 실패:',errors.join(' / '));
+ return {ok:false,reason:'공개 환율 조회 실패 · 직접 환율 입력 가능'};
+}
+const fx=await readFx();
 const items=[];
 for(const f of funds)items.push(await eachFund(f));
-await fs.writeFile(out,JSON.stringify({fetchedAt:now.toISOString(),market:'US',currency:'USD',isRealtime:false,
+await fs.writeFile(out,JSON.stringify({fetchedAt:now.toISOString(),market:'US',currency:'USD',isRealtime:false,fx,
  sourceNote:'미국장 확정 일봉만 사용하며 실시간 호가가 아닙니다. 조회 실패 시 가격을 만들어 표시하지 않습니다.',items},null,2)+'\n');
 console.log('US 유효 종목',items.filter(x=>x.ok).length+'/4');
