@@ -370,33 +370,47 @@ var names={reit:'TIGER 리츠',robot:'RISE AI&로봇',space:'1Q 우주항공',so
 var fmt=function(n,d){return Number(n).toLocaleString('ko-KR',{minimumFractionDigits:d||0,maximumFractionDigits:d||0});};
 var valid=function(n){return n!==null&&n!==undefined&&Number.isFinite(Number(n))&&Number(n)>0;};
 function rate(c,label){
- if(!c||typeof c.value!=='number'||!Number.isFinite(c.value))return '<span class="sub">'+label+' 자료 축적 중'+(c&&c.count?(' ('+c.count+'/'+(c.needed||'?')+'회)'):'')+'</span>';
+ const available=c&&typeof c.value==='number'&&Number.isFinite(c.value);
+ const count=c&&Number.isFinite(Number(c.count))?Number(c.count):0,needed=c&&Number.isFinite(Number(c.needed))?Number(c.needed):null;
+ if(!available)return '<span class="sub">'+label+': 기록 축적 중'+(needed?' ('+count+'/'+needed+'거래일)':'')+'</span>';
  return '<span class="'+(c.value<0?'error':'good')+'">'+label+' '+(c.value>=0?'+':'')+fmt(c.value,2)+'%</span>';
 }
-function formatKrw(n){if(!valid(n))return '미확인';return fmt(n/1e8,1)+'억원';}
+function formatKrw(n){
+ if(!valid(n))return '미확인';
+ return fmt(n/1e8,1)+'억원';
+}
+function clean(s){return String(s||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&quot;'}[c]||'';});}
 function show(data){
  var status=document.getElementById('etf-flow-status'),list=document.getElementById('etf-flow-list');
  if(!status||!list)return;
  if(!data||!Array.isArray(data.items)){status.textContent='자료 형식 확인 실패';list.innerHTML='';return;}
  var stamp=data.fetchedAt?new Date(data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'미확인';
- status.textContent='비공식 ETF 목록 · 수집 '+stamp+' · '+(data.status==='ok'?'6종목 확인':data.status==='partial'?'일부 종목 자료 확인':'조회 실패 (기존 가격 판단과 별도)');
+ var count=data.items.filter(function(x){return x.ok;}).length;
+ status.textContent='ETF 공개 목록 조회: '+stamp+' · 확인 '+count+'/6종목 · 시가총액과 NAV는 비공식 수치';
  list.innerHTML=data.items.map(function(x){
    var title=names[x.id]||x.code;
-   if(!x.ok)return '<div class="fund"><div class="title">'+title+'</div><p class="error">규모·NAV 확인 불가</p><p class="sub">'+String(x.reason||'수집 불가').replace(/[&<>]/g,'')+'</p></div>';
+   if(!x.ok)return '<div class="fund"><div class="title">'+clean(title)+'</div><p class="error">비공식 규모/NAV 확인되지 않음</p><p class="sub">'+clean(x.reason||'데이터 미제공')+'</p></div>';
    var alerts=[];
-   if(Number.isFinite(x.divergencePct)&&Math.abs(x.divergencePct)>=1.5)alerts.push('NAV 괴리율 1.5% 이상 · 기준시각 확인');
-   if(valid(x.tradingValueKRW)&&x.tradingValueKRW<50000000)alerts.push('거래대금 적음 · 호가·체결 확인');
-   if(x.shares5&&Number.isFinite(x.shares5.value)&&x.shares5.value<=-10)alerts.push('추정 좌수 5일 급감 · 실제 설정·환매 확인');
-   return '<div class="fund"><div class="title">'+title+' <span class="sub">'+x.code+'</span></div>'+
+   if(typeof x.divergencePct==='number'&&Number.isFinite(x.divergencePct)&&Math.abs(x.divergencePct)>=1.5)alerts.push('참고 괴리율 1.5% 이상 · 시장가격/NAV 기준시점 확인');
+   if(valid(x.tradingValueKRW)&&x.tradingValueKRW<50000000)alerts.push('거래대금 적음 · 실제 호가 확인');
+   if(x.shares5&&typeof x.shares5.value==='number'&&x.shares5.value<=-10)alerts.push('추정 발행좌수 5거래일 급감 · 실제 설정/환매 확인');
+   var info=typeof x.priorCloseDifferencePct==='number'&&Math.abs(x.priorCloseDifferencePct)>1.8?
+      '<p class="card-detail">전일 확정 종가 대비 목록 가격 차이 '+(x.priorCloseDifferencePct>=0?'+':'')+fmt(x.priorCloseDifferencePct,2)+'% · <b>비교 날짜가 달라 삭제하지 않고 구분 표시</b></p>':'';
+   var navText=valid(x.nav)?fmt(x.nav,2)+'원':'확인 불가';
+   var divergenceText=typeof x.divergencePct==='number'&&Number.isFinite(x.divergencePct)?(x.divergencePct>=0?'+':'')+fmt(x.divergencePct,2)+'%':'미확인';
+   return '<div class="fund"><div class="title">'+clean(title)+' <span class="sub">'+clean(x.code)+'</span></div>'+
     '<p><b>시가총액 '+fmt(x.marketCap100m)+'억원</b></p>'+
+    '<p class="card-detail">목록 가격 '+fmt(x.marketPrice)+'원 · 수집 '+stamp+'</p>'+
     '<p class="card-detail">추정 순자산규모(AUM 대용): '+formatKrw(x.estimatedAUMKRW)+'</p>'+
-    '<p class="card-detail">추정 발행좌수: '+fmt(x.impliedShares)+'좌 · 공식 발행좌수 아님</p>'+
-    '<p class="card-detail">NAV: '+fmt(x.nav,2)+'원 / 괴리율(참고): <b class="'+(Math.abs(x.divergencePct)>=1.5?'error':'')+'">'+(x.divergencePct>=0?'+':'')+fmt(x.divergencePct,2)+'%</b></p>'+
-    '<p class="card-detail">거래량: '+(x.volume===null?'미확인':fmt(x.volume))+'좌 / 거래대금(비공식): '+formatKrw(x.tradingValueKRW)+'</p>'+
+    '<p class="card-detail">추정 발행좌수: '+fmt(x.impliedShares)+'좌 · 공식 자료 아님</p>'+
+    '<p class="card-detail">NAV: '+navText+' / 참고 괴리율: <b class="'+(Math.abs(x.divergencePct)>=1.5?'error':'')+'">'+divergenceText+'</b></p>'+
+    '<p class="card-detail">거래량: '+(x.volume==null?'미확인':fmt(x.volume))+'좌 / 거래대금: '+formatKrw(x.tradingValueKRW)+'</p>'+
+    info+'<p class="sub">'+clean(x.comparisonNote||'시장가격과 NAV의 실제 기준시점은 제공되지 않음')+'</p>'+
     '<div class="divider"></div><p class="card-detail">시가총액: '+rate(x.cap5,'5거래일')+' · '+rate(x.cap20,'20거래일')+'</p>'+
     '<p class="card-detail">추정 좌수: '+rate(x.shares5,'5거래일')+' · '+rate(x.shares20,'20거래일')+'</p>'+
-    (alerts.length?'<p class="error card-detail">'+alerts.join(' · ')+'</p>':'<p class="sub">추가 위험 경고 없음 (안전 보장 아님)</p>')+
-    '<p class="sub">기준 일봉: '+String(x.date||'미확인')+'</p></div>';
+    '<p class="sub">'+clean(x.historyNote||'자료 축적 상태 미확인')+'</p>'+
+    (alerts.length?'<p class="error card-detail">'+alerts.join(' · ')+'</p>':'<p class="sub">추가 주의 신호 없음 (안전 보장 아님)</p>')+
+    '<p class="sub">참고 확정 일봉: '+clean(x.date||'미확인')+' · 목록 데이터의 개별 시세/NAV 기준시각은 미제공</p></div>';
  }).join('');
 }
 async function update(){
