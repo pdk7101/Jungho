@@ -112,6 +112,20 @@ details[open]>summary{margin-bottom:12px}
  .us-pos-row>strong{grid-column:1/-1;padding:0}
  .us-statgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+/* Private, optional KRW overlay on US holdings */
+.us-krw-panel{margin:14px 0;padding:13px;border:1px solid #4e688a;border-radius:12px;background:#15233d}
+.us-krw-panel h3{margin:0 0 7px;font-size:1.05rem}
+.us-krw-panel details{margin-top:12px}
+.us-krw-panel textarea{width:100%;box-sizing:border-box;background:#101c31;color:#e8f0ff;border:1px solid #526789;border-radius:8px;padding:10px;font-size:.84rem;margin:8px 0}
+.us-krw-form-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:11px 0;border-bottom:1px solid #344962}
+.us-krw-form-row strong{grid-column:1/-1}
+.us-krw-form-row label{min-width:0;font-size:.77rem}
+.us-krw-form-row input{font-size:.86rem;padding:10px 7px}
+.us-krw-price{font-size:1.1rem;font-weight:800;color:#9fcbff}
+.us-krw-price small{display:block;font-size:.7rem;font-weight:400;color:#b1bfd4}
+.us-krw-callout{border-left:3px solid #7ea8db;padding:9px 10px;background:#162842;border-radius:5px;font-size:.87rem}
+@media(max-width:380px){.us-krw-form-row{grid-template-columns:1fr}}
 </style><script src="./live-prices.js"></script></head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel flex"><div><b>현재가 재조회 · 마지막 게시 일봉과 구분</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
@@ -483,4 +497,4 @@ var reload=document.getElementById('reload');
 if(reload)reload.addEventListener('click',update);
 update();
 })();
-</script><script src="./insights.js" defer></script><script src="./us-dashboard.js" defer></script></body></html>
+</script><script src="./insights.js" defer></script><script src="./us-dashboard.js" defer></script><script src="./us-krw.js" defer></script></body></html>
