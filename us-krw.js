@@ -104,13 +104,31 @@ function dividendPrice(amountUsd){
 }
 function cardLine(id,priceUsd){
  const p=positionKrw(id,priceUsd),h=holdings()[id]||{};
- if(p)return '<span class="us-small '+(p.pnl>=0?'us-positive':'us-negative')+'">'+
-  '평단 '+won(p.avg)+' · 평가손익 '+signed(p.pnl)+' ('+signedPercent(p.rate)+')'+
-  (p.inclusive!==null?' · 분배금 포함 '+signed(p.inclusive):'')+'</span>';
- if(finitePositive(h.krwAvg))return '<span class="us-small">원화 평단 '+won(h.krwAvg)+' · 손익 계산용 수량·가격 확인 필요</span>';
- return '<span class="us-small">원화 평단 미입력</span>';
+ const qty=num(h.qty),snapshot=h.krwSnapshotDate||'기준일 미입력',
+  held=qty!==null&&Number.isFinite(qty)&&qty>=0;
+ let line='<span class="us-small">실제 보유: <b>'+(held?qty.toLocaleString('ko-KR',{maximumFractionDigits:6})+'주':'미등록')+
+  '</b> · 원화 평단 <b>'+(finitePositive(h.krwAvg)?won(h.krwAvg):'미입력')+'</b></span>';
+ if(held&&finitePositive(h.krwAvg))line+='<span class="us-small">보유정보 기준: '+clean(snapshot)+'</span>';
+ if(p)line+='<span class="us-small '+(p.pnl>=0?'us-positive':'us-negative')+'">'+
+  '평가손익 '+signed(p.pnl)+' ('+signedPercent(p.rate)+')'+
+  (p.inclusive!==null?' · 세후 분배금 포함 '+signed(p.inclusive):' · 누적 세후 분배금 미입력')+'</span>';
+ else if(held)line+='<span class="us-small">원화 평가손익 계산용 가격 확인 필요</span>';
+ return line;
 }
-
+function showHoldingsCheck(){
+ const el=$('us-krw-holdings-check');if(!el)return;
+ const all=holdings();let present=0,netKnown=0;let missing=[];
+ for(const symbol of ITEMS){
+  const id=symbol.toLowerCase(),p=all[id]||{};
+  if(finitePositive(p.qty)&&finitePositive(p.krwAvg))present++;
+  else missing.push(symbol);
+  if(netDividend(id)!==null)netKnown++;
+ }
+ el.innerHTML='<p><b>이 기기에 저장된 미국주식 보유정보: '+present+'/4종목</b></p>'+
+ (present===4?'<p class="us-small">4종목 보유수량·원화 평단이 저장되어 있습니다. 이전 스냅샷 이후 거래 여부는 직접 확인해야 합니다.</p>':
+  '<p class="us-small">아직 보유정보 '+missing.join('·')+'가 미등록입니다. 채팅에서 수치를 알려주신 것만으로 이 기기에 저장되지는 않습니다. 별도 전용 적용 링크 또는 아래 입력란을 사용해 주세요.</p>')+
+ '<p class="us-small">누적 세후 배당·분배금 확인: '+netKnown+'/4종목 · 미입력을 0원으로 취급하지 않습니다.</p>';
+}
 function totalKrw(){
  const app=window.ISA_US_APP;
  if(!app)return {count:0,principal:0,value:0,pnl:0,knownNet:0,missing:0,provisional:0,inclusive:null};
@@ -371,6 +389,7 @@ function showRate(){
 }
 function render(){
  showRate();
+ showHoldingsCheck();
  showTotal();
  renderLedger();
  window.ISA_US_SIGNAL?.refreshSummary?.();
@@ -384,6 +403,7 @@ function mount(){
  holder.innerHTML='<h3>미국주식 원화 평단·손익</h3>'+
  '<p class="us-small">달러 일봉과 별도로 토스 원화 현재가·평단을 표시합니다. 개인정보는 GitHub에 전송하지 않고 이 기기에만 저장합니다.</p>'+
  '<div id="us-krw-rate-status" class="us-small">환율 확인 중…</div>'+
+ '<div id="us-krw-holdings-check" class="us-holdings-check"></div>'+
  '<div id="us-krw-total" class="us-total-summary"></div>'+
  '<p id="us-krw-applied" class="us-small" aria-live="polite"></p>'+
  '<label>선택: 직접 적용할 USD/KRW 환율 (원)<input id="us-krw-fx" type="number" min="700" max="3000" step="0.01" placeholder="비워두면 수집한 참고 환율 사용" value="'+(manualFx||'')+'"></label>'+
