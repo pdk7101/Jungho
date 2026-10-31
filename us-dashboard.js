@@ -134,13 +134,13 @@ function details(){
  '<div>20일 고가<strong>'+metric(x.high20)+'</strong></div><div>하단 30% · 20%<strong>'+metric(z.b30)+' / '+metric(z.b20)+'</strong></div></div>'+
  '<p class="us-small">이평선 판단: <b>'+text(trend(x))+'</b>. 매수 조건은 개인 평단·비중·현금 여력을 함께 보세요.</p>'+ '<p class="us-small">원화 5·20일선과 박스권은 각각의 달러 지표에 동일 참고환율을 곱한 값입니다. 날짜별 실제 환율을 적용한 원화 이동평균은 아닙니다.</p>'+ (window.ISA_US_KRW?.detailLine?.(f.id,px)||'');
  if(b){
-  section+='<div class="us-ledger"><b>내 보유 손익 · '+b.qty.toLocaleString('ko-KR')+'주</b>'+
+  section+='<details class="us-ledger"><summary>달러(USD) 매입원가·평가손익 참고 · '+b.qty.toLocaleString('ko-KR')+'주</summary>'+
   '<p>매수원가(평단×수량) '+usd(b.principal)+' / 평가금액 '+usd(b.value)+'</p>'+
   '<p>평가손익 <strong class="'+(b.unrealized>=0?'us-positive':'us-negative')+'">'+(b.unrealized>=0?'+':'')+usd(b.unrealized)+'</strong></p>'+
   (b.net!==null?'<p>누적 세후 분배금 '+usd(b.net)+' · <b>분배금 포함 총손익 '+(b.withNet>=0?'+':'')+usd(b.withNet)+'</b></p>':
    '<p class="us-small">누적 세후 배당금 미입력 · 분배금 포함 손익 계산 보류</p>')+
   '<p>현재 가격에 1주 추가 시 예상 평단 '+usd(b.afterOne,4)+(px<b.avg?' · 평단 인하 가능':' · 평단 인하 효과 없음')+'</p>'+
-  '<p class="us-small">재투자했을 경우 재투자 주식은 보유수량·매입원가에 포함하고 누적 분배금은 손익 조정용으로만 1회 반영합니다. 분배금 현금이 계좌에 별도 남아 있으면 자산 합계에 중복 반영하지 마세요.</p></div>';
+  '<p class="us-small">별도 입력한 달러 기준 원가의 참고 내역입니다. 원화 손익은 위 원화 기준 계산을 우선하세요. 분배금 재투자 시 동일 지급금을 이중으로 반영하지 마세요.</p></details>';
  }
  if(div.available){
   section+='<p class="us-small"><b>최근 90일 세전 배당·분배금 합계(주당):</b> '+divPrice(div.total)+' · 월평균 환산 약 '+divPrice(div.total/3)+' (세전 참고)</p>'+
