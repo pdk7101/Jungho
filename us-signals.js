@@ -152,13 +152,7 @@ function updateLimitsUI(){
  });
 }
 function render(){
- const panel=$('us-signal-summary');if(!panel)return;
- const vals=Object.keys(NAMES).map(id=>({id,d:decision(id)}));
- const buy=vals.filter(x=>x.d.type==='buy'),wait=vals.filter(x=>x.d.type==='wait'),stop=vals.filter(x=>x.d.type==='stop');
- panel.innerHTML='<div class="us-signal-counts"><div><b class="state-buy">매수 검토 '+buy.length+'</b></div>'+
- '<div><b class="state-stop">매수 중단 '+stop.length+'</b></div>'+
- '<div><b class="state-wait">대기 '+wait.length+'</b></div></div>'+
- '<p class="us-small">미국장 확정 일봉의 기술적 참고 판단이며 자동매수는 실행하지 않습니다. 원화 표시는 참고 환율 환산 또는 직접 입력값입니다. 매매 전 토스 최신 시세와 예산을 확인하세요.</p>';
+ refreshSummary();
  window.ISA_US_APP?.rerender?.();
 }
 function refreshSummary(){
