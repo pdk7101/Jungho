@@ -118,7 +118,7 @@ function applyPersonalLink(){
  if(!hash.startsWith('#us-holdings='))return;
  const info=$('us-krw-applied'),notice=$('us-krw-message');
  try{
-  const value=new URLSearchParams(hash.slice(1)).get('us-holdings');
+  const value=decodeURIComponent(hash.slice('#us-holdings='.length));
   if(!value)throw Error('보유정보 없음');
   const cells=value.split(';');
   const asOf=cells.shift();
