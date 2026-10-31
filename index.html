@@ -126,6 +126,26 @@ details[open]>summary{margin-bottom:12px}
 .us-krw-price small{display:block;font-size:.7rem;font-weight:400;color:#b1bfd4}
 .us-krw-callout{border-left:3px solid #7ea8db;padding:9px 10px;background:#162842;border-radius:5px;font-size:.87rem}
 @media(max-width:380px){.us-krw-form-row{grid-template-columns:1fr}}
+
+/* KRW distribution ledger and detailed profit/loss breakdown */
+.us-fin-grid,.us-dist-figures{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.us-fin-grid>div,.us-dist-figures>div{background:#1d304a;border:1px solid #344965;border-radius:9px;padding:10px;font-size:.76rem;color:#b4c5da}
+.us-fin-grid strong,.us-dist-figures strong{display:block;color:#f2f6ff;font-size:.93rem;margin-top:5px}
+.us-fin-grid small{display:block;color:#b2bfd1;margin-top:4px}
+.us-dist-detail{background:#12243d;border:1px solid #425b7a;padding:11px;border-radius:10px;margin:12px 0;font-size:.85rem;line-height:1.55}
+.us-dist-detail p{margin:8px 0}
+.us-dist-detail strong{color:#eaf1ff}
+.us-dist-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:11px 0}
+.us-dist-form label{min-width:0}
+.us-dist-form input,.us-dist-form select{min-width:0;font-size:.88rem;padding:10px}
+.us-dist-record,.us-dist-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #394d68;font-size:.81rem}
+.us-dist-record small,.us-dist-row small{display:block;font-size:.72rem;color:#aabdd4;margin-top:4px}
+.us-dist-delete{background:#3a475d;border:1px solid #62738d;font-size:.75rem;padding:7px 10px;flex-shrink:0}
+#us-distribution-details{margin-top:15px;padding-top:12px;border-top:1px solid #3a4e69}
+#us-dist-message{margin:8px 0}
+.us-total-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.us-total-grid small{display:block;color:#aebdd2;margin-top:4px;font-size:.72rem}
+@media(max-width:430px){.us-dist-form{grid-template-columns:1fr}}
 </style><script src="./live-prices.js"></script></head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel flex"><div><b>현재가 재조회 · 마지막 게시 일봉과 구분</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
