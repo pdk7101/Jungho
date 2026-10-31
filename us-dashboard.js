@@ -17,7 +17,16 @@ const date=s=>/^\d{8}$/.test(String(s))?s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slic
 const min=(...args)=>Math.min(...args);
 const round=(n,p=2)=>Number(n.toFixed(p));
 const read=key=>{try{return JSON.parse(localStorage.getItem(key)||'null')}catch(e){return null}};
-function save(){try{localStorage.setItem('isa-us-holdings-v1',JSON.stringify(positions))}catch(e){$('us-store-msg').textContent='이 기기의 저장소를 사용할 수 없습니다.';}}
+function save(){
+ try{
+  const all=read('isa-us-holdings-v1')||{};
+  for(const f of FUNDS){
+   const p=positions[f.id]||{};
+   all[f.id]={...(all[f.id]||{}),qty:p.qty,avg:p.avg,net:p.net};
+  }
+  localStorage.setItem('isa-us-holdings-v1',JSON.stringify(all));
+ }catch(e){$('us-store-msg').textContent='이 기기의 저장소를 사용할 수 없습니다.';}
+}
 let saved=read('isa-us-holdings-v1');
 if(saved&&typeof saved==='object')FUNDS.forEach(f=>{
  const p=saved[f.id];if(!p)return;
@@ -81,9 +90,9 @@ function cards(){
  const host=$('us-cards');if(!host)return;
  host.innerHTML=FUNDS.map(f=>{
  const x=market(f),px=price(f),b=basis(f,px),z=zone(x,px);
- const main=x?usd(px)+' <small>USD · '+date(x.date)+' 미국장 마감</small>':'미확인 <small>US 완료 일봉 수집 대기</small>';
+ const main=x?(window.ISA_US_KRW?.primaryPrice?.(f.id,px)||usd(px))+' <small>미국장 확정 종가 '+date(x.date)+'</small>':'미확인 <small>US 완료 일봉 수집 대기</small>';
  const status=!x?'시세 확인 불가':trend(x);
- const avg=b?'<p class="us-small '+(b.unrealized>=0?'us-positive':'us-negative')+'">평단 '+usd(b.avg)+' · 평가 '+(b.unrealized>=0?'+':'')+usd(b.unrealized)+'</p>':'<p class="us-small">보유 수량/평단 미입력</p>';
+ const avg=b?'<span class="us-small">USD 원가 참고 '+usd(b.avg)+'</span>':'';
  const bands=z?'<span class="us-chip">'+(z.level===2?'하단 20%':z.level===1?'하단 30%':'일반 가격대')+'</span>':'';
  const cony=f.id==='cony'&&x?.splits?.length?'<span class="us-chip us-alert">주식분할·병합 이벤트 점검</span>':'';
  return '<button class="us-card '+(selected===f.id?'us-selected':'')+'" type="button" data-us="'+f.id+'">'+
@@ -115,15 +124,15 @@ function details(){
  const f=FUNDS.find(f=>f.id===selected),x=market(f),px=price(f),host=$('us-details');
  if(!host)return;
  if(!x){host.innerHTML='<h3>'+f.ticker+' · '+text(f.name)+'</h3><p class="us-small">미국장 완료 일봉을 확인할 수 없습니다. 가격과 이동평균선을 추정하지 않습니다. <a href="https://finance.yahoo.com/quote/'+f.ticker+'/" target="_blank" rel="noopener">시세 제공처에서 확인</a></p>';return;}
- const z=zone(x,px),b=basis(f,px),div=distribution(x),t=x.trend;
+ const z=zone(x,px),b=basis(f,px),div=distribution(x),t=x.trend,metric=n=>window.ISA_US_KRW?.metricPrice?.(n)||usd(n),divPrice=n=>window.ISA_US_KRW?.dividendPrice?.(n)||usd(n,4);
  const split=x.splits||[];
  let section='<h3>'+f.ticker+' · '+text(f.name)+'</h3><p class="us-small">'+text(f.type)+' · '+text(f.hint)+'</p>'+
- '<p class="us-small">미국장 확정 일봉 '+date(x.date)+' · '+text(x.source)+' · 실시간 호가 아님</p>'+
- chart(x)+'<p class="us-legend">파랑 종가 · 초록 5일선 · 노랑 20일선</p>'+
- '<div class="us-statgrid"><div>종가<strong>'+usd(x.close)+'</strong></div><div>5일선<strong>'+usd(t.ma5)+'</strong></div>'+
- '<div>20일선<strong>'+usd(t.ma20)+'</strong></div><div>20일 저가<strong>'+usd(x.low20)+'</strong></div>'+
- '<div>20일 고가<strong>'+usd(x.high20)+'</strong></div><div>하단 30% · 20%<strong>'+usd(z.b30)+' / '+usd(z.b20)+'</strong></div></div>'+
- '<p class="us-small">이평선 판단: <b>'+text(trend(x))+'</b>. 매수 조건은 개인 평단·비중·현금 여력을 함께 보세요.</p>';
+ '<p class="us-small">미국장 확정 일봉 '+date(x.date)+' · '+text(x.source)+' · 실시간 호가 아님 · 원화 환산 참고</p>'+
+ chart(x)+'<p class="us-legend">파랑 종가 · 초록 5일선 · 노랑 20일선 (원본 달러 차트)</p>'+
+ '<div class="us-statgrid"><div>종가<strong>'+metric(x.close)+'</strong></div><div>5일선<strong>'+metric(t.ma5)+'</strong></div>'+
+ '<div>20일선<strong>'+metric(t.ma20)+'</strong></div><div>20일 저가<strong>'+metric(x.low20)+'</strong></div>'+
+ '<div>20일 고가<strong>'+metric(x.high20)+'</strong></div><div>하단 30% · 20%<strong>'+metric(z.b30)+' / '+metric(z.b20)+'</strong></div></div>'+
+ '<p class="us-small">이평선 판단: <b>'+text(trend(x))+'</b>. 매수 조건은 개인 평단·비중·현금 여력을 함께 보세요.</p>'+ '<p class="us-small">원화 5·20일선과 박스권은 각각의 달러 지표에 동일 참고환율을 곱한 값입니다. 날짜별 실제 환율을 적용한 원화 이동평균은 아닙니다.</p>'+ (window.ISA_US_KRW?.detailLine?.(f.id,px)||'');
  if(b){
   section+='<div class="us-ledger"><b>내 보유 손익 · '+b.qty.toLocaleString('ko-KR')+'주</b>'+
   '<p>매수원가(평단×수량) '+usd(b.principal)+' / 평가금액 '+usd(b.value)+'</p>'+
@@ -134,11 +143,11 @@ function details(){
   '<p class="us-small">재투자했을 경우 재투자 주식은 보유수량·매입원가에 포함하고 누적 분배금은 손익 조정용으로만 1회 반영합니다. 분배금 현금이 계좌에 별도 남아 있으면 자산 합계에 중복 반영하지 마세요.</p></div>';
  }
  if(div.available){
-  section+='<p class="us-small"><b>최근 90일 제공처 배당·분배금 이벤트 합계:</b> 주당 '+usd(div.total,4)+' · 월평균 환산 약 '+usd(div.total/3,4)+' /주 (세전 참고)</p>'+
-  '<p class="us-small">마지막 기록 '+date(div.last.date)+' · '+usd(div.last.perShare,4)+'/주 · 세금/재투자/병합 조정 전, 지급예정액 보장 아님</p>';
+  section+='<p class="us-small"><b>최근 90일 세전 배당·분배금 합계(주당):</b> '+divPrice(div.total)+' · 월평균 환산 약 '+divPrice(div.total/3)+' (세전 참고)</p>'+
+  '<p class="us-small">마지막 기록 '+date(div.last.date)+' · '+divPrice(div.last.perShare)+'/주 · 현재 참고환율 환산이며 지급 당시 환율·세후 실수령액과 다릅니다</p>';
  }else section+='<p class="us-small">배당·분배금 자동 확인: '+text(div.reason)+' · 정확한 실수령액은 증권사 내역을 입력하세요.</p>';
  if(f.id==='cony'){
-  const shares=b?.qty||0;
+  const shares=valid(positions[f.id]?.qty)?Number(positions[f.id].qty):0;
   section+='<div class="us-cony"><strong>CONY 별도 관리</strong>'+
   '<p>보유 '+shares.toLocaleString('ko-KR')+'주 · 목표 230~250주'+(shares>0?' · 230주 목표까지 '+Math.max(0,230-shares).toLocaleString('ko-KR')+'주 부족':' · 실제 보유수량을 입력해 진행률 표시')+'</p>'+
   '<div class="us-progress"><span style="width:'+Math.min(100,shares/230*100)+'%"></span></div>'+
@@ -150,7 +159,6 @@ function details(){
  if(f.id==='spym')section+='<p class="us-small">SPYM은 State Street SPDR Portfolio S&P 500 ETF의 현재 티커입니다. 배당수익보다 지수 추적·총수익률 중심으로 점검합니다.</p>';
  section+='<label>가격 직접 비교 (USD, 화면 한정)<input id="us-manual" type="number" min="0" step="0.01" placeholder="확정 일봉 대체가 아닌 가정 가격" value="'+(valid(manual[f.id])?manual[f.id]:'')+'"></label>'+
  '<p class="us-small">직접 입력은 가정 가격입니다. 이동평균선은 확정 일봉 기준이며, 실제 주문가격이나 실시간 조회가격으로 오인하지 마세요.</p>';
- section+=(window.ISA_US_KRW?.detailLine?.(f.id,px)||'');
  host.innerHTML=section;
  $('us-manual').onchange=function(){const v=Number(this.value);if(this.value.trim()!==''&&Number.isFinite(v)&&v>0)manual[f.id]=v;else delete manual[f.id];render();};
 }
@@ -166,7 +174,7 @@ async function refresh(){
   data=d;loadTime=d.fetchedAt;
   const count=FUNDS.filter(f=>market(f)).length;
   const time=loadTime?new Date(loadTime).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'미확인';
-  el.textContent='미국장 완료 일봉 '+count+'/4 · 마지막 수집 '+time+' · USD · 실시간 호가 아님';
+  el.textContent='미국장 완료 일봉 '+count+'/4 · 마지막 수집 '+time+' · 원화 우선(USD 참고) · 실시간 호가 아님';
  }catch(e){data=null;if(el)el.textContent='미국장 자료 확인 실패: '+String(e.message||e);}
  render();
  window.dispatchEvent(new Event('isa-us-quotes-refreshed'));
