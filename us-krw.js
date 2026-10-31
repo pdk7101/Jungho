@@ -104,7 +104,7 @@ function dividendPrice(amountUsd){
 }
 function cardLine(id,priceUsd){
  const p=positionKrw(id,priceUsd),h=holdings()[id]||{};
- const qty=num(h.qty),snapshot=h.krwSnapshotDate||'기준일 미입력',
+ const qty=xnum(h.qty),snapshot=h.krwSnapshotDate||'기준일 미입력',
   held=qty!==null&&Number.isFinite(qty)&&qty>=0;
  let line='<span class="us-small">실제 보유: <b>'+(held?qty.toLocaleString('ko-KR',{maximumFractionDigits:6})+'주':'미등록')+
   '</b> · 원화 평단 <b>'+(finitePositive(h.krwAvg)?won(h.krwAvg):'미입력')+'</b></span>';
