@@ -114,10 +114,11 @@ function decision(id){
  return evaluate(id,q,cap);
 }
 function cardLine(id){
- const v=decision(id),held=quote(id).qty;
+ const v=decision(id);
+ // Actual owned shares + cost basis belong only to us-krw.js cardLine.
+ // This component shows decision and proposed ADDITIONAL buy quantity only.
  return '<div class="us-trade-status state-'+v.type+'"><span class="us-signal-dot"></span>'+
   esc(v.title)+'</div>'+
-  '<span class="us-small us-existing-shares">실제 보유수량: <b>'+(held!==null?held.toLocaleString('ko-KR',{maximumFractionDigits:6})+'주':'이 기기에 미등록')+'</b></span>'+
   '<span class="us-small">추가매수 검토: <b>'+(v.qty?v.qty+'주':v.amountKRW?krw(v.amountKRW)+' 소액 적립':'0주 (대기/중단)')+'</b></span>';
 }
 function detailLine(id){
