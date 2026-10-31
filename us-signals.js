@@ -114,9 +114,11 @@ function decision(id){
  return evaluate(id,q,cap);
 }
 function cardLine(id){
- const v=decision(id);
+ const v=decision(id),held=quote(id).qty;
  return '<div class="us-trade-status state-'+v.type+'"><span class="us-signal-dot"></span>'+
-  esc(v.title)+'</div><span class="us-small">검토 수량 '+(v.qty?v.qty+'주':v.amountKRW?krw(v.amountKRW)+' 적립':'0주 · 대기/중단')+'</span>';
+  esc(v.title)+'</div>'+
+  '<span class="us-small us-existing-shares">실제 보유수량: <b>'+(held!==null?held.toLocaleString('ko-KR',{maximumFractionDigits:6})+'주':'이 기기에 미등록')+'</b></span>'+
+  '<span class="us-small">추가매수 검토: <b>'+(v.qty?v.qty+'주':v.amountKRW?krw(v.amountKRW)+' 소액 적립':'0주 (대기/중단)')+'</b></span>';
 }
 function detailLine(id){
  const v=decision(id);
@@ -125,7 +127,7 @@ function detailLine(id){
   '<span class="us-decision-kind">'+(v.type==='buy'?'매수 검토':v.type==='stop'?'매수 중단':'대기')+'</span></div>'+
   '<p>'+esc(v.reason)+'</p>';
  if(v.notes?.length)html+='<p class="us-small">'+v.notes.map(esc).join(' · ')+'</p>';
- html+='<p class="us-small">검토 수량/예산: <b>'+(v.qty?v.qty+'주':v.amountKRW?krw(v.amountKRW)+' 계획 적립 검토':'0주')+
+ html+='<p class="us-small">추가매수 검토 수량/예산 (실제 보유수량 아님): <b>'+(v.qty?v.qty+'주':v.amountKRW?krw(v.amountKRW)+' 계획 적립 검토':'0주')+
   '</b> · 시세 '+(v.sourceDate?v.sourceDate.slice(0,4)+'-'+v.sourceDate.slice(4,6)+'-'+v.sourceDate.slice(6,8):'확인 불가')+
   ' 미국장 확정 일봉 · 비공식, 실시간 주문 신호 아님</p>';
  if(id!=='cony')html+='<p class="us-small">매수 상한: '+(getLimit(id)!==null?krw(getLimit(id)):'미설정')+
@@ -162,7 +164,7 @@ function refreshSummary(){
  panel.innerHTML='<div class="us-signal-counts"><div><b class="state-buy">매수 검토 '+counts.buy+'</b></div>'+
  '<div><b class="state-stop">매수 중단 '+counts.stop+'</b></div>'+
  '<div><b class="state-wait">대기 '+counts.wait+'</b></div></div>'+
- '<p class="us-small">미국장 확정 일봉의 기술적 참고 판단이며 자동매수는 실행하지 않습니다. 주문 전 실제 시세와 개인 예산을 확인하세요.</p>';
+ '<p class="us-small">‘추가매수 검토’는 보유수량이 아니라 새로 살지 살펴보는 수량입니다. 실제 보유수량은 각 카드에서 확인하세요. 자동 주문은 실행하지 않으며 토스 시세와 예산을 확인하세요.</p>';
 }
 function mount(){
  const container=$('us-panel');if(!container)return;
