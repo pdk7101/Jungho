@@ -170,6 +170,41 @@ details[open]>summary{margin-bottom:12px}
 .us-signal-limits input{font-size:.86rem;padding:9px}
 .us-signals-panel details{border-top:1px solid #3b5270;padding-top:10px;margin-top:10px}
 @media(max-width:400px){.us-signal-counts{gap:4px}.us-signal-counts>div{font-size:.74rem}.us-signal-limits{grid-template-columns:1fr}}
+
+/* Single full-width US stock row on mobile and desktop, like Korean stock list. */
+#us-panel .us-cards{display:grid;grid-template-columns:minmax(0,1fr);gap:7px;margin:10px 0}
+#us-panel .us-card.us-list-row{
+  display:block;width:100%;min-width:0;text-align:left;
+  border:1px solid #455b78;border-radius:10px;
+  background:#14233a;padding:10px 12px;
+  font-size:.84rem;font-weight:400;line-height:1.4
+}
+#us-panel .us-card.us-list-row.us-selected{border:2px solid #77a9ff;padding:9px 11px}
+#us-panel .us-list-top{
+  width:100%;min-width:0;display:grid;
+  grid-template-columns:57px minmax(0,1fr) auto 12px;
+  align-items:center;gap:7px
+}
+#us-panel .us-card .us-list-ticker{min-width:0;font-size:1.03rem;font-weight:800;white-space:nowrap}
+#us-panel .us-list-price{min-width:0;display:block;text-align:right;font-size:1.08rem;font-weight:800;white-space:nowrap;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+#us-panel .us-list-state{
+  display:block;font-size:.74rem;font-weight:750;border:1px solid currentColor;
+  border-radius:7px;padding:3px 6px;white-space:nowrap
+}
+#us-panel .us-list-state.state-buy{color:#a1d5ff}
+#us-panel .us-list-state.state-stop{color:#ffabb8}
+#us-panel .us-list-state.state-wait{color:#c5cfdd}
+#us-panel .us-list-arrow{color:#a9bed8;font-size:1.1rem}
+#us-panel .us-list-meta{
+  display:block;min-width:0;margin-top:4px;
+  color:#b9c9dd;font-size:.77rem;line-height:1.4;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
+@media(max-width:380px){
+ #us-panel .us-list-top{grid-template-columns:52px minmax(0,1fr) auto 9px;gap:5px}
+ #us-panel .us-list-price{font-size:.98rem}
+ #us-panel .us-list-state{font-size:.69rem;padding:3px 4px}
+}
 </style><script src="./live-prices.js"></script></head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel flex"><div><b>현재가 재조회 · 마지막 게시 일봉과 구분</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
