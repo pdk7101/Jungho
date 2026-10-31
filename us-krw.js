@@ -113,16 +113,16 @@ function cardLine(id,priceUsd){
 
 function totalKrw(){
  const app=window.ISA_US_APP;
- if(!app)return {count:0,principal:0,value:0,pnl:0,knownNet:0,missing:0,inclusive:null};
- let count=0,principal=0,value=0,pnl=0,knownNet=0,missing=0;
+ if(!app)return {count:0,principal:0,value:0,pnl:0,knownNet:0,missing:0,provisional:0,inclusive:null};
+ let count=0,principal=0,value=0,pnl=0,knownNet=0,missing=0,provisional=0;
  for(const symbol of ITEMS){
   const id=symbol.toLowerCase(),current=app.getPrice?.(id),p=positionKrw(id,current);
   if(!p)continue;
   count++;principal+=p.principal;value+=p.value;pnl+=p.pnl;
-  if(p.net===null)missing++;else knownNet+=p.net;
+  if(p.net===null)missing++;else {knownNet+=p.net;if(p.payout?.kind==='ledger')provisional++;}
  }
  return {count,principal,value,pnl,rate:principal>0?pnl/principal*100:null,
-  knownNet,missing,inclusive:missing===0&&count>0?pnl+knownNet:null,
+  knownNet,missing,provisional,inclusive:missing===0&&count>0?pnl+knownNet:null,
   inclusiveRate:missing===0&&count>0&&principal>0?(pnl+knownNet)/principal*100:null};
 }
 const signed=v=>(v>=0?'+':'')+won(v);
@@ -136,9 +136,10 @@ function showTotal(){
  '<div>추정 평가금액<strong>'+won(v.value)+'</strong></div>'+
  '<div>평가손익<strong class="'+(v.pnl>=0?'us-positive':'us-negative')+'">'+signed(v.pnl)+'</strong><small>'+signedPercent(v.rate)+'</small></div>'+
  '<div>확인된 누적 세후 배당금<strong>'+won(v.knownNet)+'</strong><small>'+(v.missing?'미입력 '+v.missing+'종목':'전체 입력/기록')+'</small></div>'+
- '<div>분배금 포함 총손익<strong>'+(v.inclusive===null?'전체 계산 보류':signed(v.inclusive))+'</strong>'+
+ '<div>'+(v.provisional?'기록분 포함 잠정 총손익':'분배금 포함 총손익')+'<strong>'+(v.inclusive===null?'전체 계산 보류':signed(v.inclusive))+'</strong>'+
  (v.inclusiveRate!==null?'<small>'+signedPercent(v.inclusiveRate)+'</small>':'')+'</div></div>';
- if(v.missing)html+='<p class="us-small">미입력 '+v.missing+'종목이 있어 전체 분배금 포함 총손익을 계산하지 않았습니다. 확인된 분배금만 합산하며 빈 기록을 0원으로 가정하지 않습니다.</p>';
+ if(v.missing)html+='<p class="us-small">미입력 '+v.missing+'종목이 있어 전체 분배금 포함 총손익을 계산하지 않았습니다. 빈 기록을 0원으로 가정하지 않습니다.</p>';
+ if(v.provisional)html+='<p class="us-small">'+v.provisional+'종목은 날짜별로 기록된 지급금만 반영했습니다. 누락된 과거 분배금이 있으면 실제 누적 총손익과 다를 수 있습니다.</p>'; 
  html+='<p class="us-small">매수원가는 현재 보유수량 × 입력 평단가이며 분배금 재투자분도 포함될 수 있습니다. 외부에서 입금한 실제 투자원금과 다릅니다. 원화 평가액은 토스 입력 현재가 또는 비공식 참고환율로 계산한 추정치입니다.</p>';
  el.innerHTML=html;
 }
@@ -181,7 +182,7 @@ function detailLine(id,priceUsd){
   '<div>매수 누적원가<strong>'+won(p.principal)+'</strong></div>'+
   '<div>현재 평가금액<strong>'+won(p.value)+'</strong></div>'+
   '<div>평가손익<strong class="'+(p.pnl>=0?'us-positive':'us-negative')+'">'+signed(p.pnl)+'</strong><small>'+signedPercent(p.rate)+'</small></div>'+
-  '<div>분배금 포함 총손익<strong>'+(p.inclusive===null?'미확인':signed(p.inclusive))+'</strong>'+
+  '<div>'+(p.payout?.kind==='ledger'?'기록분 포함 잠정 총손익':'분배금 포함 총손익')+'<strong>'+(p.inclusive===null?'미확인':signed(p.inclusive))+'</strong>'+
   (p.inclusiveRate===null?'':'<small>'+signedPercent(p.inclusiveRate)+'</small>')+'</div></div>';
  html+='<p>현재 표시가격으로 1주 추가 시 예상 원화 평단 <b>'+won(p.postOne,2)+'</b> ('+
   (p.postOne<p.avg?'평단 인하 가능':'평단 인하 효과 없음')+')</p>';
