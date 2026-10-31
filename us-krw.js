@@ -105,7 +105,8 @@ function dividendPrice(amountUsd){
 function cardLine(id,priceUsd){
  const p=positionKrw(id,priceUsd),h=holdings()[id]||{};
  if(p)return '<span class="us-small '+(p.pnl>=0?'us-positive':'us-negative')+'">'+
-  '내 평단 '+won(p.avg)+' · 평가손익 '+(p.pnl>=0?'+':'')+won(p.pnl)+'</span>';
+  '평단 '+won(p.avg)+' · 평가손익 '+signed(p.pnl)+' ('+signedPercent(p.rate)+')'+
+  (p.inclusive!==null?' · 분배금 포함 '+signed(p.inclusive):'')+'</span>';
  if(finitePositive(h.krwAvg))return '<span class="us-small">원화 평단 '+won(h.krwAvg)+' · 손익 계산용 수량·가격 확인 필요</span>';
  return '<span class="us-small">원화 평단 미입력</span>';
 }
@@ -141,21 +142,52 @@ function showTotal(){
  html+='<p class="us-small">매수원가는 현재 보유수량 × 입력 평단가이며 분배금 재투자분도 포함될 수 있습니다. 외부에서 입금한 실제 투자원금과 다릅니다. 원화 평가액은 토스 입력 현재가 또는 비공식 참고환율로 계산한 추정치입니다.</p>';
  el.innerHTML=html;
 }
+
+function distributionDetail(id){
+ const stats=distributionStats(id),net=netDividend(id);
+ let html='<div class="us-dist-detail"><b>원화 분배금·배당금 상세</b>';
+ if(net){
+  html+='<p>손익에 반영하는 누적 세후 분배금 <strong>'+won(net.amount)+'</strong>'+
+   ' <span class="us-small">('+clean(net.source)+')</span></p>';
+  if(net.kind==='cumulative'&&stats.count){
+   html+='<p>날짜별 기록 합계 '+won(stats.net)+' / 직접 입력 누적금액 '+won(net.amount)+
+     ' · 차액 '+(net.discrepancy>=0?'+':'')+won(net.discrepancy)+'</p>'+
+     '<p class="us-small">차액은 과거 지급내역 누락 또는 입력 차이일 수 있습니다. 두 금액을 더하지 않고 직접 입력 누적금액만 손익에 반영합니다.</p>';
+  }else if(net.kind==='ledger')html+='<p class="us-small">날짜별 지급 기록만 합산했습니다. 과거 기록이 누락됐다면 실제 총수령액보다 적을 수 있습니다.</p>';
+ }else html+='<p class="us-small">입력된 세후 분배금이 없어 분배금 포함 총손익을 확정 계산하지 않습니다.</p>';
+ if(stats.count){
+  const moneyPart=(label,amount,count)=>count===stats.count?'<p>'+label+' 합계 '+won(amount)+'</p>':
+   '<p class="us-small">'+label+' 일부 입력 '+count+'/'+stats.count+'건 · 입력된 금액 합계 '+won(amount)+' (미입력액 제외)</p>';
+  html+='<p>입력된 지급 횟수 '+stats.count+'건 · 세후 실수령 기록 합계 '+won(stats.net)+'</p>'+
+   moneyPart('세전 지급금',stats.gross,stats.grossCount)+moneyPart('원천징수·세금',stats.tax,stats.taxCount)+
+   moneyPart('재투자한 지급금',stats.reinvest,stats.reinvestCount);
+  html+='<p class="us-small">월별 실제 입력 기록: '+stats.months.slice(0,4).map(([month,total])=>clean(month)+' '+won(total)).join(' · ')+'</p>';
+  html+='<div class="us-dist-recent">'+stats.rows.slice(0,6).map(r=>
+   '<div class="us-dist-row"><span>'+clean(r.date)+'</span><span>세후 '+won(r.net)+
+   '<small>'+(r.gross!==null?'세전 '+won(r.gross)+' · ':'')+(r.tax!==null?'세금 '+won(r.tax)+' · ':'')+
+   (r.reinvest!==null?'재투자 '+won(r.reinvest):'')+'</small></span></div>').join('')+'</div>';
+ }
+ return html+'</div>';
+}
 function detailLine(id,priceUsd){
- const q=priceKrw(id,priceUsd),p=positionKrw(id,priceUsd);
- const header='<div class="us-ledger"><b>원화(KRW) 기준 매수 판단</b>';
- if(!q)return header+'<p class="us-small">미국장 종가에 적용할 환율 또는 토스 원화 현재가가 없습니다. 추정 가격을 표시하지 않습니다.</p></div>';
- let html=header+'<p>원화 표시가격 <b>'+won(q.amount,2)+'</b> · '+clean(q.source)+'</p>';
- if(!p)return html+'<p class="us-small">토스 보유수량과 원화 평단을 입력하면 평가손익과 1주 추가매수 후 예상 평단을 계산합니다.</p></div>';
- html+='<p>보유 '+p.qty.toLocaleString('ko-KR',{maximumFractionDigits:6})+'주 · 원화 평단 <b>'+won(p.avg)+'</b></p>'+
- '<p>원화 투자원금(평단 × 수량) '+won(p.principal)+' · 평가금액 '+won(p.value)+'</p>'+
- '<p>평가손익 <b class="'+(p.pnl>=0?'us-positive':'us-negative')+'">'+(p.pnl>=0?'+':'')+won(p.pnl)+'</b></p>';
- if(p.net!==null)html+='<p>누적 세후 배당·분배금 '+won(p.net)+' / <b>분배금 포함 총손익 '+(p.inclusive>=0?'+':'')+won(p.inclusive)+'</b></p>';
- else html+='<p class="us-small">누적 세후 배당금 미입력 · 분배금 포함 총손익은 계산하지 않습니다.</p>';
- html+='<p>현재 표시가격으로 1주 추가매수 후 추정 원화 평단 <b>'+won(p.postOne,2)+'</b>'+
- (p.postOne<p.avg?' · 평단 인하':' · 평단 인하 효과 없음')+'</p>'+
- '<p class="us-small">환율은 참고값이며 실제 토스 적용환율·거래 시각·수수료·표시 반올림과 차이 날 수 있습니다. 기존 평단을 현재 환율로 역산하지 않습니다. 분배금 재투자분은 실제 매입원가와 수량에 포함하고 누적 세후 분배금은 총손익 계산에만 한 번 반영합니다.</p></div>';
- return html;
+ const q=priceKrw(id,priceUsd),p=positionKrw(id,priceUsd),dist=distributionDetail(id);
+ const header='<div class="us-ledger"><b>원화 기준 평가손익 상세</b>';
+ if(!q)return header+'<p class="us-small">토스 현재가 또는 USD 종가×참고환율이 없어 원화 평가손익을 계산하지 않습니다.</p></div>'+dist;
+ let html=header+'<p>원화 현재가격 <b>'+won(q.amount,2)+'</b> · '+clean(q.source)+'</p>';
+ if(!p)return html+'<p class="us-small">보유수량과 토스 원화 평단을 입력하면 원화 투자원금과 평가손익을 계산합니다.</p></div>'+dist;
+ html+='<div class="us-fin-grid">'+
+  '<div>현재 보유수량<strong>'+p.qty.toLocaleString('ko-KR',{maximumFractionDigits:6})+'주</strong></div>'+
+  '<div>원화 평균매수가<strong>'+won(p.avg)+'</strong></div>'+
+  '<div>매수 누적원가<strong>'+won(p.principal)+'</strong></div>'+
+  '<div>현재 평가금액<strong>'+won(p.value)+'</strong></div>'+
+  '<div>평가손익<strong class="'+(p.pnl>=0?'us-positive':'us-negative')+'">'+signed(p.pnl)+'</strong><small>'+signedPercent(p.rate)+'</small></div>'+
+  '<div>분배금 포함 총손익<strong>'+(p.inclusive===null?'미확인':signed(p.inclusive))+'</strong>'+
+  (p.inclusiveRate===null?'':'<small>'+signedPercent(p.inclusiveRate)+'</small>')+'</div></div>';
+ html+='<p>현재 표시가격으로 1주 추가 시 예상 원화 평단 <b>'+won(p.postOne,2)+'</b> ('+
+  (p.postOne<p.avg?'평단 인하 가능':'평단 인하 효과 없음')+')</p>';
+ html+='<p class="us-small">평가손익 = 평가금액 − 매수 누적원가 / 분배금 포함 총손익 = 평가손익 + 누적 세후 지급금. 재투자 분배금은 누적 지급금에서 빼지 않으며, 재투자로 매수한 주식의 수량·매입원가는 이미 보유정보에 반영해야 합니다. 동일 지급금을 두 번 합산하지 않습니다.</p>'+
+ '<p class="us-small">매수 누적원가는 현재 보유수량×평단가로 추정한 금액이며 계좌 외부에서 납입한 순원금과 다를 수 있습니다. 환율·시세 시점·수수료로 인해 토스 실제 손익과 오차가 발생할 수 있습니다.</p></div>';
+ return html+dist;
 }
 function renderForm(){
  const area=$('us-krw-editor');if(!area)return;
