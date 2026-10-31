@@ -161,6 +161,15 @@ function render(){
  '<p class="us-small">미국장 확정 일봉의 기술적 참고 판단이며 자동매수는 실행하지 않습니다. 원화 표시는 참고 환율 환산 또는 직접 입력값입니다. 매매 전 토스 최신 시세와 예산을 확인하세요.</p>';
  window.ISA_US_APP?.rerender?.();
 }
+function refreshSummary(){
+ const panel=$('us-signal-summary');if(!panel)return;
+ const vals=Object.keys(NAMES).map(id=>decision(id));
+ const counts={buy:vals.filter(d=>d.type==='buy').length,stop:vals.filter(d=>d.type==='stop').length,wait:vals.filter(d=>d.type==='wait').length};
+ panel.innerHTML='<div class="us-signal-counts"><div><b class="state-buy">매수 검토 '+counts.buy+'</b></div>'+
+ '<div><b class="state-stop">매수 중단 '+counts.stop+'</b></div>'+
+ '<div><b class="state-wait">대기 '+counts.wait+'</b></div></div>'+
+ '<p class="us-small">미국장 확정 일봉의 기술적 참고 판단이며 자동매수는 실행하지 않습니다. 주문 전 실제 시세와 개인 예산을 확인하세요.</p>';
+}
 function mount(){
  const container=$('us-panel');if(!container)return;
  const holder=document.createElement('div');
@@ -174,7 +183,7 @@ function mount(){
  '<p class="us-small" id="us-signal-limits-note"></p></details>';
  const anchor=$('us-krw-panel');
  if(anchor)anchor.insertAdjacentElement('afterend',holder);else $('us-updated').insertAdjacentElement('afterend',holder);
- window.ISA_US_SIGNAL={evaluate,decision,cardLine,detailLine,settings};
+ window.ISA_US_SIGNAL={evaluate,decision,cardLine,detailLine,settings,refreshSummary};
  updateLimitsUI();
  window.addEventListener('isa-us-quotes-refreshed',render);
  render();
