@@ -106,10 +106,7 @@ function cards(){
    '<b class="us-list-price">'+text(wonPrice)+'</b>'+
    '<span class="us-list-state state-'+status+'">'+text(status==='buy'?'매수 검토':status==='stop'?'매수 중단':'대기')+'</span>'+
    '<span class="us-list-arrow" aria-hidden="true">›</span></span>'+
-   '<span class="us-list-meta">'+text(summary)+'</span>'+
-   '<span class="us-list-extra">'+text(decisionText)+
-   (x?' · 미국장 '+date(x.date)+' 확정 종가':' · 시세 확인 대기')+
-   '</span></button>';
+   '<span class="us-list-meta">'+text(summary)+'</span></button>';
  }).join('');
  host.querySelectorAll('[data-us]').forEach(btn=>btn.onclick=()=>{
   selected=btn.dataset.us;
