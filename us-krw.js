@@ -116,6 +116,17 @@ function cardLine(id,priceUsd){
  else if(held)line+='<span class="us-small">원화 평가손익 계산용 가격 확인 필요</span>';
  return line;
 }
+function compactLine(id,priceUsd){
+ const info=holdings()[id]||{},qty=xnum(info.qty),avg=xnum(info.krwAvg),p=positionKrw(id,priceUsd);
+ const parts=[];
+ if(qty!==null&&Number.isFinite(qty)&&qty>=0)parts.push('보유 '+qty.toLocaleString('ko-KR',{maximumFractionDigits:6})+'주');
+ else parts.push('보유 미입력');
+ if(finitePositive(avg))parts.push('평단 '+won(avg));
+ else parts.push('평단 미입력');
+ if(p)parts.push('평가손익 '+signed(p.pnl)+' ('+signedPercent(p.rate)+')');
+ else parts.push('손익 미확인');
+ return parts.join(' · ');
+}
 function showHoldingsCheck(){
  const el=$('us-krw-holdings-check');if(!el)return;
  const all=holdings();let present=0,netKnown=0;let missing=[];
@@ -442,7 +453,7 @@ function mount(){
  const d=$('us-krw-details');d.addEventListener('toggle',()=>{if(d.open)renderForm();});
  renderForm();
  applyPersonalLink();
- window.ISA_US_KRW={cardLine,primaryPrice,metricPrice,dividendPrice,detailLine,basisKrw:positionKrw,fx,priceKrw,totalKrw,distributionStats,netDividend};
+ window.ISA_US_KRW={cardLine,compactLine,primaryPrice,metricPrice,dividendPrice,detailLine,basisKrw:positionKrw,fx,priceKrw,totalKrw,distributionStats,netDividend};
  showRate();
  window.addEventListener('isa-us-quotes-refreshed',()=>render());
  render();
