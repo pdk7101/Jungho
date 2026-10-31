@@ -35,12 +35,50 @@ function priceKrw(id,priceUsd){
   source:'미국장 USD 종가 × '+rate.source,stamp:rate.when};
  return null;
 }
+
+/* Private, user-entered Korean-won dividend/distribution ledger.
+ * The public price feed never claims to know actual after-tax Korean receipts. */
+const LEDGER_KEY='isa-us-distributions-krw-v1';
+let ledgerSelected='cony';
+function ledgerEntries(){
+ const raw=storage(LEDGER_KEY);
+ if(!Array.isArray(raw))return [];
+ return raw.filter(r=>r&&ITEMS.includes(String(r.id||'').toUpperCase())&&
+  /^\d{4}-\d{2}-\d{2}$/.test(String(r.date||''))&&
+  Number.isFinite(Number(r.net))&&Number(r.net)>=0&&
+  typeof r.key==='string').map(r=>({
+   key:r.key,id:String(r.id).toLowerCase(),date:r.date,net:Number(r.net),
+   gross:r.gross!==null&&r.gross!==undefined&&Number.isFinite(Number(r.gross))&&Number(r.gross)>=0?Number(r.gross):null,
+   tax:r.tax!==null&&r.tax!==undefined&&Number.isFinite(Number(r.tax))&&Number(r.tax)>=0?Number(r.tax):null,
+   reinvest:r.reinvest!==null&&r.reinvest!==undefined&&Number.isFinite(Number(r.reinvest))&&Number(r.reinvest)>=0?Number(r.reinvest):null
+  })).slice(-500);
+}
+function distributionStats(id){
+ const rows=ledgerEntries().filter(r=>r.id===id).sort((a,b)=>b.date.localeCompare(a.date));
+ const sum=key=>rows.reduce((n,r)=>n+(r[key]===null?0:r[key]),0);
+ const month={};
+ rows.forEach(r=>{const m=r.date.slice(0,7);month[m]=(month[m]||0)+r.net;});
+ return {rows,count:rows.length,net:sum('net'),gross:sum('gross'),tax:sum('tax'),reinvest:sum('reinvest'),
+  grossCount:rows.filter(r=>r.gross!==null).length,taxCount:rows.filter(r=>r.tax!==null).length,
+  reinvestCount:rows.filter(r=>r.reinvest!==null).length,months:Object.entries(month).sort((a,b)=>b[0].localeCompare(a[0]))};
+}
+function netDividend(id){
+ const h=holdings()[id]||{},v=h.krwNet;
+ const manual=v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>=0?Number(v):null;
+ const logged=distributionStats(id);
+ if(manual!==null)return {amount:manual,source:'직접 입력 누적 세후 분배금',kind:'cumulative',recorded:logged.net,
+  discrepancy:logged.count?manual-logged.net:null,count:logged.count};
+ if(logged.count)return {amount:logged.net,source:'날짜별 기록된 세후 분배금 합계 (누락 가능)',kind:'ledger',recorded:logged.net,
+  discrepancy:null,count:logged.count};
+ return null;
+}
 function positionKrw(id,priceUsd){
  const p=holdings()[id]||{},q=priceKrw(id,priceUsd);
  if(!q||!finitePositive(p.qty)||!finitePositive(p.krwAvg))return null;
  const qty=Number(p.qty),avg=Number(p.krwAvg),value=q.amount*qty,principal=avg*qty,pnl=value-principal;
- const net=p.krwNet!==undefined&&p.krwNet!==null&&String(p.krwNet).trim()!==''&&Number.isFinite(Number(p.krwNet))&&Number(p.krwNet)>=0?Number(p.krwNet):null;
- return {qty,avg,price:q.amount,value,principal,pnl,net,inclusive:net!==null?pnl+net:null,
+ const payout=netDividend(id),net=payout?payout.amount:null;
+ return {qty,avg,price:q.amount,value,principal,pnl,rate:pnl/principal*100,net,payout,
+  inclusive:net!==null?pnl+net:null,inclusiveRate:net!==null?(pnl+net)/principal*100:null,
   postOne:(principal+q.amount)/(qty+1),source:q.source,stamp:q.stamp,manual:q.manual};
 }
 
@@ -71,26 +109,37 @@ function cardLine(id,priceUsd){
  if(finitePositive(h.krwAvg))return '<span class="us-small">원화 평단 '+won(h.krwAvg)+' · 손익 계산용 수량·가격 확인 필요</span>';
  return '<span class="us-small">원화 평단 미입력</span>';
 }
+
 function totalKrw(){
  const app=window.ISA_US_APP;
- if(!app)return {count:0,principal:0,value:0,pnl:0};
- let count=0,principal=0,value=0,pnl=0;
- for(const t of ITEMS){
-  const id=t.toLowerCase(),current=app.getPrice?.(id),p=positionKrw(id,current);
+ if(!app)return {count:0,principal:0,value:0,pnl:0,knownNet:0,missing:0,inclusive:null};
+ let count=0,principal=0,value=0,pnl=0,knownNet=0,missing=0;
+ for(const symbol of ITEMS){
+  const id=symbol.toLowerCase(),current=app.getPrice?.(id),p=positionKrw(id,current);
   if(!p)continue;
   count++;principal+=p.principal;value+=p.value;pnl+=p.pnl;
+  if(p.net===null)missing++;else knownNet+=p.net;
  }
- return {count,principal,value,pnl};
+ return {count,principal,value,pnl,rate:principal>0?pnl/principal*100:null,
+  knownNet,missing,inclusive:missing===0&&count>0?pnl+knownNet:null,
+  inclusiveRate:missing===0&&count>0&&principal>0?(pnl+knownNet)/principal*100:null};
 }
+const signed=v=>(v>=0?'+':'')+won(v);
+const signedPercent=v=>(v>=0?'+':'')+v.toFixed(2)+'%';
 function showTotal(){
  const el=$('us-krw-total');if(!el)return;
  const v=totalKrw();
- if(!v.count){el.innerHTML='<p class="us-small">보유수량·원화 평단을 입력하면 4종목 원화 합계를 표시합니다. 환율 또는 현재가 확인이 필요합니다.</p>';return;}
- el.innerHTML='<p><b>미국주식 원화 합계 ('+v.count+'/4종목 계산)</b></p>'+
- '<div class="us-total-grid"><div>추정 투자원금<strong>'+won(v.principal)+'</strong></div>'+
+ if(!v.count){el.innerHTML='<p class="us-small">보유수량·원화 평단을 입력하면 4종목의 원화 평가손익을 계산합니다. 유효한 환율 또는 현재가가 필요합니다.</p>';return;}
+ let html='<p><b>미국주식 평가·분배금 원화 합계 ('+v.count+'/4종목)</b></p>'+
+ '<div class="us-total-grid"><div>누적 매수원가<strong>'+won(v.principal)+'</strong></div>'+
  '<div>추정 평가금액<strong>'+won(v.value)+'</strong></div>'+
- '<div>평가손익<strong class="'+(v.pnl>=0?'us-positive':'us-negative')+'">'+(v.pnl>=0?'+':'')+won(v.pnl)+'</strong></div></div>'+
- '<p class="us-small">개인 입력 평단·수량과 비공식 환율 또는 입력 현재가로 계산한 추정 합계입니다. 배당·분배금 포함 총손익과는 다르며 실제 증권사 평가액이 아닙니다.</p>';
+ '<div>평가손익<strong class="'+(v.pnl>=0?'us-positive':'us-negative')+'">'+signed(v.pnl)+'</strong><small>'+signedPercent(v.rate)+'</small></div>'+
+ '<div>확인된 누적 세후 배당금<strong>'+won(v.knownNet)+'</strong><small>'+(v.missing?'미입력 '+v.missing+'종목':'전체 입력/기록')+'</small></div>'+
+ '<div>분배금 포함 총손익<strong>'+(v.inclusive===null?'전체 계산 보류':signed(v.inclusive))+'</strong>'+
+ (v.inclusiveRate!==null?'<small>'+signedPercent(v.inclusiveRate)+'</small>':'')+'</div></div>';
+ if(v.missing)html+='<p class="us-small">미입력 '+v.missing+'종목이 있어 전체 분배금 포함 총손익을 계산하지 않았습니다. 확인된 분배금만 합산하며 빈 기록을 0원으로 가정하지 않습니다.</p>';
+ html+='<p class="us-small">매수원가는 현재 보유수량 × 입력 평단가이며 분배금 재투자분도 포함될 수 있습니다. 외부에서 입금한 실제 투자원금과 다릅니다. 원화 평가액은 토스 입력 현재가 또는 비공식 참고환율로 계산한 추정치입니다.</p>';
+ el.innerHTML=html;
 }
 function detailLine(id,priceUsd){
  const q=priceKrw(id,priceUsd),p=positionKrw(id,priceUsd);
