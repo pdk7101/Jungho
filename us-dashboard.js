@@ -97,7 +97,7 @@ function cards(){
  const cony=f.id==='cony'&&x?.splits?.length?'<span class="us-chip us-alert">주식분할·병합 이벤트 점검</span>':'';
  return '<button class="us-card '+(selected===f.id?'us-selected':'')+'" type="button" data-us="'+f.id+'">'+
  '<strong>'+f.ticker+'</strong><span class="us-small">'+text(f.type)+'</span>'+
- '<span class="us-price">'+main+'</span>'+(window.ISA_US_KRW?.cardLine?.(f.id,px)||'')+avg+'<span class="us-small">'+text(status)+'</span>'+bands+cony+'</button>';
+ '<span class="us-price">'+main+'</span>'+(window.ISA_US_SIGNAL?.cardLine?.(f.id)||'')+(window.ISA_US_KRW?.cardLine?.(f.id,px)||'')+avg+'<span class="us-small">'+text(status)+'</span>'+bands+cony+'</button>';
  }).join('');
  host.querySelectorAll('[data-us]').forEach(btn=>btn.onclick=()=>{selected=btn.dataset.us;render();});
 }
@@ -123,12 +123,12 @@ function renderPositionEditor(){
 function details(){
  const f=FUNDS.find(f=>f.id===selected),x=market(f),px=price(f),host=$('us-details');
  if(!host)return;
- if(!x){host.innerHTML='<h3>'+f.ticker+' · '+text(f.name)+'</h3><p class="us-small">미국장 완료 일봉을 확인할 수 없습니다. 가격과 이동평균선을 추정하지 않습니다. <a href="https://finance.yahoo.com/quote/'+f.ticker+'/" target="_blank" rel="noopener">시세 제공처에서 확인</a></p>';return;}
+ if(!x){host.innerHTML='<h3>'+f.ticker+' · '+text(f.name)+'</h3>'+(window.ISA_US_SIGNAL?.detailLine?.(f.id)||'')+'<p class="us-small">미국장 완료 일봉을 확인할 수 없습니다. 가격과 이동평균선을 추정하지 않습니다. <a href="https://finance.yahoo.com/quote/'+f.ticker+'/" target="_blank" rel="noopener">시세 제공처에서 확인</a></p>';return;}
  const z=zone(x,px),b=basis(f,px),div=distribution(x),t=x.trend,metric=n=>window.ISA_US_KRW?.metricPrice?.(n)||usd(n),divPrice=n=>window.ISA_US_KRW?.dividendPrice?.(n)||usd(n,4);
  const split=x.splits||[];
  let section='<h3>'+f.ticker+' · '+text(f.name)+'</h3><p class="us-small">'+text(f.type)+' · '+text(f.hint)+'</p>'+
  '<p class="us-small">미국장 확정 일봉 '+date(x.date)+' · '+text(x.source)+' · 실시간 호가 아님 · 원화 환산 참고</p>'+
- chart(x)+'<p class="us-legend">파랑 종가 · 초록 5일선 · 노랑 20일선 (원본 달러 차트)</p>'+
+ (window.ISA_US_SIGNAL?.detailLine?.(f.id)||'')+chart(x)+'<p class="us-legend">파랑 종가 · 초록 5일선 · 노랑 20일선 (원본 달러 차트)</p>'+
  '<div class="us-statgrid"><div>종가<strong>'+metric(x.close)+'</strong></div><div>5일선<strong>'+metric(t.ma5)+'</strong></div>'+
  '<div>20일선<strong>'+metric(t.ma20)+'</strong></div><div>20일 저가<strong>'+metric(x.low20)+'</strong></div>'+
  '<div>20일 고가<strong>'+metric(x.high20)+'</strong></div><div>하단 30% · 20%<strong>'+metric(z.b30)+' / '+metric(z.b20)+'</strong></div></div>'+
