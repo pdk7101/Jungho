@@ -43,11 +43,54 @@ function positionKrw(id,priceUsd){
  return {qty,avg,price:q.amount,value,principal,pnl,net,inclusive:net!==null?pnl+net:null,
   postOne:(principal+q.amount)/(qty+1),source:q.source,stamp:q.stamp,manual:q.manual};
 }
+
+function primaryPrice(id,priceUsd){
+ const q=priceKrw(id,priceUsd);
+ const dollar=finitePositive(priceUsd)?usd(priceUsd):'달러 시세 미확인';
+ if(q)return '<span class="us-won-main">'+won(q.amount)+'</span>'+
+  '<small>'+(q.manual?'토스 당일 직접 입력':'환율 환산 참고 가격')+' · '+dollar+'</small>';
+ return '<span class="us-won-main">원화 미확인</span>'+
+  '<small>환율 정보가 없어 환산 보류 · 달러 원본 '+dollar+'</small>';
+}
+function metricPrice(priceUsd){
+ if(!finitePositive(priceUsd))return '<span>미확인</span>';
+ const r=fx();
+ return r?'<span>'+won(priceUsd*r.rate)+'</span><small class="us-usd-note">'+usd(priceUsd)+' · 동일 참고환율 환산</small>':
+ '<span>원화 환산 불가</span><small class="us-usd-note">달러 원본 '+usd(priceUsd)+'</small>';
+}
+function dividendPrice(amountUsd){
+ if(!finitePositive(amountUsd))return '미확인';
+ const r=fx();
+ return r?won(amountUsd*r.rate,2)+' (참고, '+usd(amountUsd,4)+')':
+ usd(amountUsd,4)+' (환율 미확인)';
+}
 function cardLine(id,priceUsd){
- const q=priceKrw(id,priceUsd),p=positionKrw(id,priceUsd);
- if(!q)return '<span class="us-small">원화 가격: 환율 또는 토스 현재가 입력 필요</span>';
- return '<span class="us-krw-price">'+won(q.amount)+' <small>'+(q.manual?'토스 직접 입력 · 당일':'달러 종가 환산 추정치')+'</small></span>'+
- (p?'<span class="us-small '+(p.pnl>=0?'us-positive':'us-negative')+'">원화 평단 '+won(p.avg)+' · 평가손익 '+(p.pnl>=0?'+':'')+won(p.pnl)+'</span>':'');
+ const p=positionKrw(id,priceUsd),h=holdings()[id]||{};
+ if(p)return '<span class="us-small '+(p.pnl>=0?'us-positive':'us-negative')+'">'+
+  '내 평단 '+won(p.avg)+' · 평가손익 '+(p.pnl>=0?'+':'')+won(p.pnl)+'</span>';
+ if(finitePositive(h.krwAvg))return '<span class="us-small">원화 평단 '+won(h.krwAvg)+' · 손익 계산용 수량·가격 확인 필요</span>';
+ return '<span class="us-small">원화 평단 미입력</span>';
+}
+function totalKrw(){
+ const app=window.ISA_US_APP;
+ if(!app)return {count:0,principal:0,value:0,pnl:0};
+ let count=0,principal=0,value=0,pnl=0;
+ for(const t of ITEMS){
+  const id=t.toLowerCase(),current=app.getPrice?.(id),p=positionKrw(id,current);
+  if(!p)continue;
+  count++;principal+=p.principal;value+=p.value;pnl+=p.pnl;
+ }
+ return {count,principal,value,pnl};
+}
+function showTotal(){
+ const el=$('us-krw-total');if(!el)return;
+ const v=totalKrw();
+ if(!v.count){el.innerHTML='<p class="us-small">보유수량·원화 평단을 입력하면 4종목 원화 합계를 표시합니다. 환율 또는 현재가 확인이 필요합니다.</p>';return;}
+ el.innerHTML='<p><b>미국주식 원화 합계 ('+v.count+'/4종목 계산)</b></p>'+
+ '<div class="us-total-grid"><div>추정 투자원금<strong>'+won(v.principal)+'</strong></div>'+
+ '<div>추정 평가금액<strong>'+won(v.value)+'</strong></div>'+
+ '<div>평가손익<strong class="'+(v.pnl>=0?'us-positive':'us-negative')+'">'+(v.pnl>=0?'+':'')+won(v.pnl)+'</strong></div></div>'+
+ '<p class="us-small">개인 입력 평단·수량과 비공식 환율 또는 입력 현재가로 계산한 추정 합계입니다. 배당·분배금 포함 총손익과는 다르며 실제 증권사 평가액이 아닙니다.</p>';
 }
 function detailLine(id,priceUsd){
  const q=priceKrw(id,priceUsd),p=positionKrw(id,priceUsd);
@@ -163,6 +206,7 @@ function showRate(){
 }
 function render(){
  showRate();
+ showTotal();
  window.ISA_US_APP?.rerender?.();
 }
 function mount(){
@@ -173,6 +217,7 @@ function mount(){
  holder.innerHTML='<h3>미국주식 원화 평단·손익</h3>'+
  '<p class="us-small">달러 일봉과 별도로 토스 원화 현재가·평단을 표시합니다. 개인정보는 GitHub에 전송하지 않고 이 기기에만 저장합니다.</p>'+
  '<div id="us-krw-rate-status" class="us-small">환율 확인 중…</div>'+
+ '<div id="us-krw-total" class="us-total-summary"></div>'+
  '<p id="us-krw-applied" class="us-small" aria-live="polite"></p>'+
  '<label>선택: 직접 적용할 USD/KRW 환율 (원)<input id="us-krw-fx" type="number" min="700" max="3000" step="0.01" placeholder="비워두면 수집한 참고 환율 사용" value="'+(manualFx||'')+'"></label>'+
  '<details id="us-krw-details"><summary>토스 보유수량·원화 평단·현재가 입력</summary>'+
@@ -193,7 +238,7 @@ function mount(){
  const d=$('us-krw-details');d.addEventListener('toggle',()=>{if(d.open)renderForm();});
  renderForm();
  applyPersonalLink();
- window.ISA_US_KRW={cardLine,detailLine,basisKrw:positionKrw,fx,priceKrw};
+ window.ISA_US_KRW={cardLine,primaryPrice,metricPrice,dividendPrice,detailLine,basisKrw:positionKrw,fx,priceKrw,totalKrw};
  showRate();
  window.addEventListener('isa-us-quotes-refreshed',()=>render());
  render();
