@@ -108,6 +108,55 @@ function importHoldings(){
  field.value='';renderForm();window.ISA_US_APP?.applyFromLocal?.();
  msg.textContent=good+'종목을 이 기기에 저장했습니다.'+(bad?' 형식 불일치 '+bad+'줄 제외.':'')+' 분배금은 별도 입력하세요.';
 }
+
+/* Personal portfolio snapshots are accepted only via a fragment on the user's
+ * own link. Fragment data is not part of an HTTP request to GitHub Pages;
+ * remove it from the address bar after one use. Never put private holdings
+ * into the public application source, defaults or remote JSON. */
+function applyPersonalLink(){
+ const hash=String(window.location?.hash||'');
+ if(!hash.startsWith('#us-holdings='))return;
+ const info=$('us-krw-applied'),notice=$('us-krw-message');
+ try{
+  const value=new URLSearchParams(hash.slice(1)).get('us-holdings');
+  if(!value)throw Error('보유정보 없음');
+  const cells=value.split(';');
+  const asOf=cells.shift();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(asOf)||cells.length!==4)throw Error('기준일 또는 종목 수 확인 불가');
+  const seen=new Set(),updates={};
+  for(const cell of cells){
+   const a=cell.split(',');
+   if(a.length!==3)throw Error('형식 오류');
+   const id=String(a[0]).toLowerCase(),qty=Number(a[1]),avg=Number(a[2]);
+   if(!ITEMS.includes(id.toUpperCase())||seen.has(id)||
+      !Number.isFinite(qty)||qty<0||qty>10000000||
+      !Number.isFinite(avg)||avg<=0||avg>1000000000)throw Error('종목·보유수량·평단가 검증 실패');
+   seen.add(id);updates[id]={qty,krwAvg:avg};
+  }
+  const all=holdings();
+  for(const [id,vals] of Object.entries(updates)){
+   // Retain any existing separately entered USD cost bases and net distributions.
+   all[id]={...(all[id]||{}),...vals,krwSnapshotDate:asOf};
+   // Do not import 2026-10-30 prices as if they were fresh today.
+   delete all[id].krwCurrent;
+   delete all[id].krwDay;
+  }
+  if(!write('isa-us-holdings-v1',all))throw Error('기기 저장소 접근 실패');
+  window.ISA_US_APP?.applyFromLocal?.();
+  renderForm();
+  const msg='토스 '+asOf+' 기준 미국주식 4종목 보유수량·원화 평단가를 이 기기에 적용했습니다. 이후 추가매수·재투자가 있었다면 갱신하세요.';
+  if(info)info.textContent=msg;
+  if(notice)notice.textContent=msg;
+  if($('us-krw-details'))$('us-krw-details').open=true;
+ }catch(e){
+  const msg='보유정보 자동 적용 실패: '+String(e.message||e)+'. 입력 항목에서 직접 등록할 수 있습니다.';
+  if(info)info.textContent=msg;
+  if(notice)notice.textContent=msg;
+ }finally{
+  // Ensure personal share counts and cost bases do not linger in the URL bar.
+  try{window.history.replaceState(window.history.state,'',window.location.pathname+window.location.search);}catch(_){}
+ }
+}
 function showRate(){
  const r=fx(),area=$('us-krw-rate-status');if(!area)return;
  area.textContent=r?'적용 환율: 1 USD = '+won(r.rate,2)+' · '+r.source+' ('+r.when+')':'환율 확인 실패 · 환율 직접 입력 또는 토스 현재가를 사용하세요.';
@@ -124,6 +173,7 @@ function mount(){
  holder.innerHTML='<h3>미국주식 원화 평단·손익</h3>'+
  '<p class="us-small">달러 일봉과 별도로 토스 원화 현재가·평단을 표시합니다. 개인정보는 GitHub에 전송하지 않고 이 기기에만 저장합니다.</p>'+
  '<div id="us-krw-rate-status" class="us-small">환율 확인 중…</div>'+
+ '<p id="us-krw-applied" class="us-small" aria-live="polite"></p>'+
  '<label>선택: 직접 적용할 USD/KRW 환율 (원)<input id="us-krw-fx" type="number" min="700" max="3000" step="0.01" placeholder="비워두면 수집한 참고 환율 사용" value="'+(manualFx||'')+'"></label>'+
  '<details id="us-krw-details"><summary>토스 보유수량·원화 평단·현재가 입력</summary>'+
  '<p class="us-small">현재가는 입력 당일에만 사용하고 다음 날에는 만료합니다. 1줄에 티커 / 수량 / 원화 평단 / 현재가 순으로 붙여넣으면 한 번에 저장할 수 있습니다.</p>'+
@@ -142,6 +192,7 @@ function mount(){
  $('us-krw-import-button').onclick=importHoldings;
  const d=$('us-krw-details');d.addEventListener('toggle',()=>{if(d.open)renderForm();});
  renderForm();
+ applyPersonalLink();
  window.ISA_US_KRW={cardLine,detailLine,basisKrw:positionKrw,fx,priceKrw};
  showRate();
  window.addEventListener('isa-us-quotes-refreshed',()=>render());
