@@ -354,6 +354,7 @@ function render(){
  showRate();
  showTotal();
  renderLedger();
+ window.ISA_US_SIGNAL?.refreshSummary?.();
  window.ISA_US_APP?.rerender?.();
 }
 function mount(){
