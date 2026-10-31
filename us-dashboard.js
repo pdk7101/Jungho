@@ -88,18 +88,34 @@ function chart(x){
 }
 function cards(){
  const host=$('us-cards');if(!host)return;
+ // Domestic-style layout: one compact full-width row per US symbol.
+ // The rich indicators, dividend and risk details remain in the selection panel.
  host.innerHTML=FUNDS.map(f=>{
- const x=market(f),px=price(f),b=basis(f,px),z=zone(x,px);
- const main=x?(window.ISA_US_KRW?.primaryPrice?.(f.id,px)||usd(px))+' <small>미국장 확정 종가 '+date(x.date)+'</small>':'미확인 <small>US 완료 일봉 수집 대기</small>';
- const status=!x?'시세 확인 불가':trend(x);
- const avg=b?'<span class="us-small">USD 원가 참고 '+usd(b.avg)+'</span>':'';
- const bands=z?'<span class="us-chip">'+(z.level===2?'하단 20%':z.level===1?'하단 30%':'일반 가격대')+'</span>':'';
- const cony=f.id==='cony'&&x?.splits?.length?'<span class="us-chip us-alert">주식분할·병합 이벤트 점검</span>':'';
- return '<button class="us-card '+(selected===f.id?'us-selected':'')+'" type="button" data-us="'+f.id+'">'+
- '<strong>'+f.ticker+'</strong><span class="us-small">'+text(f.type)+'</span>'+
- '<span class="us-price">'+main+'</span>'+(window.ISA_US_SIGNAL?.cardLine?.(f.id)||'')+(window.ISA_US_KRW?.cardLine?.(f.id,px)||'')+avg+'<span class="us-small">'+text(status)+'</span>'+bands+cony+'</button>';
+  const x=market(f),px=price(f),decision=window.ISA_US_SIGNAL?.decision?.(f.id),
+    wonQuote=window.ISA_US_KRW?.priceKrw?.(f.id,px);
+  const status=decision?.type||'wait';
+  const decisionText=decision?.title||'자료 확인 대기';
+  const wonPrice=wonQuote&&Number.isFinite(wonQuote.amount)&&wonQuote.amount>0?
+   Math.round(wonQuote.amount).toLocaleString('ko-KR')+'원':'원화 미확인';
+  const summary=window.ISA_US_KRW?.compactLine?.(f.id,px)||'보유수량·원화 평단 입력 필요';
+  const selectedClass=selected===f.id?'us-selected':'';
+  return '<button class="us-card us-list-row '+selectedClass+'" type="button" data-us="'+f.id+
+   '" aria-label="'+text(f.ticker+' 현재가 '+wonPrice+' '+decisionText+' '+summary)+
+   '" aria-pressed="'+(selected===f.id?'true':'false')+'">'+
+   '<span class="us-list-top"><strong class="us-list-ticker">'+f.ticker+'</strong>'+
+   '<b class="us-list-price">'+text(wonPrice)+'</b>'+
+   '<span class="us-list-state state-'+status+'">'+text(status==='buy'?'매수 검토':status==='stop'?'매수 중단':'대기')+'</span>'+
+   '<span class="us-list-arrow" aria-hidden="true">›</span></span>'+
+   '<span class="us-list-meta">'+text(summary)+'</span>'+
+   '<span class="us-list-extra">'+text(decisionText)+
+   (x?' · 미국장 '+date(x.date)+' 확정 종가':' · 시세 확인 대기')+
+   '</span></button>';
  }).join('');
- host.querySelectorAll('[data-us]').forEach(btn=>btn.onclick=()=>{selected=btn.dataset.us;render();});
+ host.querySelectorAll('[data-us]').forEach(btn=>btn.onclick=()=>{
+  selected=btn.dataset.us;
+  const select=$('us-selector');if(select)select.value=selected;
+  render();
+ });
 }
 function renderPositionEditor(){
  const host=$('us-positions');if(!host)return;
