@@ -273,6 +273,7 @@ function renderForm(){
   if(value!==null&&Number.isFinite(value)&&value>=0&&(k!=='krwAvg'||value>0)&&(k!=='krwCurrent'||value>0))p[k]=value;
   else delete p[k];
   if(k==='krwCurrent')p.krwDay=finitePositive(p.krwCurrent)?day():'';
+  if(k==='qty'||k==='krwAvg')p.krwSnapshotDate=day();
   h[id]=p;
   write('isa-us-holdings-v1',h);
   $('us-krw-message').textContent='해당 기기에 보유정보를 저장했습니다. 추가매수·재투자 후 다시 갱신하세요.';
@@ -289,7 +290,7 @@ function importHoldings(){
   if(!m){bad++;continue;}
   const id=m[1].toLowerCase(),qty=Number(m[2]),avg=Number(m[3].replace(/,/g,'')),current=Number(m[4].replace(/,/g,''));
   if(!(qty>=0)||!Number.isFinite(qty)||!(avg>0)||!(current>0)){bad++;continue;}
-  h[id]={...(h[id]||{}),qty,krwAvg:avg,krwCurrent:current,krwDay:day()};
+  h[id]={...(h[id]||{}),qty,krwAvg:avg,krwCurrent:current,krwDay:day(),krwSnapshotDate:day()};
   good++;
  }
  if(!good){msg.textContent='형식 확인: SCHD 10 50000 49000 (티커 수량 평단원 현재가원)';return;}
@@ -309,31 +310,50 @@ function applyPersonalLink(){
  try{
   const value=decodeURIComponent(hash.slice('#us-holdings='.length));
   if(!value)throw Error('보유정보 없음');
-  const cells=value.split(';');
-  const asOf=cells.shift();
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(asOf)||cells.length!==4)throw Error('기준일 또는 종목 수 확인 불가');
+  const cells=value.split(';'),asOf=cells.shift();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(asOf)||cells.length!==4||asOf>day())
+   throw Error('기준일 또는 종목 수 확인 불가');
   const seen=new Set(),updates={};
   for(const cell of cells){
    const a=cell.split(',');
-   if(a.length!==3)throw Error('형식 오류');
-   const id=String(a[0]).toLowerCase(),qty=Number(a[1]),avg=Number(a[2]);
+   if(a.length!==3&&a.length!==4)throw Error('자료 형식 확인 필요');
+   const id=String(a[0]).toLowerCase(),qty=Number(a[1]),avg=Number(a[2]),
+    net=a.length===4&&a[3]!==''?Number(a[3]):null;
    if(!ITEMS.includes(id.toUpperCase())||seen.has(id)||
       !Number.isFinite(qty)||qty<0||qty>10000000||
-      !Number.isFinite(avg)||avg<=0||avg>1000000000)throw Error('종목·보유수량·평단가 검증 실패');
-   seen.add(id);updates[id]={qty,krwAvg:avg};
+      !Number.isFinite(avg)||avg<=0||avg>1000000000||
+      (net!==null&&(!Number.isFinite(net)||net<0||net>1000000000)))
+      throw Error('종목·수량·원화 평단·세후 분배금 검증 실패');
+   seen.add(id);updates[id]={qty,krwAvg:avg,krwNet:net};
   }
   const all=holdings();
-  for(const [id,vals] of Object.entries(updates)){
-   // Retain any existing separately entered USD cost bases and net distributions.
-   all[id]={...(all[id]||{}),...vals,krwSnapshotDate:asOf};
-   // Do not import 2026-10-30 prices as if they were fresh today.
-   delete all[id].krwCurrent;
-   delete all[id].krwDay;
+  let applied=0,kept=0,dividendUpdated=0;
+  for(const [id,values] of Object.entries(updates)){
+   const old=all[id]||{};
+   // Never replace holdings with a snapshot older than an explicitly edited one.
+   const stamped=/^\d{4}-\d{2}-\d{2}$/.test(String(old.krwSnapshotDate||''));
+   const older=stamped&&old.krwSnapshotDate>asOf;
+   const unknownManual=!stamped&&finitePositive(old.qty)&&finitePositive(old.krwAvg);
+   const p={...old};
+   if(older||unknownManual)kept++;
+   else {p.qty=values.qty;p.krwAvg=values.krwAvg;p.krwSnapshotDate=asOf;applied++;}
+   // Cumulative receipts can only rise; preserve a newer amount already entered.
+   if(values.krwNet!==null){
+    const previous=old.krwNet!==undefined&&old.krwNet!==null&&String(old.krwNet).trim()!==''&&Number.isFinite(Number(old.krwNet))&&Number(old.krwNet)>=0?Number(old.krwNet):null;
+    if(previous===null||values.krwNet>previous){
+     p.krwNet=values.krwNet;dividendUpdated++;
+    }
+   }
+   // Stale old prices must not be used as if they were today's current prices.
+   if(p.krwDay!==day()){delete p.krwCurrent;delete p.krwDay;}
+   all[id]=p;
   }
   if(!write('isa-us-holdings-v1',all))throw Error('기기 저장소 접근 실패');
   window.ISA_US_APP?.applyFromLocal?.();
   renderForm();
-  const msg='토스 '+asOf+' 기준 미국주식 4종목 보유수량·원화 평단가를 이 기기에 적용했습니다. 이후 추가매수·재투자가 있었다면 갱신하세요.';
+  const msg=asOf+' 토스 보유정보: '+applied+'종목 적용'+(kept?' · 기존 최신/수동 입력 '+kept+'종목 유지':'')+
+    (dividendUpdated?' · 누적 세후 분배금 '+dividendUpdated+'종목 반영':'')+
+    '. 기존 정보가 없었던 기기에 저장했습니다. 최신 추가매수 내역이 있다면 직접 갱신하세요.';
   if(info)info.textContent=msg;
   if(notice)notice.textContent=msg;
   if($('us-krw-details'))$('us-krw-details').open=true;
@@ -342,7 +362,6 @@ function applyPersonalLink(){
   if(info)info.textContent=msg;
   if(notice)notice.textContent=msg;
  }finally{
-  // Ensure personal share counts and cost bases do not linger in the URL bar.
   try{window.history.replaceState(window.history.state,'',window.location.pathname+window.location.search);}catch(_){}
  }
 }
