@@ -46,6 +46,7 @@ jobs:
           mkdir -p site
           cp index.html insights.js live-prices.js us-dashboard.js us-krw.js us-signals.js quotes.json metrics.json us-quotes.json site/
           cp data/metric-history.json site/metric-history.json
+          node scripts/stamp-assets.js site/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
