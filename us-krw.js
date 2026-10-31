@@ -104,11 +104,12 @@ function dividendPrice(amountUsd){
 }
 function cardLine(id,priceUsd){
  const p=positionKrw(id,priceUsd),h=holdings()[id]||{};
- const qty=xnum(h.qty),snapshot=h.krwSnapshotDate||'기준일 미입력',
+ const qty=xnum(h.qty),snapshot=h.krwSnapshotDate,
   held=qty!==null&&Number.isFinite(qty)&&qty>=0;
  let line='<span class="us-small">실제 보유: <b>'+(held?qty.toLocaleString('ko-KR',{maximumFractionDigits:6})+'주':'미등록')+
   '</b> · 원화 평단 <b>'+(finitePositive(h.krwAvg)?won(h.krwAvg):'미입력')+'</b></span>';
- if(held&&finitePositive(h.krwAvg))line+='<span class="us-small">보유정보 기준: '+clean(snapshot)+'</span>';
+ if(held&&finitePositive(h.krwAvg)&&/^\d{4}-\d{2}-\d{2}$/.test(String(snapshot||'')))
+  line+='<span class="us-small">보유정보 기준: '+clean(snapshot)+'</span>';
  if(p)line+='<span class="us-small '+(p.pnl>=0?'us-positive':'us-negative')+'">'+
   '평가손익 '+signed(p.pnl)+' ('+signedPercent(p.rate)+')'+
   (p.inclusive!==null?' · 세후 분배금 포함 '+signed(p.inclusive):' · 누적 세후 분배금 미입력')+'</span>';
