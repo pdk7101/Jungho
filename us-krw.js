@@ -189,6 +189,70 @@ function detailLine(id,priceUsd){
  '<p class="us-small">매수 누적원가는 현재 보유수량×평단가로 추정한 금액이며 계좌 외부에서 납입한 순원금과 다를 수 있습니다. 환율·시세 시점·수수료로 인해 토스 실제 손익과 오차가 발생할 수 있습니다.</p></div>';
  return html+dist;
 }
+
+function renderLedger(){
+ const area=$('us-distribution-ledger'),select=$('us-distribution-ticker');if(!area||!select)return;
+ const id=select.value||ledgerSelected;
+ const stats=distributionStats(id),net=netDividend(id);
+ let html='<p><b>'+clean(id.toUpperCase())+' · 날짜별 세후 분배금 내역</b></p>';
+ if(!stats.count){
+  html+='<p class="us-small">아직 입력된 지급내역이 없습니다. 실제 토스 입금내역의 원화 세후 금액을 등록해 주세요.</p>';
+ }else{
+  html+='<div class="us-dist-figures"><div>기록된 세후 지급금<strong>'+won(stats.net)+'</strong></div>'+
+  '<div>입력된 지급횟수<strong>'+stats.count+'회</strong></div>'+
+  '<div>원화 재투자 기록<strong>'+(stats.reinvestCount===stats.count?won(stats.reinvest):'일부만 입력')+'</strong></div></div>';
+  html+='<p class="us-small">월별 입력 내역: '+stats.months.slice(0,6).map(([m,v])=>clean(m)+' '+won(v)).join(' · ')+'</p>';
+  if(net&&net.kind==='cumulative'&&net.discrepancy!==null)html+='<p class="us-small">별도 누적 세후 수령액 '+won(net.amount)+' / 날짜별 기록 '+won(stats.net)+
+    ' / 차이 '+signed(net.discrepancy)+'. 손익에는 누적 수령액만 반영하며 합산하지 않습니다.</p>';
+  html+='<div class="us-dist-records">'+stats.rows.map(r=>
+   '<div class="us-dist-record"><div><b>'+clean(r.date)+'</b> · 세후 '+won(r.net)+
+    '<small>'+(r.gross!==null?'세전 '+won(r.gross)+' · ':'')+
+    (r.tax!==null?'세금 '+won(r.tax)+' · ':'')+
+    (r.reinvest!==null?'재투자 '+won(r.reinvest):'재투자액 미입력')+'</small></div>'+
+   '<button type="button" class="us-dist-delete" data-ledger-key="'+clean(r.key)+'" aria-label="'+clean(r.date)+' 기록 삭제">삭제</button></div>'
+  ).join('')+'</div>';
+ }
+ area.innerHTML=html;
+ area.querySelectorAll('button[data-ledger-key]').forEach(btn=>btn.addEventListener('click',()=>{
+  const key=btn.getAttribute('data-ledger-key');
+  if(typeof window.confirm==='function'&&!window.confirm('선택한 세후 분배금 지급 기록을 삭제할까요?'))return;
+  const old=ledgerEntries(),next=old.filter(r=>r.key!==key);
+  if(next.length===old.length)return;
+  if(!write(LEDGER_KEY,next)){$('us-dist-message').textContent='기기 저장소에 접근할 수 없어 삭제하지 못했습니다.';return;}
+  $('us-dist-message').textContent='해당 지급 기록을 삭제했습니다.';
+  render();
+ }));
+}
+function addDistribution(){
+ const id=$('us-distribution-ticker')?.value,date=$('us-distribution-date')?.value;
+ const readField=(key,required)=>{
+  const el=$(key),raw=el?.value.trim()||'';
+  if(!raw)return required?NaN:null;
+  const value=Number(raw.replace(/,/g,''));
+  return Number.isFinite(value)&&value>=0?value:NaN;
+ };
+ const net=readField('us-dist-net',true),gross=readField('us-dist-gross',false),
+  tax=readField('us-dist-tax',false),reinvest=readField('us-dist-reinvest',false);
+ const message=$('us-dist-message');
+ if(!ITEMS.includes(String(id||'').toUpperCase())||!date||!/^20\d{2}-\d{2}-\d{2}$/.test(date)||
+  date>day()||![net,gross,tax,reinvest].every(v=>v===null||(Number.isFinite(v)&&v>=0))){
+  message.textContent='종목, 실제 지급일, 세후 실수령액(0원 이상)을 확인해 주세요. 미래 지급일이나 잘못된 금액은 등록할 수 없습니다.';return;
+ }
+ if(gross!==null&&tax!==null&&(tax>gross||Math.abs(gross-tax-net)>2)){
+  message.textContent='세전 지급금 − 세금이 세후 지급액과 일치하지 않습니다. 토스 입금내역을 확인해 주세요.';return;
+ }
+ if(reinvest!==null&&reinvest>net){
+  message.textContent='재투자한 지급금은 해당 지급일의 세후 실수령액 이하로 입력해 주세요.';return;
+ }
+ const entries=ledgerEntries();
+ if(entries.length>=500){message.textContent='기록 500건 한도에 도달했습니다. 오래된 기록을 정리해 주세요.';return;}
+ const unique='d'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+ entries.push({key:unique,id,date,net,gross,tax,reinvest});
+ if(!write(LEDGER_KEY,entries)){message.textContent='기기 저장소 저장 실패 · 지급금 기록을 저장하지 못했습니다.';return;}
+ ['us-dist-net','us-dist-gross','us-dist-tax','us-dist-reinvest'].forEach(k=>{const el=$(k);if(el)el.value='';});
+ message.textContent=clean(id.toUpperCase())+' '+date+' 세후 '+won(net)+' 지급기록을 이 기기에 저장했습니다.';
+ render();
+}
 function renderForm(){
  const area=$('us-krw-editor');if(!area)return;
  const h=holdings();
@@ -288,6 +352,7 @@ function showRate(){
 function render(){
  showRate();
  showTotal();
+ renderLedger();
  window.ISA_US_APP?.rerender?.();
 }
 function mount(){
@@ -306,7 +371,19 @@ function mount(){
  '<textarea id="us-krw-import" rows="5" placeholder="SCHD 10 50000 49000&#10;SPYM 5 120000 118000"></textarea>'+
  '<button type="button" id="us-krw-import-button" class="us-header-button">입력한 4종목 저장</button>'+
  '<div id="us-krw-editor"></div>'+
- '<p class="us-small" id="us-krw-message">누적 세후 분배금은 실수령액을 따로 입력해 주세요.</p></details>';
+ '<p class="us-small" id="us-krw-message">누적 세후 분배금은 실수령액을 따로 입력해 주세요.</p></details>'+
+ '<details id="us-distribution-details"><summary>세후 배당·분배금 원화 지급내역 상세 등록</summary>'+
+ '<p class="us-small">실제 토스 입금내역의 날짜와 원화 금액을 입력하세요. 세전 지급금·세금·재투자액은 선택사항입니다. 과거 지급내역이 누락되어 있다면 별도의 누적 실수령액을 우선 사용하며 두 값을 합산하지 않습니다.</p>'+
+ '<div class="us-dist-form">'+
+ '<label>종목<select id="us-distribution-ticker"><option value="schd">SCHD</option><option value="agnc">AGNC</option><option value="spym">SPYM</option><option value="cony" selected>CONY</option></select></label>'+
+ '<label>실제 지급일<input type="date" id="us-distribution-date"></label>'+
+ '<label>세후 실수령액 (원, 필수)<input type="number" min="0" step="0.01" id="us-dist-net" placeholder="토스 입금 원화"></label>'+
+ '<label>세전 지급액 (원, 선택)<input type="number" min="0" step="0.01" id="us-dist-gross" placeholder="확인 시 입력"></label>'+
+ '<label>원천징수·세금 (원, 선택)<input type="number" min="0" step="0.01" id="us-dist-tax" placeholder="확인 시 입력"></label>'+
+ '<label>지급금 중 재투자액 (원, 선택)<input type="number" min="0" step="0.01" id="us-dist-reinvest" placeholder="지급금 내 재투자"></label>'+
+ '</div><button type="button" class="us-header-button" id="us-dist-add">세후 지급내역 저장</button>'+
+ '<p id="us-dist-message" class="us-small" aria-live="polite"></p>'+
+ '<div id="us-distribution-ledger"></div></details>';
  head.insertAdjacentElement('afterend',holder);
  $('us-krw-fx').addEventListener('change',function(){
   const rate=this.value.trim()===''?null:Number(this.value);
@@ -316,10 +393,14 @@ function mount(){
   render();
  });
  $('us-krw-import-button').onclick=importHoldings;
+ $('us-dist-add').onclick=addDistribution;
+ $('us-distribution-date').value=day();
+ $('us-distribution-ticker').value=ledgerSelected;
+ $('us-distribution-ticker').addEventListener('change',function(){ledgerSelected=this.value;renderLedger();});
  const d=$('us-krw-details');d.addEventListener('toggle',()=>{if(d.open)renderForm();});
  renderForm();
  applyPersonalLink();
- window.ISA_US_KRW={cardLine,primaryPrice,metricPrice,dividendPrice,detailLine,basisKrw:positionKrw,fx,priceKrw,totalKrw};
+ window.ISA_US_KRW={cardLine,primaryPrice,metricPrice,dividendPrice,detailLine,basisKrw:positionKrw,fx,priceKrw,totalKrw,distributionStats,netDividend};
  showRate();
  window.addEventListener('isa-us-quotes-refreshed',()=>render());
  render();
