@@ -5,7 +5,7 @@ const sha=(process.env.GITHUB_SHA||'').trim();
 if(!/^[a-f0-9]{40}$/.test(sha))throw Error('GITHUB_SHA 40자리 값 확인 불가. 캐시 버전 없는 배포 중단');
 const version=sha.slice(0,12);
 let html=fs.readFileSync(file,'utf8');
-const names=['live-prices.js','insights.js','us-dashboard.js','us-krw.js','us-signals.js'];
+const names=['live-prices.js','insights.js','us-dashboard.js','us-krw.js','us-signals.js','unattended-orders.js'];
 for(const name of names){
  const before='src="./'+name+'"';
  const previous=new RegExp('src="\\./'+name.replace('.','\\.')+'(?:\\?v=[A-Za-z0-9_-]+)?"','g');
