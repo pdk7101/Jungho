@@ -3,9 +3,9 @@
 (function(){
 'use strict';
 const STORE='isa-unattended-order-plan-v1', REGISTER='isa-unattended-order-status-v1';
-const DEFAULT={monthlyMax:1000000,tradingDays:21,conyCashDaily:15000,reitDaily:1,sofrDaily:0,
+const DEFAULT={monthlyMax:1000000,tradingDays:21,conyCashDaily:15000,conyCashDays:10,reitDaily:1,sofrDaily:0,
  usSchdDaily:0,usAgncDaily:0,usSpymDaily:0,trQty:1,solMode:'standby'};
-const FIELDS=['monthlyMax','tradingDays','conyCashDaily','reitDaily','sofrDaily',
+const FIELDS=['monthlyMax','tradingDays','conyCashDaily','conyCashDays','reitDaily','sofrDaily',
  'usSchdDaily','usAgncDaily','usSpymDaily','trQty','solMode'];
 const ORDER_IDS=['reit','robot','space','sofr','sol','tr','schd','agnc','spym','cony'];
 const $=id=>document.getElementById(id);
@@ -24,7 +24,7 @@ if(previous&&typeof previous==='object')for(const f of FIELDS){
  const v=Number(previous[f]);
  if(previous[f]!==null&&previous[f]!==undefined&&String(previous[f]).trim()!==''&&Number.isFinite(v)&&v>=0){
   if(f==='monthlyMax'&&v>=1000&&v<=100000000)plan[f]=v;
-  else if(f==='tradingDays'&&Number.isInteger(v)&&v>=1&&v<=25)plan[f]=v;
+  else if(['tradingDays','conyCashDays'].includes(f)&&Number.isInteger(v)&&v>=1&&v<=25)plan[f]=v;
   else if(f!=='monthlyMax'&&f!=='tradingDays'&&v<=1000000)plan[f]=v;
  }
 }
@@ -90,8 +90,8 @@ function instrumentRows(){
 function budget(){
  const rows=instrumentRows(),daily=rows.filter(x=>x.id!=='tr').reduce((n,x)=>n+(typeof x.cost==='number'?x.cost:0),0);
  const tr=rows.find(x=>x.id==='tr').cost,unknown=rows.filter(x=>x.enabled&&x.cost===null).map(x=>x.name);
- const cash=plan.conyCashDaily,monthly=(daily+cash)*plan.tradingDays+tr;
- return {daily,cash,tr,monthly,remaining:plan.monthlyMax-monthly,unknown,rows};
+ const cash=plan.conyCashDaily,cashDays=plan.conyCashDays,cashReserved=cash*cashDays,monthly=daily*plan.tradingDays+cashReserved+tr;
+ return {daily,cash,cashDays,cashReserved,tr,monthly,remaining:plan.monthlyMax-monthly,unknown,rows};
 }
 function statusFor(id){
  const st=statuses[id]||{},date=nowDay();
@@ -108,7 +108,7 @@ function rowText(r){
 function summaryText(){
  const b=budget(),t='사전 자동주문 준비표 ('+nowDay()+' · 개인 기록용, 실제 주문 미전송)';
  return [t,'월 최대 '+money(plan.monthlyMax)+' / 거래일 가정 '+plan.tradingDays+'일',
-  '매일 조건부/정기 적립 최대 가정 '+money(b.daily)+' + CONY 매수 대신 현금 적립 '+money(b.cash),
+  '매 거래일 정기/조건부 주문 최대 가정 '+money(b.daily)+' + CONY 매수 대신 '+b.cashDays+'거래일간 하루 '+money(b.cash)+' 현금 적립 (총 '+money(b.cashReserved)+')',
   'KODEX200TR 1회 감시 예약금 '+money(b.tr),
   '월 계획 사용·유보액 '+money(b.monthly)+(b.unknown.length?' [계산 누락: '+b.unknown.join(', ')+']':''),
   '잔여 예산 '+money(b.remaining),...(b.rows.map(rowText)),
@@ -121,13 +121,13 @@ function render(){
  const b=budget(),bad=b.remaining<0,partial=b.unknown.length>0;
  const stat=$('uo-budget');
  stat.innerHTML='<div class="uo-summary-grid"><div>월 투자·현금 유보 한도<strong>'+money(plan.monthlyMax)+'</strong></div>'+
- '<div>매일 최대 가정(매수+현금적립)<strong>'+money(b.daily+b.cash)+'</strong></div>'+
+ '<div>정기·조건부 매수 1일 최대 가정<strong>'+money(b.daily)+'</strong></div>'+
  '<div>월 예상 사용·유보액<strong>'+money(b.monthly)+'</strong></div>'+
  '<div>남은 예산<strong class="'+(bad?'uo-danger':'')+'">'+money(b.remaining)+'</strong></div></div>'+
  (bad?'<p class="uo-danger">월 최대 투자예산을 초과합니다. 자동주문 금액이나 수량을 낮추세요.</p>':'')+
  (partial?'<p class="uo-danger">예산 미확정: '+b.unknown.map(esc).join('·')+' 가격 미확인. 현금 부족을 방지하려면 키움 최신 가격을 확인하세요.</p>':'')+
  (plan.solMode==='exclusive'?'<p class="uo-danger">SOL 단독 모드: 예산표에서 로봇·우주항공을 제외했지만 실제 증권사 감시주문은 해제되지 않습니다. 증권사에서 두 주문 취소를 먼저 확인하세요.</p>':'')+
- '<p class="sub">매 거래일 같은 주문을 재등록·반복한다고 가정한 보수적 최대 예산입니다. 주말·공휴일·환율·수수료·중복 증권사 자동주문을 반영한 확정 금액이 아닙니다. CONY 재매수 중단에 따른 현금적립 '+money(b.cash)+'/일도 예산에 포함합니다.</p>';
+ '<p class="sub">매 거래일 같은 주문을 재등록·반복한다고 가정한 보수적 최대 예산입니다. 주말·공휴일·환율·수수료·중복 증권사 자동주문을 반영한 확정 금액이 아닙니다. CONY 재매수 중단에 따른 '+b.cashDays+'거래일 현금 적립 '+money(b.cashReserved)+'도 예산에 포함합니다.</p>';
  const rows=b.rows;
  $('uo-order-list').innerHTML=rows.map(r=>{
  const s=statusFor(r.id);
@@ -162,7 +162,7 @@ function mount(){
  '<details class="uo-settings"><summary>월 예산·매일 적립금·대체매수 설정</summary>'+
  '<div class="uo-inputs">'+
  [['monthlyMax','월 최대 투자·유보 예산 (원)',1000],['tradingDays','월 거래일 가정 (일)',1],
- ['conyCashDaily','CONY 중단 대신 현금 적립 (원/일)',1000],
+ ['conyCashDaily','CONY 중단 대신 현금 적립 (원/일)',1000],['conyCashDays','CONY 현금 적립 기간 (거래일, 1~25)',1],
  ['reitDaily','리츠 하루 자동 적립 (주)',1],['sofrDaily','SOFR 하루 자동 적립 (주)',1],
  ['usSchdDaily','SCHD 하루 자동매수 (원)',1000],['usAgncDaily','AGNC 하루 자동매수 (원)',1000],
  ['usSpymDaily','SPYM 하루 자동매수 (원)',1000],['trQty','200TR -5% 감시매수 수량 (주)',1]].map(([key,label,step])=>
@@ -181,9 +181,9 @@ function mount(){
    if(key==='solMode')plan.solMode=el.value;
    else{
     const v=el.value.trim()===''?0:Number(el.value);
-    if(!Number.isFinite(v)||v<0||v>100000000||(key==='tradingDays'&&(v<1||v>25||!Number.isInteger(v)))||
+    if(!Number.isFinite(v)||v<0||v>100000000||(['tradingDays','conyCashDays'].includes(key)&&(v<1||v>25||!Number.isInteger(v)))||
       (['reitDaily','sofrDaily','trQty'].includes(key)&&!Number.isInteger(v))||(key==='monthlyMax'&&v<1000)){
-     $('uo-message').textContent='유효한 0 이상 금액·정수 수량·월 거래일(1~25)을 입력하세요.';
+     $('uo-message').textContent='유효한 0 이상 금액·정수 수량·거래일(1~25)을 입력하세요.';
      el.value=plan[key];return;
     }
     plan[key]=v;
