@@ -16,7 +16,7 @@ button:disabled{opacity:.5}.outline{background:#273650}.panel,.fund,.detail{back
 .legend{font-size:.82rem;display:flex;gap:14px;margin-bottom:13px;flex-wrap:wrap}
 .legend b{font-size:1rem}.funds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.fund{margin:0;padding:13px;cursor:pointer}
 .fund.selected{outline:2px solid #709dff}.fund strong{display:block;font-size:1.05rem;margin:6px 0}.title{font-size:.89rem;font-weight:700}
-.status{display:inline-block;font-size:.85rem;font-weight:800;margin-top:5px}.trendline{display:block;margin-top:8px;font-size:.77rem;color:#d6c9a3}.context{font-size:.8rem;color:#a8b5ce;margin:7px 0}.leg20{display:flex;gap:16px;flex-wrap:wrap;font-size:.77rem;color:#c9d3e6;margin:6px 0 9px}.legend-dot{display:inline-block;width:12px;height:3px;margin-right:5px;vertical-align:middle}.keep{color:#74a9ff}
+.status{display:inline-flex;align-items:center;font-size:.9rem;font-weight:850;margin-top:7px;padding:4px 12px;border:1px solid currentColor;border-radius:7px;letter-spacing:.04em}.trendline{display:block;margin-top:8px;font-size:.77rem;color:#d6c9a3}.context{font-size:.8rem;color:#a8b5ce;margin:7px 0}.leg20{display:flex;gap:16px;flex-wrap:wrap;font-size:.77rem;color:#c9d3e6;margin:6px 0 9px}.legend-dot{display:inline-block;width:12px;height:3px;margin-right:5px;vertical-align:middle}.keep{color:#74a9ff}
 .state-stop{color:#ff697b}.state-buy{color:#70a7ff}.state-wait{color:#acb7c9}
 .detail{margin-top:15px}select,input{width:100%;background:#101b2e;color:#fff;border:1px solid #596a85;border-radius:10px;padding:11px;font-size:1rem;min-width:0}
 label{font-size:.82rem;color:#b9c6db;display:block;margin-bottom:8px}
@@ -238,7 +238,7 @@ details[open]>summary{margin-bottom:12px}
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel flex"><div><b>현재가 재조회 · 마지막 게시 일봉과 구분</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
 <div id="alert">공개 일봉 종가와 당일 비공식 조회 가격은 다릅니다. 마지막 체결 시각을 확인하지 못하면 최신 가격으로 표시하지 않습니다.</div>
-<div class="legend"><span class="state-stop"><b>●</b> 매수 중단 · 상한 초과</span><span class="state-buy"><b>●</b> 정기 적립 · 분할매수 검토</span><span class="state-wait"><b>●</b> 대기 · 감시 · 자료 미확인</span></div>
+<div class="legend"><span class="state-buy"><b>●</b> 매수 · 조건 충족(주문 아님)</span><span class="state-stop"><b>●</b> 중지 · 상한 초과</span><span class="state-wait"><b>●</b> 대기 · 미충족·확인 필요</span></div>
 <section class="panel" id="summary"><b>오늘의 매수계획 점검</b><p class="sub">게시된 일봉으로 계산한 계획이며 실제 주문을 실행하지 않습니다.</p><div id="plan">시세 확인 중</div></section>
 <section id="funds" class="funds"></section>
 <section id="us-panel" class="panel">
@@ -391,6 +391,9 @@ function verdict(f){
  if(b.low&&!h)return {type:'wait',title:'저가 관심 · 평단 입력',info:b.name+'입니다. 평단가를 입력하면 실제 평단 인하 효과를 확인할 수 있습니다. 5·20일선: '+trend(x),qty:0};
  return {type:'wait',title:b.low?'저가·추세 확인 대기':'추세/가격 조건 대기',info:(h&&!h.canLower?'현재가가 평단보다 높아 평단 인하가 되지 않습니다. ':'')+b.name+' · '+trend(x)+'. 30%·20% 가격대가 아니더라도 상승 전환 시 재검토.',qty:0};
 }
+function actionLabel(type){
+ return type==='buy'?'매수':type==='stop'?'중지':'대기';
+}
 function chart(bars){
  var last=bars.slice(-20),all=last.map(function(x){return Number(x.close);});
  var ma20s=last.map(function(x,i){return bars.slice(i+1,i+21).reduce(function(s,b){return s+Number(b.close);},0)/20;});
@@ -431,7 +434,7 @@ function renderPlan(){
  var sol=vals.find(function(x){return x.f.id==='sol';});
  var clash=!!(reit.v.type==='buy'&&reit.v.qty===3&&sol.v.type==='buy'&&sol.v.qty===1);
  var budget=valid(settings.dailyBudget)?Number(settings.dailyBudget):null;
- var message='<p><b>현재 매수 검토:</b> '+(pieces.length?pieces.join(' · '):'조건을 충족한 수량 확인 없음')+'</p>';
+ var message='<p><b>현재 매수 조건 충족 (실제 주문·체결 아님):</b> '+(pieces.length?pieces.join(' · '):'조건을 충족한 수량 확인 없음')+'</p>';
  message+='<p><b>검토 수량 예상 비용:</b> '+(unavailable?'일부 가격 미확인 · ':'')+money(total)+' <small>(SOFR 정기 적립, 200TR 조건부 주문은 제외)</small></p>';
  if(budget!==null)message+='<p class="'+(total>budget?'error':'good')+'"><b>입력 예산:</b> '+money(budget)+' · '+(total>budget?'예상 비용이 예산을 초과합니다. 수량 조정 필요.':'현재 계산한 검토 비용은 예산 이내입니다.')+'</p>';
  else message+='<p class="sub">하루 예산이 미입력입니다. 주문 전 기존 SOFR 적립액과 미체결 주문까지 합산해 확인하세요.</p>';
@@ -445,8 +448,9 @@ function render(){
   var x=byId[f.id],v=verdict(f),p=hasBars(x)?current(x,f.id):null,h=p?holding(f.id,p):null,b=hasBars(x)?band(x,p):null,live=liveQuotes[f.id];
   var tag=b?'<span class="band-tag '+(b.name==='하단 20%'?'band20':'')+'">'+b.name+'</span>':'';
   var avgText=h?'<div class="card-detail '+(h.canLower?'avg-down':'avg-up')+'">평단 '+avgMoney(h.avg)+' 대비 '+(h.discount>=0?'+':'')+h.discount.toFixed(2)+'%</div>':'<div class="card-detail">평단가 미입력 / 미보유</div>';
-  return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+safe(f.plan)+'</small><strong>'+(p?money(p):'미확인')+'</strong><small>'+(live?'비공식 당일 현재가 · 마지막 체결 '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'}):'게시 일봉 종가 · '+(hasBars(x)?day(x.date):'확인 불가'))+'</small>'+avgText+tag+'<div class="status state-'+v.type+'">'+safe(v.title)+'</div><div class="trendline">'+(hasBars(x)?safe(trend(x)):'5·20일선 계산 불가')+'</div></div>';
+  return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+safe(f.plan)+'</small><strong>'+(p?money(p):'미확인')+'</strong><small>'+(live?'비공식 당일 현재가 · 마지막 체결 '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'}):'게시 일봉 종가 · '+(hasBars(x)?day(x.date):'확인 불가'))+'</small>'+avgText+tag+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+actionLabel(v.type)+'</div></div>';
  }).join('');
+ document.dispatchEvent(new Event('isa-rendered'));
  Array.from(list.querySelectorAll('[data-id]')).forEach(function(node){
   node.onclick=function(){selected=node.dataset.id;el('selection').value=selected;render();};
   node.onkeydown=function(ev){if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selected=node.dataset.id;el('selection').value=selected;render();}};
@@ -470,7 +474,7 @@ function render(){
   }
  }else costText='<p class="sub">보유 평단가와 수량을 입력하면 평단 인하 여부 및 예상 매수 후 평단을 계산합니다. 수량 0이면 미보유로 처리합니다.</p>';
  var vol=valid(t.avgVolume20)&&t.avgVolume20>0&&Number.isFinite(t.volumeToday)?(t.volumeToday/t.avgVolume20).toFixed(2)+'배':'미확인';
- d.innerHTML='<div class="divider"></div><div class="flex"><strong>'+money(p)+'</strong><span class="status state-'+v.type+'">'+safe(v.title)+'</span></div>'+
+ d.innerHTML='<div class="divider"></div><div class="flex"><strong>'+money(p)+'</strong><span class="status state-'+v.type+'">'+actionLabel(v.type)+'</span></div>'+
  '<p class="sub">'+(liveQuotes[f.id]?'현재 표시 가격은 비공식 당일 조회가 · 5·20일선 및 박스권은 '+day(x.date)+' 확정 일봉 기준':'게시 일봉 종가 '+day(x.date))+' · 20거래일 '+day(x.rangeStart)+'~'+day(x.rangeEnd)+'</p>'+
  chart(x.bars)+
  '<div class="leg20"><span><i class="legend-dot" style="background:#60a5fa"></i>종가</span><span><i class="legend-dot" style="background:#24bf9a"></i>5일선</span><span><i class="legend-dot" style="background:#eab308"></i>20일선</span></div>'+
@@ -482,7 +486,6 @@ function render(){
  '<div class="divider"></div><label>키움 확인 가격 직접 입력 (선택)<input type="number" id="manual" min="1" step="1" placeholder="입력하면 참고 계산, 5·20일선은 기존 종가" value="'+(valid(manual[f.id])?manual[f.id]:'')+'"></label>'+
  '<p class="fieldset-note">수동 가격은 5·20일선 계산을 바꾸지 않습니다. 수동 가격 입력 시 신규 매수 신호는 보수적으로 대기 처리합니다.</p>';
  el('manual').onchange=function(ev){if(valid(ev.target.value))manual[f.id]=Number(ev.target.value);else delete manual[f.id];render();};
- document.dispatchEvent(new Event('isa-rendered'));
 }
 async function refreshLiveQuotes(){
  liveQuotes={};liveError=null;liveSource=null;
