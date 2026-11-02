@@ -144,20 +144,35 @@ function alertLabel(s){
 function updateAlerts(){
  const area=$('important-changes'),history=$('signal-history');
  if(!area||!history)return;
- if(!quotes){area.textContent='자료 확인 중';return;}
- const latest=quotes.items.filter(x=>x.ok).map(x=>x.date).sort().at(-1);
- const all=allSignals(),fresh=all.filter(x=>x.date===latest);
+ const latest=quotes?.items?.filter(x=>x.ok).map(x=>x.date).sort().at(-1)||null;
+ const all=latest?allSignals():[];
+ const fresh=latest?all.filter(x=>x.date===latest):[];
  const prior=all.filter(x=>x.date!==latest).slice(0,20);
- const meta='<p class="fieldset-note">최근 수집 일봉 '+safe(day(latest))+' 기준 · 전 거래일 대비 신규로 바뀐 조건만 표시합니다. 개인 평단 신호는 해당 기기에 입력한 값 기준입니다.</p>';
- area.innerHTML=meta+(fresh.length?'<div class="change-feed">'+fresh.map(alertLabel).join('')+'</div>':'<p class="sub">이번 일봉에서 새로 바뀐 주요 조건이 없습니다. 기존 매수 중단·대기 상태는 종목별 카드를 확인하세요.</p>');
- history.innerHTML=prior.length?'<div class="change-feed">'+prior.map(alertLabel).join('')+'</div>':'<p class="sub">최근 분석 가능한 기간에 추가 변화 기록이 없습니다.</p>';
- // Each ETF card shows only latest-day material changes. Re-run after ordinary render.
- const cards=document.querySelectorAll('#funds [data-id]');
- cards.forEach(card=>{
+ const meta='<p class="fieldset-note">마지막 확인된 일봉 '+safe(day(latest))+
+  ' · 아래는 실제로 새로 생긴 가격·추세 변화이며, 단독으로 매수를 지시하지 않습니다.</p>';
+ area.innerHTML=meta+(fresh.length?'<div class="change-feed">'+fresh.map(alertLabel).join('')+'</div>':
+  '<p class="sub">'+(latest?'이번 확정 일봉에서 새로 바뀐 중요 조건이 없습니다.':'일봉 자료 확인 중 · 새 변화를 판단하지 않습니다.')+
+  ' 종목별 매수·중지·대기 이유는 각 카드의 「새 변화·판단 이유」에서 확인하세요.</p>');
+ history.innerHTML=prior.length?'<div class="change-feed">'+prior.map(alertLabel).join('')+'</div>':
+ '<p class="sub">분석 가능한 과거 변화 기록이 없습니다.</p>';
+ // Always show the CURRENT decision reason even when no price event happened.
+ // An observed price threshold/box crossing is NOT equivalent to permission to buy.
+ document.querySelectorAll('#funds [data-id]').forEach(card=>{
   let spot=card.querySelector('.change-mini');
   if(!spot){spot=document.createElement('div');spot.className='change-mini';card.appendChild(spot);}
-  const id=card.getAttribute('data-id'),e=fresh.filter(x=>x.id===id);
-  spot.innerHTML=e.length?'<strong>새 변화: '+e.slice(0,2).map(x=>safe(x.text)).join(' · ')+(e.length>2?' 외 '+(e.length-2)+'건':'')+'</strong>':'<span class="sub">이번 일봉 중요 변화 없음</span>';
+  const id=card.getAttribute('data-id');
+  const decision=card.querySelector('.status[data-reason]');
+  const label=decision?.textContent?.trim()||'대기',basis=decision?.getAttribute('data-basis')||'자료 확인 대기',
+   reason=decision?.getAttribute('data-reason')||'현재 판단 조건을 확인할 수 없습니다.';
+  const observed=fresh.filter(x=>x.id===id);
+  const events=observed.length?
+   '<div class="change-mini-events"><b>새 변화 (확정 일봉):</b> '+
+   observed.slice(0,2).map(x=>safe(x.text)).join(' · ')+(observed.length>2?' 외 '+(observed.length-2)+'건':'')+'</div>':
+   '<div class="change-mini-events">새 변화: '+(latest?'이번 확정 일봉의 중요 변화 없음':'자료 확인 중')+'</div>';
+  spot.innerHTML='<div class="change-mini-title">새 변화 · 매수판단 이유</div>'+
+   '<div class="change-mini-reason"><b class="state-'+
+   (label==='매수'?'buy':label==='중지'?'stop':'wait')+'">'+safe(label)+'</b> · '+
+   safe(basis)+' — '+safe(reason)+'</div>'+events;
  });
 }
 const publicDists=[
