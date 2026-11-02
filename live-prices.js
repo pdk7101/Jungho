@@ -1,95 +1,94 @@
-/* Free, best-effort public KRX ETF quote lookup for a static GitHub Pages site.
-   No brokerage/account data is sent. Browser CORS may block direct Naver fetch;
-   one public proxy is tried as fallback. Timestamp/identity validation is mandatory.
-   This is not a licensed real-time exchange feed. */
+/* Public KR quotes: best-effort intraday browser fetch, validated GitHub snapshot fallback.
+ * No brokerage API, no trade submission, no claim of official exchange realtime feed. */
 (function(){
 'use strict';
-const num=v=>{
- if(v===null||v===undefined||String(v).trim()==='')return null;
- const n=Number(String(v).replace(/,/g,'').replace(/\s/g,''));
- return Number.isFinite(n)&&n>0?n:null;
-};
-const kstParts=date=>Object.fromEntries(new Intl.DateTimeFormat('en-CA',{
- timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',
- hour:'2-digit',minute:'2-digit',hour12:false
-}).formatToParts(date).map(x=>[x.type,x.value]));
-const koreaDay=d=>{const k=kstParts(d);return k.year+k.month+k.day;};
-function parseTradeAt(value){
+const n=v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(String(v).replace(/,/g,'')))&&Number(String(v).replace(/,/g,''))>0?Number(String(v).replace(/,/g,'')):null;
+const kparts=d=>Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d).map(x=>[x.type,x.value]));
+const kday=d=>{const v=kparts(d);return v.year+v.month+v.day};
+const active=d=>{const v=kparts(d),mins=Number(v.hour)*60+Number(v.minute),weekday=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',weekday:'short'}).format(d);return !['Sat','Sun'].includes(weekday)&&mins>=540&&mins<=930};
+function tradeTime(value){
  if(!value||typeof value!=='string')return null;
- const v=value.trim();
- let date;
- if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)){
-  date=new Date(/[+-]\d{2}:\d{2}$|Z$/i.test(v)?v:v+'+09:00');
- }else if(/^\d{8}T?\d{6}$/.test(v)){
-  const digits=v.replace('T','');
-  date=new Date(digits.slice(0,4)+'-'+digits.slice(4,6)+'-'+digits.slice(6,8)+'T'+digits.slice(8,10)+':'+digits.slice(10,12)+':'+digits.slice(12,14)+'+09:00');
- }else return null;
- return isNaN(date.getTime())?null:date;
+ let v=value.trim(),dt=null;
+ if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v))dt=new Date(/[+-]\d{2}:\d{2}$|Z$/i.test(v)?v:v+'+09:00');
+ else if(/^\d{8}T?\d{6}$/.test(v)){v=v.replace('T','');dt=new Date(v.slice(0,4)+'-'+v.slice(4,6)+'-'+v.slice(6,8)+'T'+v.slice(8,10)+':'+v.slice(10,12)+':'+v.slice(12,14)+'+09:00');}
+ return dt&&!Number.isNaN(dt.getTime())?dt:null;
 }
-function parseResponse(obj,funds,now){
- const list=Array.isArray(obj?.datas)?obj.datas:
-  Array.isArray(obj?.result?.datas)?obj.result.datas:
-  Array.isArray(obj?.result)?obj.result:
-  Array.isArray(obj?.data)?obj.data:null;
- if(!list||!list.length)throw Error('시세 응답 형식을 확인할 수 없습니다');
- const codeById=Object.fromEntries(funds.map(f=>[String(f.code),f.id]));
- const result={};
- let rejected=0,firstReason='';
- for(const d of list){
-  const code=String(d.itemCode||d.itemcode||d.stockCode||d.code||d.cd||'').replace(/^A(?=\d{6}$)/,'');
-  const id=codeById[code];
-  if(!id)continue; // Do not attribute a different ticker's price to an ETF.
-  const price=num(d.closePrice??d.nowVal??d.currentPrice??d.nv);
-  const tradedAt=parseTradeAt(d.localTradedAt||d.tradedAt||d.tradeTime||d.time||'');
-  if(price===null||!tradedAt){rejected++;firstReason=firstReason||'현재가 또는 마지막 체결 시각 미확인';continue;}
-  const age=(now.getTime()-tradedAt.getTime())/60000;
-  const day=koreaDay(tradedAt),today=koreaDay(now);
-  // Trading time can reflect a delayed unofficial feed. Never label a prior-day
-  // close or a feed older than 15 min during Korean regular market as live.
-  const k=kstParts(now),min=Number(k.hour)*60+Number(k.minute);
-  const active=min>=9*60&&min<=15*60+30;
-  const validAge=age>=-2&&(active?age<=15:age<=24*60);
-  if(day!==today||!validAge){
-   rejected++;firstReason=firstReason||'조회된 체결이 당일 시세가 아니거나 거래 시각이 오래됐습니다';continue;
-  }
-  result[id]={price,tradeAt:tradedAt.toISOString(),date:day,status:String(d.marketStatus||d.marketState||''),
-   source:'네이버 금융 비공식 현재가',quoteAgeMinutes:Math.max(0,age)};
- }
- if(Object.keys(result).length===0){
-  throw Error(firstReason||('유효한 종목코드/체결시각을 확인할 수 없습니다 ('+rejected+'건 제외)'));
- }
- return result;
+function validate(price,stamp,now,source,status,method){
+ const d=tradeTime(stamp),value=n(price);
+ if(!d||!value)return null;
+ const age=(now-d)/60000;
+ if(kday(now)!==kday(d)||age< -2||age>(active(now)?20:1440))return null;
+ return {price:value,tradeAt:d.toISOString(),date:kday(d),quoteAgeMinutes:Math.max(0,age),
+  source,status:String(status||''),method};
 }
-async function requestJson(url,ms){
- const controller=new AbortController();
- const timer=setTimeout(()=>controller.abort(),ms);
+function getList(obj){
+ if(Array.isArray(obj?.datas))return obj.datas;
+ if(Array.isArray(obj?.result?.datas))return obj.result.datas;
+ if(Array.isArray(obj?.result?.areas))return obj.result.areas.flatMap(x=>x.datas||[]);
+ if(Array.isArray(obj?.areas))return obj.areas.flatMap(x=>x.datas||[]);
+ if(Array.isArray(obj?.data))return obj.data;
+ return [];
+}
+function parseResponse(obj,funds,now=new Date(),singleCode=null){
+ const list=getList(obj);
+ if(!list.length)throw Error('시세 응답 형식 미확인');
+ const ids=Object.fromEntries(funds.map(f=>[String(f.code),f.id])),out={};
+ for(const row of list){
+  const code=String(row.itemCode||row.itemcode||row.stockCode||row.code||row.cd||singleCode||'').replace(/^A(?=\d{6}$)/,'');
+  const id=ids[code];if(!id)continue;
+  const quote=validate(row.closePrice??row.nowVal??row.currentPrice??row.nv,
+   row.localTradedAt||row.tradedAt||row.tradeTime||row.time||'',now,
+   '네이버 비공식 당일 체결가격',row.marketStatus||row.marketState||row.ms||'','browser');
+  if(quote)out[id]=quote;
+ }
+ if(!Object.keys(out).length)throw Error('종목코드 일치·당일 체결시간·현재가 확인 실패');
+ return out;
+}
+async function json(url,timeout=6500){
+ const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),timeout);
  try{
-  const r=await fetch(url,{cache:'no-store',signal:controller.signal,headers:{Accept:'application/json'}});
+  const r=await fetch(url,{cache:'no-store',signal:ctl.signal,headers:{Accept:'application/json'}});
   if(!r.ok)throw Error('HTTP '+r.status);
-  const data=await r.json();
-  return data;
+  return r.json();
  }finally{clearTimeout(timer);}
 }
-async function lookup(funds){
- const codes=funds.map(f=>f.code).join(',');
- const url='https://polling.finance.naver.com/api/realtime/domestic/stock/'+codes;
- const routes=[
-  {type:'direct',url},
-  {type:'proxy',url:'https://proxy.cors.dev/'+url}
- ];
- const fail=[];
- for(const route of routes){
-  try{
-   const res=await requestJson(route.url,route.type==='direct'?4500:10000);
-   const quotes=parseResponse(res,funds,new Date());
-   if(Object.keys(quotes).length<funds.length){
-    // Keep validated partial data only, never fill missing ticker prices by position.
-    return {ok:true,quotes,via:route.type,partial:true,source:'네이버 금융 비공식 현재가'};
-   }
-   return {ok:true,quotes,via:route.type,partial:false,source:'네이버 금융 비공식 현재가'};
-  }catch(e){fail.push(route.type+': '+String(e.message||e));}
+function parsePublished(payload,funds,now=new Date()){
+ if(!payload||kday(now)!==payload.kstDate||!Array.isArray(payload.items))throw Error('게시 시세 날짜·형식 미확인');
+ const fetched=new Date(payload.fetchedAt);
+ if(!Number.isFinite(fetched.getTime()))throw Error('게시 수집시각 미확인');
+ const fresh=(now-fetched)/60000;
+ if(fresh< -2||fresh>(active(now)?22:1440))throw Error('게시 시세 재수집 지연 ('+Math.round(fresh)+'분)');
+ const ids=Object.fromEntries(funds.map(f=>[String(f.code),f.id])),result={};
+ for(const item of payload.items){
+  if(!ids[String(item.code)]||ids[String(item.code)]!==item.id)continue;
+  const q=validate(item.price,item.tradeAt,now,'GitHub 공개 비공식 시세 (게시 지연 가능)',item.status,'published');
+  if(q)result[item.id]={...q,publicationAgeMinutes:Math.max(0,fresh)};
  }
- return {ok:false,quotes:{},reason:fail.join(' / ')};
+ if(!Object.keys(result).length)throw Error('게시된 유효한 당일 체결 시세 없음');
+ return result;
 }
-window.ISA_livePriceFetch={lookup,parseResponse,parseTradeAt};
+async function lookup(funds){
+ const now=new Date(),codes=funds.map(f=>f.code).join(',');
+ const base='https://polling.finance.naver.com';
+ const candidates=[
+  {name:'직접',url:base+'/api/realtime/domestic/stock/'+codes,timeout:4000},
+  {name:'직접 통합',url:base+'/api/realtime?query='+encodeURIComponent('SERVICE_ITEM:'+codes),timeout:3500},
+  {name:'공개 프록시',url:'https://proxy.cors.dev/'+base+'/api/realtime/domestic/stock/'+codes,timeout:6000}
+ ];
+ const fail=[],quotes={};
+ for(const c of candidates){
+  try{
+   Object.assign(quotes,parseResponse(await json(c.url,c.timeout),funds,now));
+   if(Object.keys(quotes).length===funds.length)return {ok:true,quotes,via:c.name,partial:false};
+  }catch(e){fail.push(c.name+': '+String(e.message||e));}
+ }
+ try{
+  const published=parsePublished(await json('./intraday-quotes.json?nocache='+Date.now(),4800),funds,new Date());
+  for(const [id,q] of Object.entries(published))if(!quotes[id])quotes[id]=q;
+ }catch(e){fail.push('GitHub 게시 시세: '+String(e.message||e));}
+ const count=Object.keys(quotes).length;
+ return count?{ok:true,quotes,via:Object.values(quotes).some(q=>q.method==='published')?'공개 게시 보조 시세':'직접 비공식',partial:count!==funds.length,reason:fail.join(' / ')}:
+ {ok:false,quotes:{},reason:fail.join(' / ')};
+}
+window.ISA_livePriceFetch={lookup,parseResponse,parsePublished,tradeTime,active};
 })();
