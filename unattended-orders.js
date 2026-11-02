@@ -131,7 +131,7 @@ function render(){
  const rows=b.rows;
  $('uo-order-list').innerHTML=rows.map(r=>{
  const s=statusFor(r.id);
- return '<div class="uo-order"><div class="uo-order-top"><b>'+esc(r.name)+'</b><span>'+esc(r.market)+' · '+esc(r.type)+'</span></div>'+
+ return '<details class="uo-order"><summary class="uo-order-top"><b>'+esc(r.name)+'</b><span>'+esc(r.market)+' · '+esc(r.type)+'</span><em>'+esc(s.expired?'만료 확인':s.status==='registered'?'등록 기록':s.status==='filled'?'체결 확인 기록':r.enabled?'설정 확인':'대기')+'</em></summary>'+
   '<p><strong>'+esc(r.price)+'</strong> · '+esc(r.qty)+'</p>'+
   '<p class="uo-state">'+esc(r.level)+'</p>'+
   '<p class="sub">'+esc(r.remarks)+'</p>'+
@@ -140,7 +140,7 @@ function render(){
   '<option value="'+k+'"'+(s.status===k?' selected':'')+'>'+v+'</option>').join('')+'</select></label>'+
   '<label>증권사 감시 만료일(선택)<input type="date" data-order-expiry="'+r.id+'" value="'+esc(s.expiry)+'"></label></div>'+
   (s.expired?'<p class="uo-danger">기록한 만료일이 지났습니다. 증권사에서 실제 감시상태를 확인하세요. 앱에서 자동 취소되지 않습니다.</p>':'')+
-  '</div>';
+  '</details>';
  }).join('');
  root.querySelectorAll('select[data-order-status]').forEach(el=>el.onchange=()=>{
   const id=el.dataset.orderStatus;statuses[id]={...(statuses[id]||{}),status:el.value,changed:nowDay()};
