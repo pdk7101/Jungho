@@ -5,7 +5,7 @@
 'use strict';
 const PLAN='isa-unattended-order-plan-v1',STATE='isa-unattended-order-status-v1';
 const DEFAULT={monthlyMax:1000000,tradingDays:21,conyCashDaily:15000,conyCashDays:10,
- reitDaily:1,robotDaily:1,spaceDaily:1,sofrDaily:0,solDaily:1,trQty:1,
+ reitDaily:1,robotDaily:1,spaceDaily:1,sofrWeekly:1,solDaily:1,trQty:1,
  usSchdDaily:4000,usAgncDaily:3000,usSpymDaily:3000,solMode:'standby'};
 const LABELS={
  reit:'TIGER 리츠부동산인프라',robot:'RISE AI&로봇',space:'1Q 미국우주항공테크',
@@ -177,9 +177,9 @@ function rows(){
   if(id==='robot')info='가격 상한 '+won(r.robot)+' · 1일 최대 '+plan.robotDaily+'주 (상한 자동 정지 불가)';
   if(id==='space')info='가격 상한 '+won(r.space)+' · 1일 최대 '+plan.spaceDaily+'주 (상한 자동 정지 불가)';
   if(id==='reit')info=pair.known?'로봇·우주항공 '+pair.stopped+'종목 중지 → 리츠 '+pair.reitQty+'주/거래일 권고 (키움 실제 수량 자동 변경 불가)':'상태 확인 전 리츠 1·2·3주 미확정';
-  if(id==='sofr')info=plan.sofrDaily?plan.sofrDaily+'주/거래일 계획':'주식모으기 수량 미입력 · 실제 등록량 확인 필요';
+  if(id==='sofr')info=plan.sofrWeekly?'매주 월요일 '+plan.sofrWeekly+'주 정기 주식모으기 · 월 '+mondaysThisMonth()+'회 예정':'매주 월요일 정기매수 수량 0주 · 설정 확인 필요';
   if(id==='sol')info='매수·중지 상태에 따라 SOL '+(pair.known?pair.solQty+'주':'미확정')+' · 상한 '+won(r.sol)+' · 키움 실제 주문 미변경';
-  result.push({id,name:LABELS[id],broker:'키움증권',mode:'매일 주식모으기',details:info,...d[id]});
+  result.push({id,name:LABELS[id],broker:'키움증권',mode:id==='sofr'?'매주 월요일 주식모으기':'매일 주식모으기',details:info,...d[id]});
  }
  result.push({id:'tr',name:LABELS.tr,broker:'키움증권',mode:'자동감시주문',
   details:won(r.trPrice)+' 이하 하락 감시 · '+plan.trQty+'주/발동 (기준 '+won(r.trBase)+')',
@@ -193,6 +193,14 @@ function rows(){
  }
  return result;
 }
+function mondaysThisMonth(date=dateK()){
+ const [yr,mo]=date.slice(0,7).split('-').map(Number);
+ if(!Number.isInteger(yr)||!Number.isInteger(mo)||mo<1||mo>12)return 0;
+ const days=new Date(Date.UTC(yr,mo,0)).getUTCDate();
+ let count=0;
+ for(let i=1;i<=days;i++)if(new Date(Date.UTC(yr,mo-1,i)).getUTCDay()===1)count++;
+ return count;
+}
 function budget(){
  const r=rules(),pair=pairInfo(),qty=id=>Math.max(0,Number(plan[id])||0);
  const shareRobot=pair.known?(pair.robot==='buy'?qty('robotDaily'):0):qty('robotDaily');
@@ -205,19 +213,19 @@ function budget(){
  const kd=krDecisions(),reitQuote=kd.reit?.quote||null,sofrQuote=kd.sofr?.quote||null;
  const reitValid=pos(reitQuote),sofrValid=pos(sofrQuote);
  const kReit=reitValid?shareReit*Number(reitQuote):0;
- const kSofr=qty('sofrDaily')&&sofrValid?qty('sofrDaily')*Number(sofrQuote):0;
+ const monthMondays=mondaysThisMonth(),sofrMonthly=qty('sofrWeekly')&&sofrValid?qty('sofrWeekly')*Number(sofrQuote)*monthMondays:0;
  const unknown=[];
  if(shareReit&&!reitValid)unknown.push('리츠 현재가');
- if(qty('sofrDaily')&&!sofrValid)unknown.push('SOFR 현재가');
- if(!qty('sofrDaily'))unknown.push('SOFR 실제 모으기 수량');
+ if(qty('sofrWeekly')&&!sofrValid)unknown.push('SOFR 월요일 정기매수 현재가');
+ if(!qty('sofrWeekly'))unknown.push('SOFR 월요일 실제 모으기 수량');
  if(!qty('usSchdDaily'))unknown.push('SCHD 실제 모으기 금액');
  if(!qty('usAgncDaily'))unknown.push('AGNC 실제 모으기 금액');
  if(!qty('usSpymDaily'))unknown.push('SPYM 실제 모으기 금액');
  if(uncertain)unknown.push('로봇·우주항공 매수/중지 확인 전 · 보수적 최대치 예산 사용');
- const daily=rob+space+sol+kReit+kSofr+us,cash=qty('conyCashDaily')*qty('conyCashDays');
- const subtotal=daily*qty('tradingDays')+watch+cash;
+ const daily=rob+space+sol+kReit+us,cash=qty('conyCashDaily')*qty('conyCashDays');
+ const subtotal=daily*qty('tradingDays')+sofrMonthly+watch+cash;
  return {daily,watch,cash,subtotal,remaining:plan.monthlyMax-subtotal,unknown,
-  estimatedOnly:unknown.length>0,rates:r,conditional:pair,shares:{robot:shareRobot,space:shareSpace,reit:shareReit,sol:shareSol},
+  estimatedOnly:unknown.length>0,rates:r,conditional:pair,sofrMondays:monthMondays,sofrWeekly:qty('sofrWeekly'),sofrMonthly,shares:{robot:shareRobot,space:shareSpace,reit:shareReit,sol:shareSol},
   scenario:uncertain?'상태 미확정 → 보수적 최대 매수 가정':'조건별 예상 수량'};
 }
 function mismatch(row){
@@ -257,6 +265,7 @@ function render(){
  '<p class="sub"><b>토스 사용자 확인 상태:</b> 매수중 '+running+'종목 · 일시중지 '+paused+'종목 · 미확인 '+missing+'종목. 실시간 토스 계좌 조회가 아닌 이 기기의 기록입니다.</p>'+ 
  (budgetData.remaining<0?'<p class="uo-danger">월 최대 투자한도 초과 예상 · 매일 모으기 금액·수량 조정이 필요합니다.</p>':'')+
  (budgetData.estimatedOnly?'<p class="uo-danger">예산 미완성: '+budgetData.unknown.map(esc).join(' · ')+'. 등록금액 미확인은 0원으로 계산된 항목이 있으므로 남은 예산이 실제보다 많아 보일 수 있습니다.</p>':'')+
+ '<p class="sub">SOFR은 매주 월요일 '+budgetData.sofrWeekly+'주 · 이번 달 월요일 '+budgetData.sofrMondays+'회 · 월간 예상 매수대금 '+(budgetData.sofrMonthly?won(budgetData.sofrMonthly):'가격 확인 대기')+' (월요일 공휴일이면 실제 체결일은 달라질 수 있음)</p>'+ 
  '<p class="sub">리츠·SOL 조건별 예상 수량: 리츠 '+(budgetData.conditional.known?budgetData.shares.reit+'주':'미확정')+' / SOL '+(budgetData.conditional.known?budgetData.shares.sol+'주':'미확정')+' · '+esc(budgetData.scenario)+'</p>'+
  '<p class="sub">로봇·우주의 당일 키움 사용자 확인 기록이 있으면 우선 사용하며, 없으면 시세 기반 판단을 참고합니다. 주식모으기 수량이나 중지 상태는 키움에서 자동 변경되지 않습니다. 금액·환율·수수료에 따라 예산은 달라질 수 있습니다.</p>';
  const groups=[['키움증권',data.filter(r=>r.broker==='키움증권')],['토스증권',data.filter(r=>r.broker==='토스증권')]];
@@ -318,14 +327,14 @@ function mount(){
  const anchor=$('summary');if(!anchor)return;
  const section=document.createElement('section');section.className='panel uo-panel';section.id='unattended-orders';
  section.innerHTML='<h2>매일 주식모으기 매수·중지 점검</h2>'+
- '<p class="sub"><b>키움:</b> 국내 5종목은 매일 주식모으기, KODEX 200TR만 자동감시주문. <b>토스:</b> 미국주식은 매일 주식모으기. 현재 프로그램 판단과 증권사에 실제 설정한 상태는 다르므로 각각 확인해야 합니다.</p>'+
+ '<p class="sub"><b>키움:</b> 리츠·로봇·1Q·SOL은 매일 주식모으기, <b>SOFR은 매주 월요일 1주</b>, KODEX 200TR만 자동감시주문. <b>토스:</b> 미국주식은 매일 원화 소수점 주식모으기입니다. 실제 증권사 설정은 별도로 확인하세요.</p>'+
  '<p class="sub"><b>확인시점:</b> <span id="uo-today">'+dateK()+'</span> · 확정 일봉/비공식 가격 참고 · 이 웹페이지는 계좌에 접속하거나 자동매수를 중지·재개하지 않습니다.</p>'+
  '<div id="uo-budget"></div>'+
  '<details class="uo-settings"><summary>월 예산 및 실제 주식모으기 수량·금액 입력</summary>'+
  '<div class="uo-inputs">'+
  [['monthlyMax','월 투자·유보 예산 한도 (원)',1000],['tradingDays','월 거래일 가정',1],
  ['robotDaily','키움 로봇 매일 최대 수량(주)',1],
- ['spaceDaily','키움 1Q 매일 최대 수량(주)',1],['sofrDaily','키움 SOFR 매일 수량(주)',1],
+ ['spaceDaily','키움 1Q 매일 최대 수량(주)',1],['sofrWeekly','키움 SOFR 월요일마다 매수(주)',1],
  ['trQty','KODEX 200TR 감시 매수 수량(주)',1],
  ['usSchdDaily','토스 SCHD 매일 금액(원)',1000],
  ['usAgncDaily','토스 AGNC 매일 금액(원)',1000],
@@ -349,7 +358,7 @@ function mount(){
   inp.addEventListener('change',()=>{
    {
     const val=inp.value.trim()===''?0:Number(inp.value),isDays=['tradingDays','conyCashDays'].includes(key);
-    const isShares=['robotDaily','spaceDaily','sofrDaily','trQty'].includes(key);
+    const isShares=['robotDaily','spaceDaily','sofrWeekly','trQty'].includes(key);
     if(!Number.isFinite(val)||val<0||val>100000000||(isDays&&(!Number.isInteger(val)||val<1||val>25))||
      (isShares&&!Number.isInteger(val))||(key==='monthlyMax'&&val<1000)){
      inp.value=plan[key];$('uo-message').textContent='금액·정수 수량·거래일(1~25)을 확인하세요.';return;
@@ -372,6 +381,6 @@ function mount(){
  window.addEventListener('isa-us-quotes-refreshed',render);
  render();
 }
-window.ISA_ORDER_PLAN={rows,decisions,rules,budget,note,checklist,mismatch,tossDailyKrw,importTossConfirmation};
+window.ISA_ORDER_PLAN={rows,decisions,rules,budget,mondaysThisMonth,note,checklist,mismatch,tossDailyKrw,importTossConfirmation};
 mount();
 })();
