@@ -245,11 +245,16 @@ function mismatch(row){
 function render(){
  const root=$('unattended-orders');if(!root)return;
  const data=rows(),budgetData=budget(),loc=$('uo-budget');
+ const tossActual=US.map(id=>({id,...note(id)})),
+  running=tossActual.filter(x=>x.value==='running').length,
+  paused=tossActual.filter(x=>x.value==='paused').length,
+  missing=tossActual.filter(x=>x.value==='unknown').length;
  loc.innerHTML='<div class="uo-summary-grid">'+
  '<div>월 계획 한도<strong>'+won(plan.monthlyMax)+'</strong></div>'+
  '<div>확인된 설정 기반 추정<strong>'+won(budgetData.subtotal)+'</strong></div>'+
  '<div>CONY 별도 현금 유보<strong>'+won(budgetData.cash)+'</strong></div>'+
  '<div>단순 잔여 추정<strong>'+won(budgetData.remaining)+'</strong></div></div>'+
+ '<p class="sub"><b>토스 사용자 확인 상태:</b> 매수중 '+running+'종목 · 일시중지 '+paused+'종목 · 미확인 '+missing+'종목. 실시간 토스 계좌 조회가 아닌 이 기기의 기록입니다.</p>'+ 
  (budgetData.remaining<0?'<p class="uo-danger">월 최대 투자한도 초과 예상 · 매일 모으기 금액·수량 조정이 필요합니다.</p>':'')+
  (budgetData.estimatedOnly?'<p class="uo-danger">예산 미완성: '+budgetData.unknown.map(esc).join(' · ')+'. 등록금액 미확인은 0원으로 계산된 항목이 있으므로 남은 예산이 실제보다 많아 보일 수 있습니다.</p>':'')+
  '<p class="sub">리츠·SOL 조건별 예상 수량: 리츠 '+(budgetData.conditional.known?budgetData.shares.reit+'주':'미확정')+' / SOL '+(budgetData.conditional.known?budgetData.shares.sol+'주':'미확정')+' · '+esc(budgetData.scenario)+'</p>'+
@@ -363,7 +368,7 @@ function mount(){
  };
  $('uo-refresh').onclick=()=>{render();$('uo-message').textContent='현재 페이지에 로드된 자료로 판단을 다시 계산했습니다. 증권사 실제 상태를 다시 조회한 것은 아닙니다.';};
  document.addEventListener('isa-rendered',render);
- if(typeof importedToss==='string'&&importedToss.includes('저장'))window.ISA_US_APP?.rerender?.();
+ window.ISA_US_APP?.rerender?.();
  window.addEventListener('isa-us-quotes-refreshed',render);
  render();
 }
