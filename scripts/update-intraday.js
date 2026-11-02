@@ -44,7 +44,8 @@ async function one([id,code],now){
 }
 const now=new Date(),p=parts(now),minute=Number(p.hour)*60+Number(p.minute);
 const weekday=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',weekday:'short'}).format(now);
-const run=!['Sat','Sun'].includes(weekday)&&minute>=540&&minute<=960;
+// On deploys after the close, retain today's last trade so evening users can verify it.
+const run=!['Sat','Sun'].includes(weekday)&&minute>=540&&minute<1440;
 const items=run?await Promise.all(funds.map(x=>one(x,now))):[];
 await fs.writeFile(new URL('../intraday-quotes.json',import.meta.url),JSON.stringify({fetchedAt:now.toISOString(),kstDate:kday(now),source:'네이버 금융 비공식 / GitHub 게시 지연 가능',items},null,2));
 console.log('KR intraday '+p.hour+':'+p.minute+' '+items.filter(x=>x.price).length+'/'+funds.length);
