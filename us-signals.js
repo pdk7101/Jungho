@@ -133,13 +133,13 @@ function cardLine(id){
  return '<div class="us-trade-status state-'+v.type+'"><span class="us-signal-dot"></span>'+
   esc(v.title)+'</div>'+
   '<span class="us-small">토스 매일 주식모으기 설정 기준: <b>'+krw(daily)+'</b> · 소수점 적립 (실제 활성·중지 상태 별도 확인)</span>'+
-  '<span class="us-small">프로그램 검토: <b>'+(v.type==='buy'?'정액 적립 유지 검토':id==='cony'?'CONY 일시중지 유지 검토':'매수 대기·중지 검토')+'</b></span>';
+  '<span class="us-small">기술적 추가매수 분석: <b>'+(v.type==='buy'?'정액 적립 유지 검토':id==='cony'?'CONY 일시중지 유지 검토':'추가매수 주의 · 정액 모으기와 별개')+'</b></span>';
 }
 function detailLine(id){
  const v=decision(id);
  let html='<div class="us-decision-block us-decision-'+v.type+'">'+
-  '<div class="us-decision-head"><b>'+esc(NAMES[id])+' · '+esc(v.title)+'</b>'+
-  '<span class="us-decision-kind">'+(v.type==='buy'?'매수 검토':v.type==='stop'?'매수 중단':'대기')+'</span></div>'+
+  '<div class="us-decision-head"><b>'+esc(NAMES[id])+' · 기술적 참고: '+esc(v.title)+'</b>'+
+  '<span class="us-decision-kind">'+(v.type==='buy'?'기술상 매수 검토':v.type==='stop'?'기술상 추가매수 보류':'추세 확인 대기')+'</span></div>'+
   '<p>'+esc(v.reason)+'</p>';
  if(v.notes?.length)html+='<p class="us-small">'+v.notes.map(esc).join(' · ')+'</p>';
  html+='<p class="us-small">토스 매일 주식모으기 기준 <b>'+krw(dailyAmount(id))+' 원화 정액 소수점 매수</b> · 프로그램 판단: <b>'+(v.type==='buy'?'정액매수 유지 검토':id==='cony'?'기존 매수 일시중지 유지':'대기·중지 검토')+'</b>'+
@@ -177,16 +177,16 @@ function refreshSummary(){
  const vals=Object.keys(NAMES).map(id=>decision(id));
  const counts={buy:vals.filter(d=>d.type==='buy').length,stop:vals.filter(d=>d.type==='stop').length,wait:vals.filter(d=>d.type==='wait').length};
  panel.innerHTML='<div class="us-signal-counts"><div><b class="state-buy">매수 검토 '+counts.buy+'</b></div>'+
- '<div><b class="state-stop">매수 중단 '+counts.stop+'</b></div>'+
+ '<div><b class="state-stop">추가매수 보류 '+counts.stop+'</b></div>'+
  '<div><b class="state-wait">대기 '+counts.wait+'</b></div></div>'+
- '<p class="us-small">토스 미국주식은 1주 단위가 아닌 매일 원화 금액의 소수점 주식모으기입니다. 이 신호는 유지·중지 검토이며 실제 주문을 켜거나 끄지 않습니다.</p>';
+ '<p class="us-small">이 숫자는 이동평균·저가 등 기술적 참고 분석이며 토스의 실제 매수중·일시중지 종목 수가 아닙니다. 실제 주문상태는 사용자 확인 기록으로 별도 표시합니다.</p>';
 }
 function mount(){
  const container=$('us-panel');if(!container)return;
  const holder=document.createElement('div');
  holder.id='us-signals-panel';
  holder.className='us-signals-panel';
- holder.innerHTML='<div class="us-head"><h3>미국주식 매수 · 중단 · 대기 판단</h3></div>'+
+ holder.innerHTML='<div class="us-head"><h3>미국주식 기술적 추가매수 분석 (실제 주문상태와 별도)</h3></div>'+
  '<div id="us-signal-summary"></div>'+
  '<details id="us-signal-settings"><summary>미국주식 원화 매수 상한 설정 (선택)</summary>'+
  '<p class="us-small">상한은 미설정이 기본값입니다. 투자자가 정한 상한을 초과하면 중단으로 표시합니다. 임의 상한을 자동으로 정하지 않습니다.</p>'+
