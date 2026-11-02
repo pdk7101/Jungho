@@ -1,7 +1,7 @@
 /* Public best-effort Naver quote fallback for browser CORS restrictions. */
 import fs from 'node:fs/promises';
 const funds=[['reit','329200'],['robot','469070'],['space','0131V0'],['sofr','455030'],['tr','278530'],['sol','0167B0']];
-const parts=d=>Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d).map(x=>[x.type,x.value]));
+const parts=d=>Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d).map(x=>[x.type,x.value]));
 const kday=d=>{const v=parts(d);return v.year+v.month+v.day};
 const num=x=>x!=null&&String(x).trim()!==''&&Number.isFinite(Number(String(x).replace(/,/g,'')))&&Number(String(x).replace(/,/g,''))>0?Number(String(x).replace(/,/g,'')):null;
 function tradeAt(str){
