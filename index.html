@@ -348,7 +348,7 @@ var saved=readLocal('isa-rules');if(saved){Object.keys(defaults).forEach(functio
 var savedPositions=readLocal('isa-private-positions-v1');if(savedPositions&&typeof savedPositions==='object')FUNDS.forEach(function(f){var v=savedPositions[f.id];if(v&&qtyValid(v.qty)){positions[f.id]={qty:Number(v.qty),avg:valid(v.avg)?Number(v.avg):''};}});
 function hasBars(x){return !!(x&&x.ok&&Array.isArray(x.bars)&&x.bars.length>=40&&x.trend&&valid(x.trend.ma5)&&valid(x.trend.previousMa5)&&valid(x.trend.ma20)&&valid(x.trend.previousMa20)&&valid(x.low20)&&valid(x.high20)&&Number(x.high20)>Number(x.low20)&&valid(x.close)&&/^\d{8}$/.test(x.date));}
 function stale(x){if(!hasBars(x))return true;var d=new Date(x.date.slice(0,4)+'-'+x.date.slice(4,6)+'-'+x.date.slice(6,8)+'T00:00:00Z');return !isFinite(d.getTime())||(Date.now()-d.getTime()>12*86400000);}
-function current(x,id){return valid(manual[id])?Number(manual[id]):liveQuotes[id]&&valid(liveQuotes[id].price)?Number(liveQuotes[id].price):Number(x.close);}
+function current(x,id){return liveQuotes[id]&&valid(liveQuotes[id].price)?Number(liveQuotes[id].price):valid(manual[id])?Number(manual[id]):Number(x.close);}
 function verified(id){return !!(hasBars(byId[id])&&!stale(byId[id]));}
 function capStop(id){
  var cap=settings[id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap'];
@@ -410,6 +410,12 @@ function verdict(f){
    qty:isMonday?1:0,
    info:'키움 주식모으기 매주 월요일 1주. 월요일 외에는 별도 매수 예정이 없습니다. 이동평균선 약세만으로 정기적립을 중지하지 않습니다. 한국 증시 휴장 시 키움의 실제 체결일을 확인하세요.'};
  }
+ var kparts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+ var todayParts={};kparts.forEach(function(p){todayParts[p.type]=p.value;});
+ var kToday=todayParts.year+todayParts.month+todayParts.day;
+ if(['robot','space','sol'].includes(id)&&!liveQuotes[id]&&x?.date!==kToday)
+  return {type:'wait',title:'오늘 시세 미확인',qty:0,
+   info:'현재 검증된 당일 체결가 및 오늘 확정 일봉이 모두 없습니다. 이전 거래일 종가를 오늘의 매수·중지 신호로 사용하지 않습니다.'};
  if(['robot','space','sol'].includes(id)&&window.ISA_livePriceFetch?.active?.(new Date())&&!liveQuotes[id])
   return {type:'wait',title:'오늘 현재가 검증 대기',qty:0,
    info:'장중 검증 가능한 당일 체결가가 없어서 이전 일봉으로 오늘 매수·중지 신호를 만들지 않습니다.'};
