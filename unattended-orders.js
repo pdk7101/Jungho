@@ -6,7 +6,7 @@
 const PLAN='isa-unattended-order-plan-v1',STATE='isa-unattended-order-status-v1';
 const DEFAULT={monthlyMax:1000000,tradingDays:21,conyCashDaily:15000,conyCashDays:10,
  reitDaily:1,robotDaily:1,spaceDaily:1,sofrDaily:0,solDaily:1,trQty:1,
- usSchdDaily:0,usAgncDaily:0,usSpymDaily:0,solMode:'standby'};
+ usSchdDaily:4000,usAgncDaily:3000,usSpymDaily:3000,solMode:'standby'};
 const LABELS={
  reit:'TIGER 리츠부동산인프라',robot:'RISE AI&로봇',space:'1Q 미국우주항공테크',
  sofr:'KODEX 미국달러SOFR',sol:'SOL 200타겟위클리커버드콜',tr:'KODEX 200TR',
@@ -34,6 +34,19 @@ for(const key of Object.keys(DEFAULT)){
  else if(['tradingDays','conyCashDays'].includes(key)&&Number.isInteger(n)&&n>=1&&n<=25)plan[key]=n;
  else if(!['monthlyMax','tradingDays','conyCashDays'].includes(key))plan[key]=n;
 }
+/* The previous app stored zero placeholders for the three Toss daily amounts.
+ * One-time on-device migration corrects those placeholder values without
+ * replacing a later user adjustment, including an explicit future zero. */
+const MIGRATION='isa-toss-daily-amounts-2026-11-02-v1';
+if(!read(MIGRATION)){
+ const restored={schd:4000,agnc:3000,spym:3000};
+ for(const [id,amount] of Object.entries(restored)){
+  const field='us'+id[0].toUpperCase()+id.slice(1)+'Daily';
+  if(plan[field]===0)plan[field]=amount;
+ }
+ // Migration marker only when both writes succeed; never touch broker settings.
+ if(save(PLAN,plan))save(MIGRATION,{applied:true,date:'2026-11-02'});
+}
 let records=read(STATE)||{};
 function rules(){
  const s=read('isa-rules')||{},val=(k,f)=>pos(s[k])?Number(s[k]):f;
@@ -46,6 +59,11 @@ function krDecisions(){
 }
 function usDecision(id){
  try{return window.ISA_US_SIGNAL?.decision?.(id)||null}catch(_){return null}
+}
+function tossDailyKrw(id){
+ if(id==='cony')return plan.conyCashDaily;
+ const key={schd:'usSchdDaily',agnc:'usAgncDaily',spym:'usSpymDaily'}[id];
+ return key?Number(plan[key])||0:null;
 }
 function note(id){
  const old=records[id]||{};
@@ -107,7 +125,7 @@ function rows(){
  for(const id of US){
   let amount=id==='schd'?plan.usSchdDaily:id==='agnc'?plan.usAgncDaily:id==='spym'?plan.usSpymDaily:0;
   result.push({id,name:LABELS[id],broker:'토스증권',mode:'매일 주식모으기',
-   details:id==='cony'?'자동매수 일시중지 · '+won(plan.conyCashDaily)+'/거래일 별도 현금 유보':
+   details:id==='cony'?'원래 매일 '+won(plan.conyCashDaily)+' 주식모으기 · 현재 중지 · 동일 금액 현금 유보':
    amount>0?won(amount)+'/거래일 예정':'모으기 금액 미입력 · 실제 등록금액 확인 필요',
    ...d[id]});
  }
@@ -277,6 +295,6 @@ function mount(){
  window.addEventListener('isa-us-quotes-refreshed',render);
  render();
 }
-window.ISA_ORDER_PLAN={rows,decisions,rules,budget,note,checklist,mismatch};
+window.ISA_ORDER_PLAN={rows,decisions,rules,budget,note,checklist,mismatch,tossDailyKrw};
 mount();
 })();
