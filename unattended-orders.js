@@ -206,17 +206,21 @@ function render(){
  (budgetData.remaining<0?'<p class="uo-danger">월 최대 투자한도 초과 예상 · 매일 모으기 금액·수량 조정이 필요합니다.</p>':'')+
  (budgetData.estimatedOnly?'<p class="uo-danger">예산 미완성: '+budgetData.unknown.map(esc).join(' · ')+'. 등록금액 미확인은 0원으로 계산된 항목이 있으므로 남은 예산이 실제보다 많아 보일 수 있습니다.</p>':'')+
  '<p class="sub">리츠·SOL 조건별 예상 수량: 리츠 '+(budgetData.conditional.known?budgetData.shares.reit+'주':'미확정')+' / SOL '+(budgetData.conditional.known?budgetData.shares.sol+'주':'미확정')+' · '+esc(budgetData.scenario)+'</p>'+
- '<p class="sub">가격 상한은 참고 기준입니다. 주식모으기는 프로그램의 가격 판단을 따라 자동 중지되지 않습니다. 월 계산은 모든 날 설정액대로 주문되는 가정이며 변동 가격·환율·수수료는 제외합니다.</p>';
+ '<p class="sub">로봇·우주의 당일 키움 사용자 확인 기록이 있으면 우선 사용하며, 없으면 시세 기반 판단을 참고합니다. 주식모으기 수량이나 중지 상태는 키움에서 자동 변경되지 않습니다. 금액·환율·수수료에 따라 예산은 달라질 수 있습니다.</p>';
  const groups=[['키움증권',data.filter(r=>r.broker==='키움증권')],['토스증권',data.filter(r=>r.broker==='토스증권')]];
  $('uo-order-list').innerHTML=groups.map(([name,items])=>
   '<h3 class="uo-broker-title">'+esc(name)+'</h3>'+
   items.map(row=>{
-   const st=note(row.id),warning=mismatch(row),statusLabel=row.value==='keep'?'매수 유지':row.value==='pause'?'매수 중지':row.value==='watch'?'자동감시':'자료 확인';
+   const st=note(row.id),warning=mismatch(row),
+    pair=pairInfo(),statusLabel=row.value==='keep'?'매수 유지':row.value==='pause'?'매수 중지':row.value==='watch'?'자동감시':'자료 확인';
+   const badge=(row.id==='reit'&&pair.known?'리츠 '+pair.reitQty+'주':
+    row.id==='sol'&&pair.known&&row.value==='keep'?'SOL '+pair.solQty+'주':
+    row.id==='sol'&&pair.known&&pair.solQty===0?'SOL 0주 · 중지':statusLabel);
    const options=row.id==='tr'?
     [['unknown','미확인'],['watching','감시중 확인'],['paused','감시중지 확인'],['filled','체결 확인'],['expired','만료/취소 확인']]:
     [['unknown','미확인'],['running','주식모으기 매수중 확인'],['paused','주식모으기 중지 확인']];
    return '<details class="uo-order"><summary class="uo-order-top"><b>'+esc(row.name)+'</b>'+
-    '<span>'+esc(row.mode)+'</span><em class="uo-action action-'+row.value+'">'+statusLabel+'</em></summary>'+
+    '<span>'+esc(row.mode)+'</span><em class="uo-action action-'+row.value+'">'+esc(badge)+'</em></summary>'+
     '<p class="uo-state"><b>프로그램 판단:</b> '+esc(row.label)+'</p>'+
     '<p class="sub">'+esc(row.details)+'</p>'+
     '<p class="sub"><b>판단 이유:</b> '+esc(row.reason)+'</p>'+
