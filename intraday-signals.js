@@ -38,6 +38,17 @@ function renderSignals(){
    (q.method==='published'?' · 지연 게시 시세':' · 직접 공개 시세'):'검증된 당일 체결가 없음 · 과거 일봉 참고';
   const text=(v.title||'')+' · '+(v.reason||'');
   const flag=v.type||'wait';
+  // A Kiwoom fill is past execution; keep the independent next-session signal
+  // visible without recommending a second purchase on the same trading day.
+  const afterFill=id==='robot'?
+   '<p class="sub"><b>체결 이후 추가매수 판단:</b> '+
+   safe(flag==='buy'?
+    '현재 조건은 매수 검토 '+(v.qty>0?v.qty+'주':'')+' · 오늘 이미 매수했다면 동일 조건으로 재매수하지 않고 다음 거래일 최신 시세로 다시 판단':
+    flag==='stop'?
+    '현재 조건은 매수 중지 · 다음 거래일 가격 상한과 추세를 다시 확인':
+    '현재 조건은 매수 판단 대기 · 다음 거래일 가격·평단·추세 확인 후 다시 판단')+
+   ' (키움 체결 여부와 독립된 분석 · 주문 실행 아님)</p>':'';
+
   if(q&&['robot','space','sol'].includes(id)){
    const key=flag+'|'+(v.qty??0);
    if(initialized&&prior.has(id)&&prior.get(id)!==key&&['buy','stop'].includes(flag))alertItems.push({...v,id,quote:q});
@@ -48,7 +59,7 @@ function renderSignals(){
   return '<div class="intraday-signal-row"><div class="intraday-signal-main"><strong>'+safe(NAMES[id])+'</strong>'+
    '<span class="intraday-signal-kind state-'+flag+'">'+safe(colors[flag]||'확인 대기')+(v.qty>0?' · '+v.qty+'주':'')+'</span></div>'+
    '<p class="sub">'+safe(sourceNote)+(q?' · '+cash(q.price):'')+'</p>'+
-   '<p class="sub">'+safe(text)+'</p></div>';
+   '<p class="sub">'+safe(text)+'</p>'+afterFill+'</div>';
  }).join('');
  initialized=true;
  for(const item of alertItems)notice(item);
