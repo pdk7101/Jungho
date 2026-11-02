@@ -378,15 +378,21 @@ function pairPlan(){
  var states={},sources={};
  ['robot','space'].forEach(function(id){
   var v=verdict(FUNDS.find(function(f){return f.id===id;})),q=freshQuote(id);
-  states[id]=v.type==='buy'?'buy':v.type==='stop'?'stop':'wait';
-  sources[id]=q?'검증된 비공식 당일 체결가 '+money(q.price)+' · '+
+  // Confirmed price but no entry condition means no BUY today.
+  // Missing/unverified prices remain WAIT, never inferred as a market STOP.
+  var evaluatedNoBuy=v.type==='wait'&&!!q&&
+   ['저가 관심 · 평단 입력','저가·추세 확인 대기','추세/가격 조건 대기'].includes(v.title);
+  states[id]=v.type==='buy'?'buy':v.type==='stop'||evaluatedNoBuy?'stop':'wait';
+  sources[id]=evaluatedNoBuy?
+   '오늘 비공식 체결가 '+money(q.price)+' · 추가매수 조건 미충족(오늘 매수 안 함, 실제 키움 중지 아님)':
+   q?'검증된 비공식 당일 체결가 '+money(q.price)+' · '+
    new Date(q.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'}):
    '확정 일봉 '+day(byId[id]?.date)+' 기준 · 실시간 미확인';
  });
  var known=states.robot!=='wait'&&states.space!=='wait';
  var stopped=(states.robot==='stop'?1:0)+(states.space==='stop'?1:0);
  return {known:known,robot:states.robot,space:states.space,stopped:known?stopped:null,
-  reitQty:known?stopped+1:null,solQty:known&&stopped>0?1:known?0:null,sources:sources};
+  reitQty:known?stopped+1:1,solQty:known&&stopped>0?1:known?0:null,sources:sources};
 }
 function reitCount(){return pairPlan().reitQty;}
 
@@ -451,7 +457,7 @@ function verdict(f){
  }
  if(id==='reit'){
   var pair=pairPlan(),n=pair.reitQty;
-  if(!pair.known)return {type:'wait',title:'리츠 매수수량 확인 대기',qty:0,info:'로봇 또는 우주항공의 매수·중지 상태가 확인되지 않아 리츠를 임의로 1·2·3주로 정하지 않습니다. 키움 실제 상태를 확인해 기록하거나 시세 판단을 기다리세요.'};
+  if(!pair.known)return {type:'buy',title:'리츠 기본 1주 유지 · 추가 수량 대기',qty:1,info:'기존 리츠 매 거래일 1주 적립 유지. 로봇·우주항공 시세 또는 조건이 확인되지 않아 추가 1~2주는 결정하지 않습니다. 실제 키움 주문 설정은 별도 확인하세요.'};
   var reason=pair.stopped===2?'로봇·우주항공 모두 중지 → 리츠 3주.':
    pair.stopped===1?'로봇·우주항공 한 종목 중지 → 리츠 2주.':
    '로봇·우주항공 모두 매수 → 리츠 1주.';
@@ -533,7 +539,7 @@ function renderPlan(){
    if(verified(item.f.id)){
     var cost=current(item.x,item.f.id)*item.v.qty;
     total+=cost;pieces.push(safe(item.f.name)+' '+item.v.qty+'주 ('+money(cost)+')');
-   }else unavailable=true;
+   }else{unavailable=true;if(item.f.id==='reit')pieces.push(safe(item.f.name)+' '+item.v.qty+'주 (기본 적립 유지 · 가격 확인 대기)');}
   }
  });
  var reit=vals.find(function(x){return x.f.id==='reit';});

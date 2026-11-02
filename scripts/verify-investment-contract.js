@@ -61,7 +61,15 @@ app.setQuotes({robot:trade(9501),space:trade(9701),sol:trade(9750)});
 equal(app.pairPlan().reitQty,3,'broker-running log never overrides actual over-cap BUY/STOP decision');
 app.setQuotes({robot:trade(9300),space:trade(9685),sol:trade(9750)});
 equal(verdict('space').type,'wait','below price cap alone is not sufficient for BUY');
-equal(app.pairPlan().known,false,'WAIT never incorrectly means STOP');
+equal(app.pairPlan().known,true,'fresh-price technical WAIT is no BUY today for the paired plan');
+equal([app.pairPlan().reitQty,app.pairPlan().solQty],[2,1],
+ 'robot BUY and aerospace priced no-BUY -> REIT 2 shares and SOL 1 share');
+equal(verdict('sol').qty,1,'SOL follows confirmed one-no-buy plan under its own price cap');
+app.setQuotes({robot:trade(9300),sol:trade(9750)});
+equal(app.pairPlan().known,false,'no verified aerospace price keeps conditional extras unknown');
+equal(app.pairPlan().reitQty,1,'REIT base one share remains when space price unavailable');
+equal(verdict('reit').qty,1,'REIT base one share still displayed as BUY');
+app.setQuotes({robot:trade(9300),space:trade(9685),sol:trade(9750)});
 app.manual.robot=25000;
 equal(app.current(app.byId.robot,'robot'),9300,'verified quote outranks manually entered old price');
 app.setQuotes({});

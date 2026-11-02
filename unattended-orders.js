@@ -134,9 +134,9 @@ function decisions(){
     category(x.type,x.title,x.reason,x.quoteDate,!!x.hasIntraday);
   if(id==='reit'){
    v=pair.known?{value:'keep',label:'리츠 '+pair.reitQty+'주 적립 검토',
-    reason:'로봇·우주항공 '+pair.stopped+'종목 중지 → 리츠 '+pair.reitQty+'주. 키움 주식모으기 수량은 앱에서 자동 조정되지 않습니다.',
+    reason:'로봇·우주항공 '+pair.stopped+'종목 매수 안 함 → 리츠 '+pair.reitQty+'주. 키움 주식모으기 수량은 앱에서 자동 조정되지 않습니다.',
     sourceDate:x?.quoteDate||null}:
-    {value:'unknown',label:'리츠 수량 확인 필요',reason:'로봇·우주항공의 매수/중지 상태가 불확실해 리츠 1·2·3주를 결정하지 않습니다.',
+    {value:'keep',label:'리츠 기본 1주 유지 · 추가 수량 미확정',reason:'기존 매 거래일 리츠 1주 적립은 유지하며, 로봇·우주항공 가격/상태 미확인으로 추가 1~2주만 보류합니다.',
      sourceDate:x?.quoteDate||null};
   }
   if(id==='sol'){
@@ -153,7 +153,7 @@ function decisions(){
     value:'unknown',label:'SOL 원화가격 확인 필요',reason:'SOL 1주 조건이지만 SOL 시세·매수상한 확인이 불완전합니다. 임의 재개하지 마세요.',
     sourceDate:x?.quoteDate||null};
    else v={value:'keep',label:'SOL 1주 매수 검토',
-    reason:'로봇·우주항공 '+pair.stopped+'종목 중지 → SOL 1주. 매수상한 '+won(limit.sol)+' 이내, 키움에서 실제 수량·활성 상태를 별도 확인하세요.',
+    reason:'로봇·우주항공 '+pair.stopped+'종목 오늘 매수 안 함 → SOL 1주. 매수상한 '+won(limit.sol)+' 이내, 키움에서 실제 수량·활성 상태를 별도 확인하세요.',
     sourceDate:x?.quoteDate||null};
   }
   result[id]=v;
@@ -176,7 +176,7 @@ function rows(){
   let info='';
   if(id==='robot')info='가격 상한 '+won(r.robot)+' · 1일 최대 '+plan.robotDaily+'주 (상한 자동 정지 불가)';
   if(id==='space')info='가격 상한 '+won(r.space)+' · 1일 최대 '+plan.spaceDaily+'주 (상한 자동 정지 불가)';
-  if(id==='reit')info=pair.known?'로봇·우주항공 '+pair.stopped+'종목 중지 → 리츠 '+pair.reitQty+'주/거래일 권고 (키움 실제 수량 자동 변경 불가)':'상태 확인 전 리츠 1·2·3주 미확정';
+  if(id==='reit')info=pair.known?'로봇·우주항공 '+pair.stopped+'종목 중지 → 리츠 '+pair.reitQty+'주/거래일 권고 (키움 실제 수량 자동 변경 불가)':'리츠 기본 1주/거래일 유지 · 추가 1~2주 미확정';
   if(id==='sofr')info=plan.sofrWeekly?'매주 월요일 '+plan.sofrWeekly+'주 정기 주식모으기 · 월 '+mondaysThisMonth()+'회 예정':'매주 월요일 정기매수 수량 0주 · 설정 확인 필요';
   if(id==='sol')info='매수·중지 상태에 따라 SOL '+(pair.known?pair.solQty+'주':'미확정')+' · 상한 '+won(r.sol)+' · 키움 실제 주문 미변경';
   result.push({id,name:LABELS[id],broker:'키움증권',mode:id==='sofr'?'매주 월요일 주식모으기':'매일 주식모으기',details:info,...d[id]});
