@@ -331,7 +331,31 @@ function capStop(id){
  var cap=settings[id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap'];
  return verified(id)&&valid(cap)&&current(byId[id],id)>cap;
 }
-function reitCount(){return capStop('robot')&&capStop('space')?3:1;}
+function pairPlan(){
+ // Use same-day user-confirmed broker collection statuses first; otherwise
+ // use verified technical BUY / STOP. WAIT is never guessed as a STOP.
+ var today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ var raw=readLocal('isa-unattended-order-status-v1')||{};
+ var sources={},states={};
+ ['robot','space'].forEach(function(id){
+  var item=raw[id]||{},dayConfirmed=item.checkedDate||item.changed||'';
+  var confirmed=item.status==='running'||item.status==='paused'||item.status==='closed';
+  if(confirmed&&dayConfirmed===today){
+   states[id]=item.status==='running'?'buy':'stop';
+   sources[id]='당일 사용자 확인한 키움 주식모으기 상태';
+  }else{
+   var d=verdict(FUNDS.find(function(f){return f.id===id;}));
+   states[id]=d.type==='buy'?'buy':d.type==='stop'?'stop':'wait';
+   sources[id]='프로그램 가격·추세 판단(증권사 상태 미확인)';
+  }
+ });
+ var known=states.robot!=='wait'&&states.space!=='wait';
+ var stopped=(states.robot==='stop'?1:0)+(states.space==='stop'?1:0);
+ return {known:known,robot:states.robot,space:states.space,stopped:known?stopped:null,
+  reitQty:known?stopped+1:null,solQty:known&&stopped>0?1:known?0:null,sources:sources};
+}
+function reitCount(){return pairPlan().reitQty;}
+
 function band(x,p){
  var lo=Number(x.low20),hi=Number(x.high20);
  var b30=round5(lo+(hi-lo)*0.30),b20=round5(lo+(hi-lo)*0.20);
@@ -372,8 +396,12 @@ function verdict(f){
   if(p>cap)return {type:'stop',title:'매수 중단',info:'기존 매수 상한 '+money(cap)+' 초과. 박스권 저가 여부와 관계없이 추격매수 중단.'+liveNote,qty:0};
  }
  if(id==='reit'){
-  var n=reitCount(),reason=n===3?'로봇·우주항공 모두 상한 초과로 3주 검토.':'기본 적립 1주 유지.';
-  return {type:'buy',title:'리츠 '+n+'주 적립 검토',qty:n,info:reason+' 5·20일선은 참고하며 이탈만으로 적립을 중단하지 않습니다.'+(decline?' 단, 약세에서 추가적인 확대는 주의.':'')};
+  var pair=pairPlan(),n=pair.reitQty;
+  if(!pair.known)return {type:'wait',title:'리츠 매수수량 확인 대기',qty:0,info:'로봇 또는 우주항공의 매수·중지 상태가 확인되지 않아 리츠를 임의로 1·2·3주로 정하지 않습니다. 키움 실제 상태를 확인해 기록하거나 시세 판단을 기다리세요.'};
+  var reason=pair.stopped===2?'로봇·우주항공 모두 중지 → 리츠 3주.':
+   pair.stopped===1?'로봇·우주항공 한 종목 중지 → 리츠 2주.':
+   '로봇·우주항공 모두 매수 → 리츠 1주.';
+  return {type:'buy',title:'리츠 '+n+'주 적립 검토',qty:n,info:reason+' 키움 주식모으기 등록수량은 자동 변경되지 않습니다. 5·20일선은 참고이며 별도 시세 위험을 확인하세요.'};
  }
  if(id==='sofr')return {type:'buy',title:'정기 적립 유지',qty:0,info:'기존 SOFR 정기 적립을 유지합니다. 5·20일선과 평단가는 참고만 하며, 자동 추천 수량은 정하지 않습니다.'};
  if(id==='tr'){
@@ -381,7 +409,12 @@ function verdict(f){
   if(!valid(settings.trBase))return {type:'wait',title:'감시 기준 미입력',info:'기준가를 입력해야 -5% 감시가격을 계산할 수 있습니다.',qty:0};
   return p<=target?{type:'wait',title:'-5% 도달 · 검토',info:'감시가격 '+money(target)+' 이하입니다. 기존 주문 체결 여부 및 급락 원인 확인. 5·20일선: '+trend(x),qty:0}:{type:'wait',title:'-5% 하락 감시',info:'감시가격 '+money(target)+' 이하에 도달했는지 확인. 5·20일선: '+trend(x),qty:0};
  }
- if(id==='sol'&&!capStop('robot')&&!capStop('space'))return {type:'wait',title:'대체매수 대기',info:'로봇·우주항공의 상한 초과가 없어 SOL 대체매수는 대기합니다.',qty:0};
+ if(id==='sol'){
+  var pair=pairPlan();
+  if(!pair.known)return {type:'wait',title:'SOL 연동조건 확인 대기',info:'로봇·우주항공의 매수·중지 중 확인되지 않은 상태가 있습니다. SOL 적립을 임의로 정하지 않고 실제 키움 모으기 상태를 확인합니다.',qty:0};
+  if(pair.solQty===0)return {type:'stop',title:'SOL 대체매수 중지',info:'로봇·우주항공 모두 매수 → SOL 0주. 이미 키움에서 SOL 매수중이면 실제 주식모으기 상태와 이번 권고가 다르니 확인해야 합니다.',qty:0};
+  return {type:'buy',title:'SOL 대체매수 1주',info:(pair.stopped===2?'로봇·우주항공 모두 중지':'로봇·우주항공 중 한 종목 중지')+' → SOL 하루 1주 검토. SOL 상한 '+money(settings.solCap)+' 이내에서만 검토하며 키움 실제 주식모으기 주문은 자동 변경되지 않습니다.',qty:1};
+ }
  if(valid(manual[id]))return {type:'wait',title:'수동 가격 · 재확인',info:'직접 입력 가격으로 상한과 박스권은 비교할 수 있지만 5·20일선은 이전 종가이므로 신규매수 결정 전 다시 확인하세요.',qty:0};
  if(h&&h.canLower&&b.low){
   var at20=p<=b.b20;
@@ -401,6 +434,7 @@ function actionLabel(type){
  return type==='buy'?'매수':type==='stop'?'중지':'대기';
 }
 window.ISA_KR_APP={
+ pairPlan:pairPlan,
  decisions:function(){
   return FUNDS.map(function(f){
    var v=verdict(f),x=byId[f.id],p=hasBars(x)?current(x,f.id):null;
