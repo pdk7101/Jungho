@@ -205,6 +205,35 @@ details[open]>summary{margin-bottom:12px}
  #us-panel .us-list-price{font-size:.98rem}
  #us-panel .us-list-state{font-size:.69rem;padding:3px 4px}
 }
+
+/* Pre-entry unattended order plan; no brokerage connection or order transmission */
+.uo-panel{border-color:#4c688f}.uo-panel h2{font-size:1.1rem;margin:0 0 8px}
+.uo-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:12px 0}
+.uo-summary-grid>div{background:#1b2f4c;border-radius:9px;padding:10px;font-size:.75rem;color:#adc0da}
+.uo-summary-grid strong{display:block;color:#f1f6ff;font-size:.94rem;margin-top:5px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.uo-danger{color:#ffabb6!important;font-size:.8rem;line-height:1.5;font-weight:650}
+.uo-settings{margin:10px 0;border-top:1px solid #3f506c;padding:10px 0}
+.uo-settings summary{font-weight:750;cursor:pointer}
+.uo-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:11px}
+.uo-inputs label{font-size:.74rem;min-width:0}
+.uo-inputs input,.uo-inputs select{min-width:0;font-size:.88rem;padding:10px}
+.uo-list{display:grid;grid-template-columns:1fr;gap:7px}
+.uo-order{border:1px solid #455b78;border-radius:9px;background:#14243d;padding:10px 12px;margin:0}
+.uo-order summary{cursor:pointer}
+.uo-order-top{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.81rem}
+.uo-order-top b{font-size:.87rem;flex:1 1 auto}
+.uo-order-top span{color:#aebfd7;font-size:.72rem;text-align:right}
+.uo-order-top em{font-style:normal;font-size:.69rem;color:#cdd8e5;white-space:nowrap;border:1px solid #5e728d;padding:2px 5px;border-radius:6px}
+.uo-order p{font-size:.79rem;line-height:1.5;margin:8px 0}
+.uo-order .uo-state{font-weight:750;color:#b5dafa}
+.uo-record{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0 0}
+.uo-record label{font-size:.72rem;min-width:0}
+.uo-record select,.uo-record input{min-width:0;font-size:.79rem;padding:9px}
+.uo-controls{display:flex;gap:8px;margin:14px 0 8px;flex-wrap:wrap}
+.uo-controls button{font-size:.78rem;padding:10px 12px}
+#uo-copy-area{width:100%;font-size:.75rem;background:#11203a;color:#dce9f9;border:1px solid #4a6080;border-radius:8px;padding:9px}
+#uo-copy-area[hidden]{display:none}
+@media(max-width:410px){.uo-inputs,.uo-record{grid-template-columns:1fr}.uo-order-top{flex-wrap:wrap}.uo-order-top b{flex:1 1 100%}.uo-order-top span{flex:1}.uo-summary-grid strong{font-size:.85rem}}
 </style><script src="./live-prices.js"></script></head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel flex"><div><b>현재가 재조회 · 마지막 게시 일봉과 구분</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
@@ -577,4 +606,4 @@ var reload=document.getElementById('reload');
 if(reload)reload.addEventListener('click',update);
 update();
 })();
-</script><script src="./insights.js" defer></script><script src="./us-dashboard.js" defer></script><script src="./us-krw.js" defer></script><script src="./us-signals.js" defer></script></body></html>
+</script><script src="./insights.js" defer></script><script src="./us-dashboard.js" defer></script><script src="./us-krw.js" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script></body></html>
