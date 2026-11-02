@@ -431,7 +431,7 @@ function verdict(f){
  }
  if(id==='sofr'){
   const isMonday=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',weekday:'short'}).format(new Date())==='Mon';
-  return {type:'buy',title:isMonday?'월요일 SOFR 1주 정기적립':'SOFR 매주 월요일 1주 정기적립',
+  return {type:isMonday?'buy':'wait',title:isMonday?'월요일 SOFR 1주 정기매수 예정':'SOFR 다음 월요일 1주 정기매수 예정',
    qty:isMonday?1:0,
    info:'키움 주식모으기 매주 월요일 1주. 월요일 외에는 별도 매수 예정이 없습니다. 이동평균선 약세만으로 정기적립을 중지하지 않습니다. 한국 증시 휴장 시 키움의 실제 체결일을 확인하세요.'};
  }
@@ -539,7 +539,7 @@ function renderPlan(){
    if(verified(item.f.id)){
     var cost=current(item.x,item.f.id)*item.v.qty;
     total+=cost;pieces.push(safe(item.f.name)+' '+item.v.qty+'주 ('+money(cost)+')');
-   }else{unavailable=true;if(item.f.id==='reit')pieces.push(safe(item.f.name)+' '+item.v.qty+'주 (기본 적립 유지 · 가격 확인 대기)');}
+   }else{unavailable=true;if(item.f.id==='reit'||item.f.id==='sofr')pieces.push(safe(item.f.name)+' '+item.v.qty+'주 ('+(item.f.id==='sofr'?'월요일 정기매수 예정 · 예상가격 미확인':'기본 적립 유지 · 가격 확인 대기')+')');}
   }
  });
  var reit=vals.find(function(x){return x.f.id==='reit';});

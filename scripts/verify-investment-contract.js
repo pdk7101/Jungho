@@ -84,6 +84,23 @@ equal(app.freshQuote('space'),null,'prior-day quote rejected');
 const isMonday=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',weekday:'short'})
  .format(new Date())==='Mon';
 equal(verdict('sofr').qty,1,'SOFR 1 share on fixed Monday');
+equal(verdict('sofr').type,'buy','SOFR Monday recurrence is BUY regardless of trend');
+const TuesdayDate=class extends Date{constructor(...args){super(...(args.length?args:['2026-11-03T05:00:00.000Z']));}static now(){return Date.parse('2026-11-03T05:00:00.000Z');}};
+const tueApp=new Function('window','localStorage','document','Date',appCode+
+ '\nreturn {FUNDS,verdict};')({ISA_livePriceFetch:{active:()=>false}},loc,{getElementById:()=>null},TuesdayDate);
+const tuesdaySofr=tueApp.verdict(tueApp.FUNDS.find(x=>x.id==='sofr'));
+equal([tuesdaySofr.type,tuesdaySofr.qty],['wait',0],
+ 'SOFR Tuesday is zero shares today, not a daily BUY signal');
+truth(tuesdaySofr.title.includes('다음 월요일'),
+ 'SOFR non-Monday is a scheduled weekly buy, not price-data failure');
+const planHost={innerHTML:''};
+const planSrc=html.slice(html.indexOf('function renderPlan(){'),html.indexOf('function render(){'));
+const planApp=new Function('window','localStorage','document','Date',appCode+'\n'+planSrc+
+ '\nreturn {renderPlan};')({ISA_livePriceFetch:{active:()=>false}},loc,
+ {getElementById:id=>id==='plan'?planHost:null},FixedDate);
+planApp.renderPlan();
+truth(planHost.innerHTML.includes('KODEX 미국달러SOFR 1주 (월요일 정기매수 예정 · 예상가격 미확인)'),
+ 'SOFR Monday scheduled 1 share stays visible with missing bar price, without guessed cost');
 
 const head=source=>source.slice(0,source.indexOf('function mount(){'))
  .replace(/^\/\*[\s\S]*?\*\/\s*\(function\(\)\{\s*'use strict';/,'');
@@ -101,6 +118,10 @@ equal(broker.decisions().cony.value,'pause','CONY remains paused, no automatic r
 equal(broker.rows().filter(x=>x.mode==='자동감시주문').map(x=>x.id),
  ['tr'],'only KODEX 200TR is broker price-watch order');
 equal(broker.plan.sofrWeekly,1,'SOFR recurring 1 share per Monday');
+truth(broker.decisions().sofr.label.includes('월요일'),
+ 'broker schedule displays weekly SOFR, not technical pause');
+truth(broker.rows().find(x=>x.id==='sofr').label.includes('월요일'),
+ 'broker SOFR order row displays weekly schedule');
 equal(broker.rows().find(x=>x.id==='sofr').mode,'매주 월요일 주식모으기',
  'SOFR order schedule remains weekly not daily');
 equal(broker.budget().sofrMonthly,11500*broker.mondaysThisMonth(),

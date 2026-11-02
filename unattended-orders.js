@@ -132,6 +132,11 @@ function decisions(){
   const x=kd[id];
   let v=!x?category('wait','자료 미확인','국내주식 판단 데이터가 아직 로드되지 않았습니다.',null):
     category(x.type,x.title,x.reason,x.quoteDate,!!x.hasIntraday);
+  if(id==='sofr'){
+   const monday=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',weekday:'short'}).format(new Date())==='Mon';
+   v={value:'keep',label:monday?'SOFR 오늘 월요일 1주 정기매수 예정':'SOFR 다음 월요일 1주 정기매수 예정 · 오늘 0주',
+    reason:'SOFR은 매주 월요일 1주 정기적립 계획입니다. 가격·5/20일 이동평균선·로봇/우주항공 매수 신호와 독립적이며 실제 키움 체결은 별도로 확인합니다.',sourceDate:null};
+  }
   if(id==='reit'){
    v=pair.known?{value:'keep',label:'리츠 '+pair.reitQty+'주 적립 검토',
     reason:'로봇·우주항공 '+pair.stopped+'종목 매수 안 함 → 리츠 '+pair.reitQty+'주. 키움 주식모으기 수량은 앱에서 자동 조정되지 않습니다.',
@@ -275,7 +280,8 @@ function render(){
    const st=note(row.id),warning=mismatch(row),
     pair=pairInfo(),statusLabel=row.value==='keep'?'매수 유지':row.value==='pause'?'매수 중지':row.value==='watch'?'자동감시':'자료 확인';
    const badge=US.includes(row.id)?(st.value==='running'?'매수중 · 사용자 확인':st.value==='paused'?'일시중지 · 사용자 확인':'실제 상태 미확인'):
-    (row.id==='reit'&&pair.known?'리츠 '+pair.reitQty+'주':
+    (row.id==='sofr'?'월요일 1주 정기적립':
+    row.id==='reit'&&pair.known?'리츠 '+pair.reitQty+'주':
     row.id==='sol'&&pair.known&&row.value==='keep'?'SOL '+pair.solQty+'주':
     row.id==='sol'&&pair.known&&pair.solQty===0?'SOL 0주 · 중지':statusLabel);
    const options=row.id==='tr'?
@@ -286,7 +292,8 @@ function render(){
     '<p class="uo-state"><b>'+(US.includes(row.id)?'투자 계획:':'프로그램 판단:')+'</b> '+esc(row.label)+'</p>'+
     '<p class="sub">'+esc(row.details)+'</p>'+ (US.includes(row.id)?'<p class="sub">토스 주문상태: <b>'+esc(st.value==='running'?'매수중':st.value==='paused'?'일시중지':'미확인')+'</b> · '+esc(st.date||'확인일 없음')+' 사용자 확인 기록 (실시간 연동 아님)</p>':'')+
     '<p class="sub"><b>판단 이유:</b> '+esc(row.reason)+'</p>'+
-    (row.sourceDate?'<p class="sub">분석 일봉 기준: '+esc(row.sourceDate)+(row.manual?' · 당일 시세 참고':'')+'</p>':
+    (row.id==='sofr'?'<p class="sub">정기매수 기준: 매주 월요일 1주 · 이동평균선 매수조건 없음</p>':
+    row.sourceDate?'<p class="sub">분석 일봉 기준: '+esc(row.sourceDate)+(row.manual?' · 당일 시세 참고':'')+'</p>':
     '<p class="sub">분석 일봉 기준: 자료 확인 필요</p>')+
     (warning?'<p class="uo-danger">'+esc(warning)+'</p>':'')+
     '<div class="uo-record"><label>실제 증권사 상태 (사용자 확인 기록)<select data-uo-status="'+row.id+'">'+

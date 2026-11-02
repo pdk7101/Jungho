@@ -57,7 +57,7 @@ function renderSignals(){
    prior.delete(id);
   }
   return '<div class="intraday-signal-row"><div class="intraday-signal-main"><strong>'+safe(NAMES[id])+'</strong>'+
-   '<span class="intraday-signal-kind state-'+flag+'">'+safe(colors[flag]||'확인 대기')+(v.qty>0?' · '+v.qty+'주':'')+'</span></div>'+
+   '<span class="intraday-signal-kind state-'+flag+'">'+safe(id==='sofr'?(v.qty===1?'월요일 1주 정기매수 예정':'다음 월요일 1주 예정 · 오늘 0주'):(colors[flag]||'확인 대기')+(v.qty>0?' · '+v.qty+'주':''))+'</span></div>'+
    '<p class="sub">'+safe(sourceNote)+(q?' · '+cash(q.price):'')+'</p>'+
    '<p class="sub">'+safe(text)+'</p>'+afterFill+'</div>';
  }).join('');
