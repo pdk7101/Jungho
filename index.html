@@ -403,7 +403,7 @@ function verdict(f){
   var reason=pair.stopped===2?'로봇·우주항공 모두 중지 → 리츠 3주.':
    pair.stopped===1?'로봇·우주항공 한 종목 중지 → 리츠 2주.':
    '로봇·우주항공 모두 매수 → 리츠 1주.';
-  return {type:'buy',title:'리츠 '+n+'주 적립 검토',qty:n,info:reason+' 키움 주식모으기 등록수량은 자동 변경되지 않습니다. 5·20일선은 참고이며 별도 시세 위험을 확인하세요.'};
+  return {type:'buy',title:'리츠 '+n+'주 적립 검토',qty:n,info:reason+' 로봇: '+pair.sources.robot+' / 우주: '+pair.sources.space+'. 키움 주식모으기 등록수량은 자동 변경되지 않습니다. 5·20일선은 참고이며 별도 시세 위험을 확인하세요.'};
  }
  if(id==='sofr')return {type:'buy',title:'정기 적립 유지',qty:0,info:'기존 SOFR 정기 적립을 유지합니다. 5·20일선과 평단가는 참고만 하며, 자동 추천 수량은 정하지 않습니다.'};
  if(id==='tr'){
@@ -415,7 +415,7 @@ function verdict(f){
   var pair=pairPlan();
   if(!pair.known)return {type:'wait',title:'SOL 연동조건 확인 대기',info:'로봇·우주항공의 매수·중지 중 확인되지 않은 상태가 있습니다. SOL 적립을 임의로 정하지 않고 실제 키움 모으기 상태를 확인합니다.',qty:0};
   if(pair.solQty===0)return {type:'stop',title:'SOL 대체매수 중지',info:'로봇·우주항공 모두 매수 → SOL 0주. 이미 키움에서 SOL 매수중이면 실제 주식모으기 상태와 이번 권고가 다르니 확인해야 합니다.',qty:0};
-  return {type:'buy',title:'SOL 대체매수 1주',info:(pair.stopped===2?'로봇·우주항공 모두 중지':'로봇·우주항공 중 한 종목 중지')+' → SOL 하루 1주 검토. SOL 상한 '+money(settings.solCap)+' 이내에서만 검토하며 키움 실제 주식모으기 주문은 자동 변경되지 않습니다.',qty:1};
+  return {type:'buy',title:'SOL 대체매수 1주',info:(pair.stopped===2?'로봇·우주항공 모두 중지':'로봇·우주항공 중 한 종목 중지')+' → SOL 하루 1주 검토. SOL 상한 '+money(settings.solCap)+' 이내에서만 검토하며 키움 실제 주식모으기 주문은 자동 변경되지 않습니다. 로봇: '+pair.sources.robot+' / 우주: '+pair.sources.space+'.',qty:1};
  }
  if(valid(manual[id]))return {type:'wait',title:'수동 가격 · 재확인',info:'직접 입력 가격으로 상한과 박스권은 비교할 수 있지만 5·20일선은 이전 종가이므로 신규매수 결정 전 다시 확인하세요.',qty:0};
  if(h&&h.canLower&&b.low){
@@ -490,7 +490,7 @@ function renderPlan(){
  message+='<p><b>검토 수량 예상 비용:</b> '+(unavailable?'일부 가격 미확인 · ':'')+money(total)+' <small>(SOFR 정기 적립, 200TR 조건부 주문은 제외)</small></p>';
  if(budget!==null)message+='<p class="'+(total>budget?'error':'good')+'"><b>입력 예산:</b> '+money(budget)+' · '+(total>budget?'예상 비용이 예산을 초과합니다. 수량 조정 필요.':'현재 계산한 검토 비용은 예산 이내입니다.')+'</p>';
  else message+='<p class="sub">하루 예산이 미입력입니다. 주문 전 기존 SOFR 적립액과 미체결 주문까지 합산해 확인하세요.</p>';
- if(clash)message+='<p class="error"><b>예산 중복 가능성:</b> 리츠 3주와 SOL 1주가 동시에 검토됩니다. 같은 대체매수 여유자금을 중복 사용하지 마세요.</p>';
+ if(clash)message+='<p class="sub"><b>확정한 대체매수 조합:</b> 로봇·우주 모두 중지 시 리츠 3주와 SOL 1주를 함께 검토합니다. 두 주문의 매수대금을 각각 준비하고, 키움 실제 주식모으기 수량·활성 상태를 확인하세요.</p>';
  el('plan').innerHTML=message;
 }
 function render(){
