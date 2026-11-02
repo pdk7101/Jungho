@@ -302,7 +302,7 @@ details[open]>summary{margin-bottom:12px}
 (function(){
 'use strict';
 var FUNDS=[
-{id:'reit',name:'TIGER 리츠부동산인프라',code:'329200',plan:'기본 1주 / 두 종목 모두 중단 시 3주'},
+{id:'reit',name:'TIGER 리츠부동산인프라',code:'329200',plan:'로봇·우주 매수 2/1/0종목에 따라 1/2/3주 적립'},
 {id:'robot',name:'RISE AI&로봇',code:'469070',plan:'9,500원 상한 · 소액 분할 검토'},
 {id:'space',name:'1Q 미국우주항공테크',code:'0131V0',plan:'9,700원 상한 · 소액 분할 검토'},
 {id:'sofr',name:'KODEX 미국달러SOFR',code:'455030',plan:'기존 정기 적립 유지'},
@@ -334,7 +334,9 @@ function capStop(id){
 function pairPlan(){
  // Use same-day user-confirmed broker collection statuses first; otherwise
  // use verified technical BUY / STOP. WAIT is never guessed as a STOP.
- var today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ var dparts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+ var values={};dparts.forEach(function(p){values[p.type]=p.value;});
+ var today=values.year+'-'+values.month+'-'+values.day;
  var raw=readLocal('isa-unattended-order-status-v1')||{};
  var sources={},states={};
  ['robot','space'].forEach(function(id){
