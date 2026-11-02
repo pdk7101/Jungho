@@ -400,6 +400,16 @@ function verdict(f){
 function actionLabel(type){
  return type==='buy'?'매수':type==='stop'?'중지':'대기';
 }
+window.ISA_KR_APP={
+ decisions:function(){
+  return FUNDS.map(function(f){
+   var v=verdict(f),x=byId[f.id],p=hasBars(x)?current(x,f.id):null;
+   return {id:f.id,name:f.name,code:f.code,type:v.type,title:v.title,reason:v.info,qty:v.qty,
+    quote:p,quoteDate:hasBars(x)?day(x.date):null,verified:verified(f.id),
+    hasIntraday:!!liveQuotes[f.id],broker:'키움증권'};
+  });
+ }
+};
 function chart(bars){
  var last=bars.slice(-20),all=last.map(function(x){return Number(x.close);});
  var ma20s=last.map(function(x,i){return bars.slice(i+1,i+21).reduce(function(s,b){return s+Number(b.close);},0)/20;});
