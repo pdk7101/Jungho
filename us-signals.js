@@ -38,6 +38,16 @@ function latest(x){
  const age=Date.now()-dt.getTime();
  return Number.isFinite(age)&&age>=0&&age<=7*86400000;
 }
+function dailyAmount(id){
+ // All Toss US orders use KRW amounts with fractional shares; never 1-share orders.
+ const fromPlanner=window.ISA_ORDER_PLAN?.tossDailyKrw?.(id);
+ if(typeof fromPlanner==='number'&&Number.isFinite(fromPlanner)&&fromPlanner>=0)return fromPlanner;
+ const saved=read('isa-unattended-order-plan-v1');
+ const field={schd:'usSchdDaily',spym:'usSpymDaily',agnc:'usAgncDaily',cony:'conyCashDaily'}[id];
+ const defaults={schd:4000,spym:3000,agnc:3000,cony:15000};
+ const v=saved&&field!==undefined?saved[field]:undefined;
+ return typeof v==='number'&&Number.isFinite(v)&&v>0?v:defaults[id]??0;
+}
 function evaluate(id,source,cap){
  const x=source?.x,usd=source?.usdClose,kr=source?.krw,qty=source?.qty,avg=source?.avg;
  const basic=(type,title,reason,extra={})=>({
@@ -91,20 +101,20 @@ function evaluate(id,source,cap){
  if(id==='agnc'){
   if(steep||t.deadCross)return basic('wait','AGNC 배당·자산가치 점검',
    'AGNC는 모기지 리츠 개별주입니다. 하락추세가 강해 장부가치(BVPS), 레버리지, 금리 민감도와 배당 지속성을 확인할 때까지 추가매수를 보류합니다.',extras);
-  if((low&&canLower&&!down)||healthy)return basic('buy','AGNC 소액 분할매수 검토',
-   '기술적 조건을 충족했으나 배당만으로 안전성을 판단할 수 없습니다. 공식 BVPS·배당 지속성 확인과 별도 예산 점검 후 소액 분할매수를 검토하세요.',
-   {...extras,qty:1});
+  if((low&&canLower&&!down)||healthy)return basic('buy','AGNC 원화 적립 유지 검토',
+   '기술적 조건을 충족했으나 배당만으로 안전성을 판단할 수 없습니다. 공식 BVPS·배당 지속성 확인과 별도 예산 점검 후 매일 설정된 원화 금액의 소수점 적립을 검토하세요.',
+   {...extras,qty:0,amountKRW:dailyAmount(id)});
   return basic('wait','AGNC 추세·배당 확인 대기',
    '저가만으로 매수하지 않습니다. 기술적 약세와 공식 BVPS/배당 지속성 미확인 상태에서 대기합니다.',extras);
  }
  if(steep||t.deadCross)return basic('wait','하락 추세 확인 대기',
   '20일선 대비 큰 하락 또는 데드크로스 위험이 있습니다. 저가라도 반등 확인 전 분할매수는 보수적으로 대기합니다.',extras);
  if(low&&canLower&&!down)return basic('buy','평단 인하 분할매수 검토',
-  '저가 구간이며 입력된 원화 평단보다 낮고 20일선 약세가 완화됐습니다. 투자예산과 종목 비중을 확인하고 소액 1주 검토.',
-  {...extras,qty:1});
+  '저가 구간이며 입력된 원화 평단보다 낮고 20일선 약세가 완화됐습니다. 보유 비중과 예산을 확인한 뒤 매일 설정한 원화 금액으로 소수점 적립을 검토하세요.',
+  {...extras,qty:0,amountKRW:dailyAmount(id)});
  if(healthy&&usd<=ma20*1.05)return basic('buy','추세 전환 매수 검토',
-  '종가가 20일선 위에서 2거래일 유지하고 5일선이 우위이며 20일선이 상승·횡보입니다. 추격매수를 피하면서 최대 1주를 검토하세요.',
-  {...extras,qty:1});
+  '종가가 20일선 위에서 2거래일 유지하고 5일선이 우위이며 20일선이 상승·횡보입니다. 원화 정액 소수점 주식모으기 지속 여부를 검토하세요.',
+  {...extras,qty:0,amountKRW:dailyAmount(id)});
  return basic('wait',low?'저가·추세 확인 대기':'추세·가격 조건 대기',
   (avg!==null&&kr.amount>=avg?'현재 가격은 입력된 원화 평단보다 낮지 않습니다. ':'')+
   '저가/평단 인하 또는 상승 추세 확인 조건이 충족되지 않아 신규 매수를 보류합니다.',extras);
@@ -119,12 +129,11 @@ function decision(id){
  return evaluate(id,q,cap);
 }
 function cardLine(id){
- const v=decision(id);
- // Actual owned shares + cost basis belong only to us-krw.js cardLine.
- // This component shows decision and proposed ADDITIONAL buy quantity only.
+ const v=decision(id),daily=dailyAmount(id);
  return '<div class="us-trade-status state-'+v.type+'"><span class="us-signal-dot"></span>'+
   esc(v.title)+'</div>'+
-  '<span class="us-small">추가매수 검토: <b>'+(v.qty?v.qty+'주':v.amountKRW?krw(v.amountKRW)+' 소액 적립':'0주 (대기/중단)')+'</b></span>';
+  '<span class="us-small">토스 매일 주식모으기 설정 기준: <b>'+krw(daily)+'</b> · 소수점 적립 (실제 활성·중지 상태 별도 확인)</span>'+
+  '<span class="us-small">프로그램 검토: <b>'+(v.type==='buy'?'정액 적립 유지 검토':id==='cony'?'CONY 일시중지 유지 검토':'매수 대기·중지 검토')+'</b></span>';
 }
 function detailLine(id){
  const v=decision(id);
@@ -133,7 +142,7 @@ function detailLine(id){
   '<span class="us-decision-kind">'+(v.type==='buy'?'매수 검토':v.type==='stop'?'매수 중단':'대기')+'</span></div>'+
   '<p>'+esc(v.reason)+'</p>';
  if(v.notes?.length)html+='<p class="us-small">'+v.notes.map(esc).join(' · ')+'</p>';
- html+='<p class="us-small">추가매수 검토 수량/예산 (실제 보유수량 아님): <b>'+(v.qty?v.qty+'주':v.amountKRW?krw(v.amountKRW)+' 계획 적립 검토':'0주')+
+ html+='<p class="us-small">토스 매일 주식모으기 기준 <b>'+krw(dailyAmount(id))+' 원화 정액 소수점 매수</b> · 프로그램 판단: <b>'+(v.type==='buy'?'정액매수 유지 검토':id==='cony'?'기존 매수 일시중지 유지':'대기·중지 검토')+'</b>'+
   '</b> · 시세 '+(v.sourceDate?v.sourceDate.slice(0,4)+'-'+v.sourceDate.slice(4,6)+'-'+v.sourceDate.slice(6,8):'확인 불가')+
   ' 미국장 확정 일봉 · 비공식, 실시간 주문 신호 아님</p>';
  if(id!=='cony')html+='<p class="us-small">매수 상한: '+(getLimit(id)!==null?krw(getLimit(id)):'미설정')+
@@ -170,7 +179,7 @@ function refreshSummary(){
  panel.innerHTML='<div class="us-signal-counts"><div><b class="state-buy">매수 검토 '+counts.buy+'</b></div>'+
  '<div><b class="state-stop">매수 중단 '+counts.stop+'</b></div>'+
  '<div><b class="state-wait">대기 '+counts.wait+'</b></div></div>'+
- '<p class="us-small">‘추가매수 검토’는 보유수량이 아니라 새로 살지 살펴보는 수량입니다. 실제 보유수량은 각 카드에서 확인하세요. 자동 주문은 실행하지 않으며 토스 시세와 예산을 확인하세요.</p>';
+ '<p class="us-small">토스 미국주식은 1주 단위가 아닌 매일 원화 금액의 소수점 주식모으기입니다. 이 신호는 유지·중지 검토이며 실제 주문을 켜거나 끄지 않습니다.</p>';
 }
 function mount(){
  const container=$('us-panel');if(!container)return;
