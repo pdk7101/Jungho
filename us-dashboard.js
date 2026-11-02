@@ -93,8 +93,11 @@ function cards(){
  host.innerHTML=FUNDS.map(f=>{
   const x=market(f),px=price(f),decision=window.ISA_US_SIGNAL?.decision?.(f.id),
     wonQuote=window.ISA_US_KRW?.priceKrw?.(f.id,px);
-  const status=decision?.type||'wait';
-  const decisionText=decision?.title||'자료 확인 대기';
+  const brokerNote=window.ISA_ORDER_PLAN?.note?.(f.id);
+  const brokerStatus=brokerNote?.value||'unknown';
+  const status=brokerStatus==='running'?'buy':brokerStatus==='paused'?'stop':'wait';
+  const actualText=brokerStatus==='running'?'매수중':brokerStatus==='paused'?'일시중지':'실제 상태 미확인';
+  const decisionText='토스 사용자 확인 기록 '+(brokerNote?.date||'미등록')+' · 기술 판단은 상세화면 참고';
   const wonPrice=wonQuote&&Number.isFinite(wonQuote.amount)&&wonQuote.amount>0?
    Math.round(wonQuote.amount).toLocaleString('ko-KR')+'원':'원화 미확인';
   const summary=window.ISA_US_KRW?.compactLine?.(f.id,px)||'보유수량·원화 평단 입력 필요';
@@ -104,9 +107,10 @@ function cards(){
    '" aria-pressed="'+(selected===f.id?'true':'false')+'">'+
    '<span class="us-list-top"><strong class="us-list-ticker">'+f.ticker+'</strong>'+
    '<b class="us-list-price">'+text(wonPrice)+'</b>'+
-   '<span class="us-list-state state-'+status+'">'+text(status==='buy'?'매수 검토':status==='stop'?'매수 중단':'대기')+'</span>'+
+   '<span class="us-list-state state-'+status+'">'+text(actualText)+'</span>'+
    '<span class="us-list-arrow" aria-hidden="true">›</span></span>'+
-   '<span class="us-list-meta">'+text(summary)+'</span></button>';
+   '<span class="us-list-meta">'+text(summary)+'</span>'+
+   '<span class="us-list-meta">토스 '+text(brokerNote?.date?'사용자 확인 '+brokerNote.date:'실제 주문 확인 필요')+' · '+text('매일 원화 소수점 적립')+'</span></button>';
  }).join('');
  host.querySelectorAll('[data-us]').forEach(btn=>btn.onclick=()=>{
   selected=btn.dataset.us;
