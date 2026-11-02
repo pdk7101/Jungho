@@ -31,7 +31,6 @@ if(previous&&typeof previous==='object')for(const f of FIELDS){
 function domesticRules(){
  const s=read('isa-rules')||{};
  const val=(key,fallback)=>Number.isFinite(Number(s[key]))&&Number(s[key])>0?Number(s[key]):fallback;
- const ceil5=n=>Math.ceil(n/5)*5;
  const floor5=n=>Math.floor(n/5)*5;
  const caps={robot:val('robotCap',9500),space:val('spaceCap',9700),sol:val('solCap',10000),
   trBase:val('trBase',31150)};
@@ -54,11 +53,11 @@ function instrumentRows(){
   enabled:plan.reitDaily>0,level:'계획 유지',cost:reit?reit.price*plan.reitDaily:null,
   remarks:'기본 매 거래일 1주. 로봇·우주항공 둘 다 상한 초과 시 3주 검토 규칙은 주문 시스템 간 자동 연동 불가. 가격 미확인이면 주문 조건 직접 확인'},
  {id:'robot',market:'KR',name:'RISE AI&로봇',type:'조건부 자동감시',price:'매수가 상한 '+money(lim.robot),qty:'최대 1주/기회',
-  enabled:true,level:rob&&rob.price>lim.robot?'상한 초과 · 신규주문 보류':'상한 이내에서만 1주 검토',
-  cost:lim.robot,remarks:'주문 조건: 설정한 상한 이하에서만 지정가 매수. 5일 감시 설정은 증권사에서 등록/유효기간 확인. 감시 발동 후 재등록 필요 여부 확인'},
+  enabled:!backupAllowed,level:backupAllowed?'SOL 단독 전환 모드 · 등록 대기':rob&&rob.price>lim.robot?'상한 초과 · 신규주문 보류':'상한 이내에서만 1주 검토',
+  cost:backupAllowed?0:lim.robot,remarks:'주문 조건: 설정한 상한 이하에서만 지정가 매수. 5일 감시 설정은 증권사에서 등록/유효기간 확인. 감시 발동 후 재등록 필요 여부 확인'},
  {id:'space',market:'KR',name:'1Q 미국우주항공테크',type:'조건부 자동감시',price:'매수가 상한 '+money(lim.space),qty:'최대 1주/기회',
-  enabled:true,level:space&&space.price>lim.space?'상한 초과 · 신규주문 보류':'상한 이내에서만 1주 검토',
-  cost:lim.space,remarks:'저가·추세 대기 중이어도 상한 이하 가격 감시주문은 실행될 수 있습니다. 상한만으로 반등 확인 불가. 주문 조건과 5일 유효기간 직접 점검'},
+  enabled:!backupAllowed,level:backupAllowed?'SOL 단독 전환 모드 · 등록 대기':space&&space.price>lim.space?'상한 초과 · 신규주문 보류':'상한 이내에서만 1주 검토',
+  cost:backupAllowed?0:lim.space,remarks:'저가·추세 대기 중이어도 상한 이하 가격 감시주문은 실행될 수 있습니다. 상한만으로 반등 확인 불가. 주문 조건과 5일 유효기간 직접 점검'},
  {id:'sofr',market:'KR',name:'KODEX 미국달러SOFR',type:'정기적립',price:sofr?money(sofr.price)+'(확정종가)':'현재가 미확인',qty:plan.sofrDaily?plan.sofrDaily+'주/거래일':'수량 미설정',
   enabled:plan.sofrDaily>0,level:plan.sofrDaily?'정기 적립 설정 확인':'기존 적립 유지 · 수량 입력 필요',
   cost:plan.sofrDaily?(sofr?sofr.price*plan.sofrDaily:null):0,
@@ -66,7 +65,7 @@ function instrumentRows(){
  {id:'sol',market:'KR',name:'SOL 200타겟위클리커버드콜',type:'대체매수',price:'상한 '+money(lim.sol),qty:backupAllowed?'최대 1주(별도 단독 선택)':'0주(예비)',
   enabled:backupAllowed,level:backupAllowed?'기타 겹치는 주문 해제 확인 필수':'대체매수 대기',
   cost:backupAllowed?lim.sol:0,
-  remarks:'로봇·우주항공 중 한 종목의 상한 초과 시에만 대체 1주 검토. 독립적인 사전 조건주문으로 두 종목의 상한초과를 자동 판정하지 못함. 동시 주문하면 의도하지 않은 중복 매수 위험'},
+  remarks:'로봇·우주항공 중 한 종목의 상한 초과 시에만 대체 1주 검토. 독립적인 사전 조건주문으로 두 종목의 상한초과를 자동 판정하지 못함. 로봇·우주항공 감시주문을 증권사에서 실제 해제한 뒤에만 단독 모드로 전환하세요. 동시 주문하면 의도하지 않은 중복 매수 위험'},
  {id:'tr',market:'KR',name:'KODEX 200TR',type:'5% 하락 감시',price:'기준 '+money(lim.trBase)+' → 감시 '+money(lim.trTarget),
   qty:plan.trQty+'주/발동',enabled:plan.trQty>0,level:'감시조건 등록 후 감시중 확인',
   cost:plan.trQty*lim.trTarget,
@@ -127,6 +126,7 @@ function render(){
  '<div>남은 예산<strong class="'+(bad?'uo-danger':'')+'">'+money(b.remaining)+'</strong></div></div>'+
  (bad?'<p class="uo-danger">월 최대 투자예산을 초과합니다. 자동주문 금액이나 수량을 낮추세요.</p>':'')+
  (partial?'<p class="uo-danger">예산 미확정: '+b.unknown.map(esc).join('·')+' 가격 미확인. 현금 부족을 방지하려면 키움 최신 가격을 확인하세요.</p>':'')+
+ (plan.solMode==='exclusive'?'<p class="uo-danger">SOL 단독 모드: 예산표에서 로봇·우주항공을 제외했지만 실제 증권사 감시주문은 해제되지 않습니다. 증권사에서 두 주문 취소를 먼저 확인하세요.</p>':'')+
  '<p class="sub">매 거래일 같은 주문을 재등록·반복한다고 가정한 보수적 최대 예산입니다. 주말·공휴일·환율·수수료·중복 증권사 자동주문을 반영한 확정 금액이 아닙니다. CONY 재매수 중단에 따른 현금적립 '+money(b.cash)+'/일도 예산에 포함합니다.</p>';
  const rows=b.rows;
  $('uo-order-list').innerHTML=rows.map(r=>{
