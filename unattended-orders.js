@@ -48,6 +48,44 @@ if(!read(MIGRATION)){
  if(save(PLAN,plan))save(MIGRATION,{applied:true,date:'2026-11-02'});
 }
 let records=read(STATE)||{};
+/* User-confirmed Toss states are imported into this browser only from the
+ * one-time private URL fragment. Never publish personal account status in source. */
+function importTossConfirmation(){
+ const hash=String(window.location?.hash||'');
+ if(!hash.startsWith('#toss-collection='))return null;
+ let message='';
+ try{
+  const value=decodeURIComponent(hash.slice('#toss-collection='.length));
+  const cells=value.split(';'),date=cells.shift();
+  const expected=['schd','agnc','spym','cony'];
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>dateK()||cells.length!==4)
+   throw Error('확인 날짜 또는 종목 수가 맞지 않습니다');
+  const updates={};
+  for(const cell of cells){
+   const parts=cell.split(':'),id=parts[0],state=parts[1];
+   if(parts.length!==2||!expected.includes(id)||updates[id]||!['running','paused'].includes(state))
+    throw Error('종목 또는 매수상태를 확인해 주세요');
+   updates[id]=state;
+  }
+  if(expected.some(id=>!updates[id]))throw Error('4종목이 모두 필요합니다');
+  const copy={...records};let applied=0,kept=0;
+  for(const id of expected){
+   const older=copy[id]?.checkedDate&&copy[id].checkedDate>date;
+   if(older){kept++;continue;}
+   copy[id]={...(copy[id]||{}),status:updates[id],checkedDate:date,source:'user-confirmed'};
+   applied++;
+  }
+  if(!save(STATE,copy))throw Error('이 기기의 저장소에 쓸 수 없습니다');
+  records=copy;
+  message=date+' 토스 주식모으기 사용자 확인 기록 '+applied+'종목 저장'+
+   (kept?' (더 최근 확인 '+kept+'종목은 유지)':'')+'. 실제 주문은 변경하지 않았습니다.';
+ }catch(err){
+  message='토스 상태 적용 실패: '+String(err.message||err);
+ }finally{
+  try{window.history.replaceState(window.history.state,'',window.location.pathname+window.location.search);}catch(_){}
+ }
+ return message;
+}
 function rules(){
  const s=read('isa-rules')||{},val=(k,f)=>pos(s[k])?Number(s[k]):f;
  const robot=val('robotCap',9500),space=val('spaceCap',9700),sol=val('solCap',10000),trBase=val('trBase',31150);
@@ -123,9 +161,12 @@ function decisions(){
  for(const id of US){
   const x=usDecision(id);
   result[id]=id==='cony'?
-    {value:'pause',label:'CONY 자동매수 중지 유지',reason:'11월 1일에 일 15,000원 자동매수를 일시중단하고 1~2주간 현금을 모으기로 한 최근 계획을 우선합니다. NAV·COIN 안정·총수익률·역분할 공시 확인 전 자동 재개를 권하지 않습니다.',sourceDate:x?.sourceDate||null}:
-    !x?category('wait','시세 미확인','미국주식 매수 판단 자료를 아직 읽지 못했습니다.',null):
-     category(x.type,x.title,x.reason,x.sourceDate,!!x.quoteManual);
+    {value:'pause',label:'CONY 정액매수 중단 계획',reason:'11월 1일부터 기존 15,000원 주식모으기를 일시중단하고 현금으로 유보합니다. 실제 상태는 토스 사용자 확인 기록과 구분하며 NAV·COIN·역분할 공시 확인 전 재개하지 않습니다.',sourceDate:x?.sourceDate||null}:
+    {value:'keep',label:'매일 원화 정액 소수점 적립 계획',
+     reason:'기존 SCHD·AGNC·SPYM 일일 원화 적립계획은 유지합니다. '+
+       (x?'기술적 분석: '+x.title+' — '+x.reason+' 이는 추가매수 위험 참고이며 토스의 매수중·중지 상태를 뜻하지 않습니다.':
+        '미국장 기술적 분석은 미확인입니다. 실제 토스 주식모으기 상태는 사용자 확인 기록으로만 표시합니다.'),
+     sourceDate:x?.sourceDate||null};
  }
  return result;
 }
@@ -188,10 +229,16 @@ function mismatch(row){
   if(st.value==='expired')return '만료·취소 기록 · 재등록 필요 여부 확인';
   return prior?'감시중 기록이 이전 날짜임 · 키움 확인':'';
  }
+ if(US.includes(row.id)){
+  if(st.value==='unknown')return '토스 실제 주식모으기 상태는 미확인입니다. 프로그램의 적립계획·기술 분석으로 대신 판단하지 않습니다.';
+  if(prior)return '마지막 사용자 확인 날짜 '+st.date+' · 최신 토스 주문 상태는 실시간 조회하지 않습니다.';
+  if(row.id==='cony'&&st.value==='running')return 'CONY 중단 계획과 확인된 매수중 기록이 다릅니다. 토스에서 실제 중단 여부를 확인하세요.';
+  return '';
+ }
  if(row.value==='unknown')return '시세 또는 조건 확인 전 임의 재개하지 마세요';
- if(st.value==='unknown')return row.value==='pause'?'중지 권고 · 토스/키움 실제 모으기 상태 미확인':'유지 권고 · 실제 모으기 상태 미확인';
- if(row.value==='pause'&&st.value==='running')return '중지 권고와 증권사 모으기 기록 불일치 · 실제 중지 확인 필요';
- if(row.value==='keep'&&st.value==='paused')return '매수 유지 검토 상태지만 증권사 중지 기록 있음 · 재개 전 확인';
+ if(st.value==='unknown')return row.value==='pause'?'중지 권고 · 키움 실제 모으기 상태 미확인':'유지 권고 · 키움 실제 모으기 상태 미확인';
+ if(row.value==='pause'&&st.value==='running')return '중지 검토와 키움 사용자 확인 매수중 기록이 다릅니다. 주문 변경 여부는 직접 판단해야 합니다.';
+ if(row.value==='keep'&&st.value==='paused')return '매수 유지 검토지만 키움 사용자 확인 중지 상태입니다. 재개 전 확인하세요.';
  if(prior)return '증권사 상태 기록이 오늘 확인한 것이 아님';
  return '';
 }
@@ -213,16 +260,17 @@ function render(){
   items.map(row=>{
    const st=note(row.id),warning=mismatch(row),
     pair=pairInfo(),statusLabel=row.value==='keep'?'매수 유지':row.value==='pause'?'매수 중지':row.value==='watch'?'자동감시':'자료 확인';
-   const badge=(row.id==='reit'&&pair.known?'리츠 '+pair.reitQty+'주':
+   const badge=US.includes(row.id)?(st.value==='running'?'매수중 · 사용자 확인':st.value==='paused'?'일시중지 · 사용자 확인':'실제 상태 미확인'):
+    (row.id==='reit'&&pair.known?'리츠 '+pair.reitQty+'주':
     row.id==='sol'&&pair.known&&row.value==='keep'?'SOL '+pair.solQty+'주':
     row.id==='sol'&&pair.known&&pair.solQty===0?'SOL 0주 · 중지':statusLabel);
    const options=row.id==='tr'?
     [['unknown','미확인'],['watching','감시중 확인'],['paused','감시중지 확인'],['filled','체결 확인'],['expired','만료/취소 확인']]:
     [['unknown','미확인'],['running','주식모으기 매수중 확인'],['paused','주식모으기 중지 확인']];
    return '<details class="uo-order"><summary class="uo-order-top"><b>'+esc(row.name)+'</b>'+
-    '<span>'+esc(row.mode)+'</span><em class="uo-action action-'+row.value+'">'+esc(badge)+'</em></summary>'+
-    '<p class="uo-state"><b>프로그램 판단:</b> '+esc(row.label)+'</p>'+
-    '<p class="sub">'+esc(row.details)+'</p>'+
+    '<span>'+esc(row.mode)+'</span><em class="uo-action action-'+(US.includes(row.id)?(st.value==='running'?'keep':st.value==='paused'?'pause':'unknown'):row.value)+'">'+esc(badge)+'</em></summary>'+
+    '<p class="uo-state"><b>'+(US.includes(row.id)?'투자 계획:':'프로그램 판단:')+'</b> '+esc(row.label)+'</p>'+
+    '<p class="sub">'+esc(row.details)+'</p>'+ (US.includes(row.id)?'<p class="sub">토스 주문상태: <b>'+esc(st.value==='running'?'매수중':st.value==='paused'?'일시중지':'미확인')+'</b> · '+esc(st.date||'확인일 없음')+' 사용자 확인 기록 (실시간 연동 아님)</p>':'')+
     '<p class="sub"><b>판단 이유:</b> '+esc(row.reason)+'</p>'+
     (row.sourceDate?'<p class="sub">분석 일봉 기준: '+esc(row.sourceDate)+(row.manual?' · 당일 시세 참고':'')+'</p>':
     '<p class="sub">분석 일봉 기준: 자료 확인 필요</p>')+
@@ -289,6 +337,8 @@ function mount(){
  '<textarea id="uo-copy-area" rows="7" hidden readonly aria-label="오늘 점검표"></textarea>'+
  '<p class="sub" id="uo-message">매일 주식모으기 유지·중지 판단은 앱을 열었을 때 표시됩니다. GitHub Pages가 증권사 계좌를 실시간 변경하지는 않습니다.</p>';
  anchor.insertAdjacentElement('afterend',section);
+ const importedToss=importTossConfirmation();
+ if(importedToss)$('uo-message').textContent=importedToss;
  section.querySelectorAll('[data-uo-plan]').forEach(inp=>{
   const key=inp.dataset.uoPlan;
   inp.addEventListener('change',()=>{
@@ -313,9 +363,10 @@ function mount(){
  };
  $('uo-refresh').onclick=()=>{render();$('uo-message').textContent='현재 페이지에 로드된 자료로 판단을 다시 계산했습니다. 증권사 실제 상태를 다시 조회한 것은 아닙니다.';};
  document.addEventListener('isa-rendered',render);
+ if(typeof importedToss==='string'&&importedToss.includes('저장'))window.ISA_US_APP?.rerender?.();
  window.addEventListener('isa-us-quotes-refreshed',render);
  render();
 }
-window.ISA_ORDER_PLAN={rows,decisions,rules,budget,note,checklist,mismatch,tossDailyKrw};
+window.ISA_ORDER_PLAN={rows,decisions,rules,budget,note,checklist,mismatch,tossDailyKrw,importTossConfirmation};
 mount();
 })();
