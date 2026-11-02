@@ -251,6 +251,18 @@ details[open]>summary{margin-bottom:12px}
 .portfolio-shot-row small{display:block;font-size:.72rem;color:#aebed5;margin-top:3px}
 .portfolio-shot-row strong{flex-shrink:0;text-align:right;font-variant-numeric:tabular-nums;font-size:.79rem}
 @media(max-width:410px){.portfolio-shot-row{font-size:.75rem}.portfolio-shot-row strong{font-size:.74rem}}
+
+/* Intraday quote status and optional in-page signal-change alerts. */
+#intraday-signals{border-color:#5276a5}
+#intraday-signals h2{font-size:1.07rem}
+#intraday-signal-list{display:grid;grid-template-columns:1fr;gap:6px;margin:12px 0}
+.intraday-signal-row{border:1px solid #425775;background:#13253f;border-radius:8px;padding:10px 12px}
+.intraday-signal-main{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.intraday-signal-main strong{font-size:.89rem}
+.intraday-signal-kind{font-size:.79rem;white-space:nowrap;font-weight:800;border:1px solid currentColor;border-radius:7px;padding:4px 7px}
+.intraday-signal-row p{font-size:.75rem;margin:6px 0}
+.intraday-signal-changes{color:#c4dafa;font-size:.81rem;margin:8px 0}
+#intraday-enable-notifications{margin-top:8px;font-size:.8rem;padding:10px}
 </style><script src="./live-prices.js"></script></head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel flex"><div><b>한국 ETF 자동 시세 재조회 · 약 75초 간격 (페이지 열린 동안)</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
@@ -307,7 +319,7 @@ details[open]>summary{margin-bottom:12px}
  <div class="notice-block"><b>박스권 하단 30%</b>는 저가 관심, <b>하단 20%</b>는 더 낮은 저가 우선 검토구간입니다. 평단가보다 낮더라도 하락 추세가 지속될 수 있으며, 매수 상한과 예산 조건을 우선합니다.</div>
  <p class="fieldset-note">로봇·우주 모두 매수: 리츠 1주·SOL 0주. 한 종목 중지: 리츠 2주·SOL 1주. 모두 중지: 리츠 3주·SOL 1주. SOFR은 매주 월요일 1주. 200TR은 -5% 자동감시. 매수·중지 권고는 키움 주식모으기 주문을 자동으로 변경하지 않습니다.</p>
 </section>
-<footer><b>가격 정확성 안내</b><p>제공처: 네이버 금융 일봉(비공식). 한국거래소 공식 확정 종가와 다를 수 있습니다. 실제 주문 전 키움증권에서 종가를 대조하세요. 갱신 버튼은 마지막 게시된 일봉을 불러온 뒤 네이버 금융의 당일 공개 시세를 재조회합니다. 조회 출처가 CORS 제약·차단·지연을 겪거나 마지막 체결 시각이 불분명하면 기존 일봉만 표시합니다. 증권사 공식 체결가와 차이가 있을 수 있습니다. 시세가 오래되거나 계산값이 부족하면 매수 판단을 보류합니다. 평단가와 보유수량은 해당 브라우저의 로컬 저장소에만 기록됩니다. 표시는 참고용이며 자동주문은 지원하지 않습니다.</p></footer>
+<footer><b>가격 정확성 안내</b><p>제공처: 네이버 금융 일봉(비공식). 한국거래소 공식 확정 종가와 다를 수 있습니다. 실제 주문 전 키움증권에서 종가를 대조하세요. 갱신 버튼은 게시 일봉과 네이버 금융의 당일 공개 시세를 재조회합니다. 페이지가 열려 있는 동안 한국장 장중 약 75초마다 자동 조회하며, 공개 시세를 직접 조회하지 못할 때는 게시 지연시세를 보조로 사용합니다. 매수 신호는 체결시각 검증이 가능한 당일 가격에만 의존하고, 실제 키움 주문을 자동 변경하지 않습니다. 페이지를 닫은 뒤 휴대폰 푸시 알림은 지원되지 않습니다. 조회 출처가 CORS 제약·차단·지연을 겪거나 마지막 체결 시각이 불분명하면 기존 일봉만 표시합니다. 증권사 공식 체결가와 차이가 있을 수 있습니다. 시세가 오래되거나 계산값이 부족하면 매수 판단을 보류합니다. 평단가와 보유수량은 해당 브라우저의 로컬 저장소에만 기록됩니다. 표시는 참고용이며 자동주문은 지원하지 않습니다.</p></footer>
 </main>
 <script>
 (function(){
@@ -699,4 +711,4 @@ var reload=document.getElementById('reload');
 if(reload)reload.addEventListener('click',update);
 update();
 })();
-</script><script src="./insights.js" defer></script><script src="./us-dashboard.js" defer></script><script src="./us-krw.js" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script></body></html>
+</script><script src="./insights.js" defer></script><script src="./us-dashboard.js" defer></script><script src="./us-krw.js" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script></body></html>
