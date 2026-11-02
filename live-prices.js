@@ -3,7 +3,7 @@
 (function(){
 'use strict';
 const n=v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(String(v).replace(/,/g,'')))&&Number(String(v).replace(/,/g,''))>0?Number(String(v).replace(/,/g,'')):null;
-const kparts=d=>Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d).map(x=>[x.type,x.value]));
+const kparts=d=>Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d).map(x=>[x.type,x.value]));
 const kday=d=>{const v=kparts(d);return v.year+v.month+v.day};
 const active=d=>{const v=kparts(d),mins=Number(v.hour)*60+Number(v.minute),weekday=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',weekday:'short'}).format(d);return !['Sat','Sun'].includes(weekday)&&mins>=540&&mins<=930};
 function tradeTime(value){
