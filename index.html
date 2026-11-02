@@ -305,7 +305,7 @@ var FUNDS=[
 {id:'reit',name:'TIGER 리츠부동산인프라',code:'329200',plan:'로봇·우주 매수 2/1/0종목에 따라 1/2/3주 적립'},
 {id:'robot',name:'RISE AI&로봇',code:'469070',plan:'9,500원 상한 · 소액 분할 검토'},
 {id:'space',name:'1Q 미국우주항공테크',code:'0131V0',plan:'9,700원 상한 · 소액 분할 검토'},
-{id:'sofr',name:'KODEX 미국달러SOFR',code:'455030',plan:'기존 정기 적립 유지'},
+{id:'sofr',name:'KODEX 미국달러SOFR',code:'455030',plan:'키움 주식모으기 매주 월요일 1주'},
 {id:'tr',name:'KODEX 200TR',code:'278530',plan:'기준가 대비 -5% 감시'},
 {id:'sol',name:'SOL 200타겟위클리커버드콜',code:'0167B0',plan:'대체매수 최대 1주'}
 ];
@@ -386,6 +386,12 @@ function projected(id,p,buyQty){
 }
 function verdict(f){
  var id=f.id,x=byId[id];
+ if(id==='sofr'){
+  const isMonday=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',weekday:'short'}).format(new Date())==='Mon';
+  return {type:'buy',title:isMonday?'월요일 SOFR 1주 정기적립':'SOFR 매주 월요일 1주 정기적립',
+   qty:isMonday?1:0,
+   info:'키움 주식모으기 매주 월요일 1주. 월요일 외에는 별도 매수 예정이 없습니다. 이동평균선 약세만으로 정기적립을 중지하지 않습니다. 한국 증시 휴장 시 키움의 실제 체결일을 확인하세요.'};
+ }
  if(!hasBars(x))return {type:'wait',title:'가격·이평선 미확인',info:'40거래일 실제 일봉이 부족합니다. 가격을 추정하지 않습니다.',qty:0};
  if(stale(x))return {type:'wait',title:'오래된 시세 · 확인',info:'마지막 일봉 '+day(x.date)+'. 주문 전 최신 종가를 확인하세요.',qty:0};
  var p=current(x,id),t=x.trend,b=band(x,p),h=holding(id,p);
@@ -405,7 +411,7 @@ function verdict(f){
    '로봇·우주항공 모두 매수 → 리츠 1주.';
   return {type:'buy',title:'리츠 '+n+'주 적립 검토',qty:n,info:reason+' 로봇: '+pair.sources.robot+' / 우주: '+pair.sources.space+'. 키움 주식모으기 등록수량은 자동 변경되지 않습니다. 5·20일선은 참고이며 별도 시세 위험을 확인하세요.'};
  }
- if(id==='sofr')return {type:'buy',title:'정기 적립 유지',qty:0,info:'기존 SOFR 정기 적립을 유지합니다. 5·20일선과 평단가는 참고만 하며, 자동 추천 수량은 정하지 않습니다.'};
+ 
  if(id==='tr'){
   var target=round5(Number(settings.trBase)*.95);
   if(!valid(settings.trBase))return {type:'wait',title:'감시 기준 미입력',info:'기준가를 입력해야 -5% 감시가격을 계산할 수 있습니다.',qty:0};
@@ -487,9 +493,9 @@ function renderPlan(){
  var clash=!!(reit.v.type==='buy'&&reit.v.qty===3&&sol.v.type==='buy'&&sol.v.qty===1);
  var budget=valid(settings.dailyBudget)?Number(settings.dailyBudget):null;
  var message='<p><b>현재 매수 조건 충족 (실제 주문·체결 아님):</b> '+(pieces.length?pieces.join(' · '):'조건을 충족한 수량 확인 없음')+'</p>';
- message+='<p><b>검토 수량 예상 비용:</b> '+(unavailable?'일부 가격 미확인 · ':'')+money(total)+' <small>(SOFR 정기 적립, 200TR 조건부 주문은 제외)</small></p>';
+ message+='<p><b>검토 수량 예상 비용:</b> '+(unavailable?'일부 가격 미확인 · ':'')+money(total)+' <small>(SOFR은 월요일에만 포함, 200TR 조건부 주문은 제외)</small></p>';
  if(budget!==null)message+='<p class="'+(total>budget?'error':'good')+'"><b>입력 예산:</b> '+money(budget)+' · '+(total>budget?'예상 비용이 예산을 초과합니다. 수량 조정 필요.':'현재 계산한 검토 비용은 예산 이내입니다.')+'</p>';
- else message+='<p class="sub">하루 예산이 미입력입니다. 주문 전 기존 SOFR 적립액과 미체결 주문까지 합산해 확인하세요.</p>';
+ else message+='<p class="sub">하루 예산이 미입력입니다. SOFR은 매주 월요일 1주이며, 미체결 감시주문도 별도로 확인하세요.</p>';
  if(clash)message+='<p class="sub"><b>확정한 대체매수 조합:</b> 로봇·우주 모두 중지 시 리츠 3주와 SOL 1주를 함께 검토합니다. 두 주문의 매수대금을 각각 준비하고, 키움 실제 주식모으기 수량·활성 상태를 확인하세요.</p>';
  el('plan').innerHTML=message;
 }
