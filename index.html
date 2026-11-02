@@ -348,7 +348,26 @@ var saved=readLocal('isa-rules');if(saved){Object.keys(defaults).forEach(functio
 var savedPositions=readLocal('isa-private-positions-v1');if(savedPositions&&typeof savedPositions==='object')FUNDS.forEach(function(f){var v=savedPositions[f.id];if(v&&qtyValid(v.qty)){positions[f.id]={qty:Number(v.qty),avg:valid(v.avg)?Number(v.avg):''};}});
 function hasBars(x){return !!(x&&x.ok&&Array.isArray(x.bars)&&x.bars.length>=40&&x.trend&&valid(x.trend.ma5)&&valid(x.trend.previousMa5)&&valid(x.trend.ma20)&&valid(x.trend.previousMa20)&&valid(x.low20)&&valid(x.high20)&&Number(x.high20)>Number(x.low20)&&valid(x.close)&&/^\d{8}$/.test(x.date));}
 function stale(x){if(!hasBars(x))return true;var d=new Date(x.date.slice(0,4)+'-'+x.date.slice(4,6)+'-'+x.date.slice(6,8)+'T00:00:00Z');return !isFinite(d.getTime())||(Date.now()-d.getTime()>12*86400000);}
-function current(x,id){return liveQuotes[id]&&valid(liveQuotes[id].price)?Number(liveQuotes[id].price):valid(manual[id])?Number(manual[id]):Number(x.close);}
+function freshQuote(id){
+ // Never reuse a timestamped quote without checking it again at decision time.
+ var q=liveQuotes[id];if(!q||!valid(q.price)||!q.tradeAt)return null;
+ var traded=new Date(q.tradeAt),now=new Date();
+ if(!isFinite(traded.getTime()))return null;
+ var age=(now.getTime()-traded.getTime())/60000;
+ if(age< -2||age>1440)return null;
+ function kparts(d){return Object.fromEntries(new Intl.DateTimeFormat('en-CA',{
+  timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',
+  hour:'2-digit',minute:'2-digit',hour12:false
+ }).formatToParts(d).map(function(p){return [p.type,p.value]}));}
+ var a=kparts(now),b=kparts(traded);
+ if(a.year+a.month+a.day!==b.year+b.month+b.day)return null;
+ var nowMinute=Number(a.hour)*60+Number(a.minute),tradeMinute=Number(b.hour)*60+Number(b.minute);
+ if(nowMinute<540)return null;
+ if(nowMinute<=930&&age>20)return null;
+ if(nowMinute>930&&(tradeMinute<920||tradeMinute>931))return null;
+ return q;
+}
+function current(x,id){var q=freshQuote(id);return q?Number(q.price):valid(manual[id])?Number(manual[id]):Number(x.close);}
 function verified(id){return !!(hasBars(byId[id])&&!stale(byId[id]));}
 function capStop(id){
  var cap=settings[id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap'];
@@ -358,7 +377,7 @@ function pairPlan(){
  // Broker activation notes are separate from price-based BUY/STOP advice.
  var states={},sources={};
  ['robot','space'].forEach(function(id){
-  var v=verdict(FUNDS.find(function(f){return f.id===id;})),q=liveQuotes[id];
+  var v=verdict(FUNDS.find(function(f){return f.id===id;})),q=freshQuote(id);
   states[id]=v.type==='buy'?'buy':v.type==='stop'?'stop':'wait';
   sources[id]=q?'검증된 비공식 당일 체결가 '+money(q.price)+' · '+
    new Date(q.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'}):
@@ -398,11 +417,11 @@ function projected(id,p,buyQty){
  return {next:next,lower:h.avg-next,lowerPct:(1-next/h.avg)*100,total:buyQty*p};
 }
 function verdict(f){
- var id=f.id,x=byId[id];
- if(['robot','space','sol'].includes(id)&&liveQuotes[id]){
+ var id=f.id,x=byId[id],quote=freshQuote(id);
+ if(['robot','space','sol'].includes(id)&&quote){
   var top=settings[id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap'];
-  if(valid(top)&&liveQuotes[id].price>top)return {type:'stop',title:'오늘 체결가 상한 초과',qty:0,
-   info:'당일 비공식 체결가 '+money(liveQuotes[id].price)+' > 상한 '+money(top)+'. 체결 '+new Date(liveQuotes[id].tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+'. 실제 키움 주식모으기 중지는 별도 확인.'};
+  if(valid(top)&&quote.price>top)return {type:'stop',title:'오늘 체결가 상한 초과',qty:0,
+   info:'당일 비공식 체결가 '+money(quote.price)+' > 상한 '+money(top)+'. 체결 '+new Date(quote.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+'. 실제 키움 주식모으기 중지는 별도 확인.'};
  }
  if(id==='sofr'){
   const isMonday=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',weekday:'short'}).format(new Date())==='Mon';
@@ -413,18 +432,18 @@ function verdict(f){
  var kparts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
  var todayParts={};kparts.forEach(function(p){todayParts[p.type]=p.value;});
  var kToday=todayParts.year+todayParts.month+todayParts.day;
- if(['robot','space','sol'].includes(id)&&!liveQuotes[id]&&x?.date!==kToday)
+ if(['robot','space','sol'].includes(id)&&!quote&&x?.date!==kToday)
   return {type:'wait',title:'오늘 시세 미확인',qty:0,
    info:'현재 검증된 당일 체결가 및 오늘 확정 일봉이 모두 없습니다. 이전 거래일 종가를 오늘의 매수·중지 신호로 사용하지 않습니다.'};
- if(['robot','space','sol'].includes(id)&&window.ISA_livePriceFetch?.active?.(new Date())&&!liveQuotes[id])
+ if(['robot','space','sol'].includes(id)&&window.ISA_livePriceFetch?.active?.(new Date())&&!quote)
   return {type:'wait',title:'오늘 현재가 검증 대기',qty:0,
    info:'장중 검증 가능한 당일 체결가가 없어서 이전 일봉으로 오늘 매수·중지 신호를 만들지 않습니다.'};
  if(!hasBars(x))return {type:'wait',title:'가격·이평선 미확인',info:'40거래일 실제 일봉이 부족합니다. 가격을 추정하지 않습니다.',qty:0};
  if(stale(x))return {type:'wait',title:'오래된 시세 · 확인',info:'마지막 일봉 '+day(x.date)+'. 주문 전 최신 종가를 확인하세요.',qty:0};
  var p=current(x,id),t=x.trend,b=band(x,p),h=holding(id,p);
- var goodTrend=!!(t.twoDaysAbove&&t.maRising&&t.ma5Above20)&&!liveQuotes[id];
+ var goodTrend=!!(t.twoDaysAbove&&t.maRising&&t.ma5Above20)&&!quote;
  var decline=Number(x.close)<Number(t.ma20)||!t.maRising;
- var liveNote=liveQuotes[id]?' 당일 조회 현재가로 계산한 잠정 판단입니다. 5·20일선은 '+day(x.date)+'까지의 확정 일봉 기준입니다.':'';
+ var liveNote=quote?' 당일 조회 현재가로 계산한 잠정 판단입니다. 5·20일선은 '+day(x.date)+'까지의 확정 일봉 기준입니다.':'';
  if(['robot','space','sol'].includes(id)){
   var cap=settings[id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap'];
   if(!valid(cap))return {type:'wait',title:'상한 미설정',info:'먼저 상한을 입력하세요.',qty:0};
@@ -471,13 +490,13 @@ function actionLabel(type){
 window.ISA_KR_APP={
  pairPlan:pairPlan,
  refreshLive:function(){return refreshLiveQuotes();},
- quoteStatus:function(){return {quotes:{...liveQuotes},error:liveError,source:liveSource,checkedAt:lastLiveCheckedAt};},
+ quoteStatus:function(){var quotes={};FUNDS.forEach(function(f){var q=freshQuote(f.id);if(q)quotes[f.id]=q;});return {quotes:quotes,error:liveError,source:liveSource,checkedAt:lastLiveCheckedAt};},
  decisions:function(){
   return FUNDS.map(function(f){
    var v=verdict(f),x=byId[f.id],p=hasBars(x)?current(x,f.id):null;
    return {id:f.id,name:f.name,code:f.code,type:v.type,title:v.title,reason:v.info,qty:v.qty,
     quote:p,quoteDate:hasBars(x)?day(x.date):null,verified:verified(f.id),
-    hasIntraday:!!liveQuotes[f.id],broker:'키움증권'};
+    hasIntraday:!!freshQuote(f.id),broker:'키움증권'};
   });
  }
 };
@@ -532,7 +551,7 @@ function render(){
  renderPlan();
  var list=el('funds');
  list.innerHTML=FUNDS.map(function(f){
-  var x=byId[f.id],v=verdict(f),p=hasBars(x)?current(x,f.id):null,h=p?holding(f.id,p):null,b=hasBars(x)?band(x,p):null,live=liveQuotes[f.id];
+  var x=byId[f.id],v=verdict(f),live=freshQuote(f.id),p=hasBars(x)?current(x,f.id):(live?live.price:null),h=p?holding(f.id,p):null,b=hasBars(x)?band(x,p):null;
   var tag=b?'<span class="band-tag '+(b.name==='하단 20%'?'band20':'')+'">'+b.name+'</span>':'';
   var avgText=h?'<div class="card-detail '+(h.canLower?'avg-down':'avg-up')+'">평단 '+avgMoney(h.avg)+' 대비 '+(h.discount>=0?'+':'')+h.discount.toFixed(2)+'%</div>':'<div class="card-detail">평단가 미입력 / 미보유</div>';
   return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+safe(f.plan)+'</small><strong>'+(p?money(p):'미확인')+'</strong><small>'+(live?'오늘 비공식 체결가 ('+(live.method==='published'?'게시 시세 · 지연가능':'직접 조회')+') · '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'}):'과거 일봉 종가 · '+(hasBars(x)?day(x.date):'확인 불가'))+'</small>'+avgText+tag+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+actionLabel(v.type)+'</div></div>';
@@ -562,7 +581,7 @@ function render(){
  }else costText='<p class="sub">보유 평단가와 수량을 입력하면 평단 인하 여부 및 예상 매수 후 평단을 계산합니다. 수량 0이면 미보유로 처리합니다.</p>';
  var vol=valid(t.avgVolume20)&&t.avgVolume20>0&&Number.isFinite(t.volumeToday)?(t.volumeToday/t.avgVolume20).toFixed(2)+'배':'미확인';
  d.innerHTML='<div class="divider"></div><div class="flex"><strong>'+money(p)+'</strong><span class="status state-'+v.type+'">'+actionLabel(v.type)+'</span></div>'+
- '<p class="sub">'+(liveQuotes[f.id]?'현재 표시 가격은 비공식 당일 조회가 · 5·20일선 및 박스권은 '+day(x.date)+' 확정 일봉 기준':'게시 일봉 종가 '+day(x.date))+' · 20거래일 '+day(x.rangeStart)+'~'+day(x.rangeEnd)+'</p>'+
+ '<p class="sub">'+(freshQuote(f.id)?'현재 표시 가격은 비공식 당일 조회가 · 5·20일선 및 박스권은 '+day(x.date)+' 확정 일봉 기준':'게시 일봉 종가 '+day(x.date))+' · 20거래일 '+day(x.rangeStart)+'~'+day(x.rangeEnd)+'</p>'+
  chart(x.bars)+
  '<div class="leg20"><span><i class="legend-dot" style="background:#60a5fa"></i>종가</span><span><i class="legend-dot" style="background:#24bf9a"></i>5일선</span><span><i class="legend-dot" style="background:#eab308"></i>20일선</span></div>'+
  '<div class="metrics"><div><small>20거래일 저가</small><strong>'+money(low)+'</strong></div><div><small>20거래일 고가</small><strong>'+money(high)+'</strong></div><div><small>하단 30% 기준</small><strong>'+money(b.b30)+'</strong></div><div><small>하단 20% 기준</small><strong>'+money(b.b20)+'</strong></div><div><small>5일 이동평균</small><strong>'+avgMoney(t.ma5)+'</strong></div><div><small>20일 이동평균</small><strong>'+avgMoney(t.ma20)+'</strong></div></div>'+

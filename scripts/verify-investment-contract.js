@@ -18,14 +18,15 @@ function storage(data={}){
 const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{
  timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'
 }).formatToParts(new Date()).map(v=>[v.type,v.value]));
-const today=parts.year+parts.month+parts.day;
+const today='20261102';
 const loc=storage();
-const win={ISA_livePriceFetch:{active:()=>false}};
+const win={ISA_livePriceFetch:{active:()=>true}};
+const FixedDate=class extends Date{constructor(...args){super(...(args.length?args:['2026-11-02T05:00:00.000Z']));}static now(){return Date.parse('2026-11-02T05:00:00.000Z');}};
 const appCode=html.slice(html.indexOf('var FUNDS='),html.indexOf('function chart(bars){'));
 truth(appCode.includes('window.ISA_KR_APP='),'domestic decision module is present');
-const app=new Function('window','localStorage','document',appCode+
- '\nreturn {FUNDS,defaults,positions,byId,manual,verdict,pairPlan,current,setQuotes:q=>liveQuotes=q};')(
- win,loc,{getElementById:()=>null});
+const app=new Function('window','localStorage','document','Date',appCode+
+ '\nreturn {FUNDS,defaults,positions,byId,manual,verdict,pairPlan,current,freshQuote,setQuotes:q=>liveQuotes=q};')(
+ win,loc,{getElementById:()=>null},FixedDate);
 equal(app.FUNDS.map(x=>[x.id,x.code]),[
  ['reit','329200'],['robot','469070'],['space','0131V0'],
  ['sofr','455030'],['tr','278530'],['sol','0167B0']
@@ -41,7 +42,7 @@ for(const [id,p] of Object.entries({reit:3805,robot:9300,space:9350,sofr:11500,t
  app.byId[id]=bars(id,p);
 app.positions.robot={avg:9500,qty:3};
 app.positions.space={avg:9600,qty:3};
-const trade=p=>({price:p,tradeAt:new Date().toISOString(),date:today,method:'published'});
+const trade=p=>({price:p,tradeAt:'2026-11-02T05:00:00.000Z',date:today,method:'published'});
 const verdict=id=>app.verdict(app.FUNDS.find(f=>f.id===id));
 for(const [robot,space,reit,sol] of [
  [9300,9350,1,0],[9501,9350,2,1],[9300,9701,2,1],[9501,9701,3,1]
@@ -67,9 +68,14 @@ app.setQuotes({});
 app.byId.robot=bars('robot',9300,'20260102');
 equal(verdict('robot').type,'wait','stale daily candle cannot generate a new BUY');
 equal(verdict('tr').type,'wait','KODEX 200TR remains watch order, not a trading command');
+app.setQuotes({robot:trade(9300),space:{...trade(9701),tradeAt:'2026-11-02T04:00:00Z'},sol:trade(9750)});
+equal(app.freshQuote('space'),null,'60-minute-old intraday quote rejected');
+equal(verdict('space').type,'wait','expired quote cannot trigger BUY or STOP');
+app.setQuotes({robot:trade(9300),space:{...trade(9701),tradeAt:'2026-11-01T06:30:00Z'},sol:trade(9750)});
+equal(app.freshQuote('space'),null,'prior-day quote rejected');
 const isMonday=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',weekday:'short'})
  .format(new Date())==='Mon';
-equal(verdict('sofr').qty,isMonday?1:0,'SOFR 1 share Monday only');
+equal(verdict('sofr').qty,1,'SOFR 1 share on fixed Monday');
 
 const head=source=>source.slice(0,source.indexOf('function mount(){'))
  .replace(/^\/\*[\s\S]*?\*\/\s*\(function\(\)\{\s*'use strict';/,'');

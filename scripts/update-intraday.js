@@ -30,7 +30,7 @@ async function one([id,code],now){
  for(const url of urls){
   try{
    const items=rows(await query(url));
-   const item=items.find(x=>String(x.itemCode||x.stockCode||x.code||x.cd||'').replace(/^A(?=\d{6}$)/,'')===code)||(items.length===1?items[0]:null);
+   const item=items.find(x=>String(x.itemCode||x.stockCode||x.code||x.cd||'').replace(/^A(?=[A-Z0-9]{6}$)/i,'')===code);
    if(!item)throw Error('종목코드 미확인');
    const price=num(item.closePrice??item.currentPrice??item.nv),stamp=tradeAt(item.localTradedAt||item.tradedAt||item.tradeTime||'');
    if(!price||!stamp)throw Error('현재가/체결시각 없음');
