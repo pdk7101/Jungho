@@ -253,7 +253,7 @@ details[open]>summary{margin-bottom:12px}
 @media(max-width:410px){.portfolio-shot-row{font-size:.75rem}.portfolio-shot-row strong{font-size:.74rem}}
 </style><script src="./live-prices.js"></script></head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
-<section class="panel flex"><div><b>현재가 재조회 · 마지막 게시 일봉과 구분</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
+<section class="panel flex"><div><b>한국 ETF 자동 시세 재조회 · 약 75초 간격 (페이지 열린 동안)</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
 <div id="alert">공개 일봉 종가와 당일 비공식 조회 가격은 다릅니다. 마지막 체결 시각을 확인하지 못하면 최신 가격으로 표시하지 않습니다.</div>
 <div class="legend"><span class="state-buy"><b>●</b> 매수 · 조건 충족(주문 아님)</span><span class="state-stop"><b>●</b> 중지 · 상한 초과</span><span class="state-wait"><b>●</b> 대기 · 미충족·확인 필요</span></div>
 <section class="panel" id="summary"><b>오늘의 매수계획 점검</b><p class="sub">게시된 일봉으로 계산한 계획이며 실제 주문을 실행하지 않습니다.</p><div id="plan">시세 확인 중</div></section>
@@ -305,7 +305,7 @@ details[open]>summary{margin-bottom:12px}
  </div>
  <label>하루 투자 가능 예산 (원 · 선택)<input id="dailyBudget" type="number" min="0" step="1000" placeholder="입력 시 추천 수량 예산 초과 확인"></label>
  <div class="notice-block"><b>박스권 하단 30%</b>는 저가 관심, <b>하단 20%</b>는 더 낮은 저가 우선 검토구간입니다. 평단가보다 낮더라도 하락 추세가 지속될 수 있으며, 매수 상한과 예산 조건을 우선합니다.</div>
- <p class="fieldset-note">리츠는 기본 매 거래일 1주, 로봇과 우주항공 모두 빨간색 매수 중단일 때만 3주입니다. SOFR은 기존 정기 적립 유지(수량은 사용자가 직접 결정). 200TR은 31,150원 대비 -5% 감시 우선. SOL은 로봇·우주항공 중 하나 이상 상한 초과 시 대체 1주 검토. 이동평균은 모두 참고하지만 저가 구간의 평단 인하 기회를 별도로 계산합니다.</p>
+ <p class="fieldset-note">로봇·우주 모두 매수: 리츠 1주·SOL 0주. 한 종목 중지: 리츠 2주·SOL 1주. 모두 중지: 리츠 3주·SOL 1주. SOFR은 매주 월요일 1주. 200TR은 -5% 자동감시. 매수·중지 권고는 키움 주식모으기 주문을 자동으로 변경하지 않습니다.</p>
 </section>
 <footer><b>가격 정확성 안내</b><p>제공처: 네이버 금융 일봉(비공식). 한국거래소 공식 확정 종가와 다를 수 있습니다. 실제 주문 전 키움증권에서 종가를 대조하세요. 갱신 버튼은 마지막 게시된 일봉을 불러온 뒤 네이버 금융의 당일 공개 시세를 재조회합니다. 조회 출처가 CORS 제약·차단·지연을 겪거나 마지막 체결 시각이 불분명하면 기존 일봉만 표시합니다. 증권사 공식 체결가와 차이가 있을 수 있습니다. 시세가 오래되거나 계산값이 부족하면 매수 판단을 보류합니다. 평단가와 보유수량은 해당 브라우저의 로컬 저장소에만 기록됩니다. 표시는 참고용이며 자동주문은 지원하지 않습니다.</p></footer>
 </main>
@@ -557,25 +557,30 @@ function render(){
  el('manual').onchange=function(ev){if(valid(ev.target.value))manual[f.id]=Number(ev.target.value);else delete manual[f.id];render();};
 }
 async function refreshLiveQuotes(){
- liveQuotes={};liveError=null;liveSource=null;
+ if(liveBusy)return;
+ liveBusy=true;
  var target=el('liveStatus');
- if(target)target.textContent='당일 현재가를 재조회하고 체결시각 검증 중...';
+ if(target)target.textContent='당일 체결가격과 시각 검증 중…';
  try{
-  if(!window.ISA_livePriceFetch||!window.ISA_livePriceFetch.lookup)throw Error('현재가 조회 스크립트가 로드되지 않았습니다');
+  if(!window.ISA_livePriceFetch?.lookup)throw Error('시세 조회 모듈 미로드');
   var result=await window.ISA_livePriceFetch.lookup(FUNDS);
-  if(!result.ok)throw Error(result.reason||'유효한 실시간 자료 없음');
-  liveQuotes=result.quotes;liveSource=result.via==='proxy'?'중계 경유':'원본 직접';
-  var count=Object.keys(liveQuotes).length;
-  var checked=new Date().toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  if(target)target.textContent='확인 시각 '+checked+' · 당일 체결 유효 '+count+'/6 · 네이버 금융 비공식 '+liveSource+' · 체결시각 최대 15분 허용';
-  if(el('signal'))el('signal').textContent='당일 시세 '+count+'/6';
-  if(el('alert'))el('alert').textContent='방금 새로 조회한 유효 가격 '+count+'종목만 적용했습니다. '+(6-count)+'종목은 게시 일봉 종가를 표시합니다. 5·20일 이동평균과 박스권은 마지막 확정 일봉 기준으로 유지합니다. 주문 전 키움증권 시세를 확인하세요.';
+  if(!result.ok)throw Error(result.reason||'유효한 당일 가격 없음');
+  liveQuotes=result.quotes;liveSource=result.via;
+  liveError=result.partial?result.reason||'일부 종목 미확인':null;
+  lastLiveCheckedAt=new Date().toISOString();
+  var rows=Object.values(liveQuotes),published=rows.filter(q=>q.method==='published').length;
+  var count=rows.length,checked=new Date().toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'});
+  if(target)target.textContent='조회 '+checked+' · 당일 체결 '+count+'/6 · 직접 '+(count-published)+' / 지연 게시 '+published+
+    ' · 5·20일선은 확정 일봉 기준'+(result.partial?' · 일부 미확인':'');
+  if(el('signal'))el('signal').textContent='당일 체결 '+count+'/6';
+  if(el('alert'))el('alert').textContent='검증된 오늘 체결가 '+count+'종목 적용. 게시 보조시세는 지연될 수 있습니다. 미확인 '+(6-count)+
+   '종목은 장중 매수 신호 대기. 주식모으기 중지·재개는 증권사에서 별도 실행.';
  }catch(e){
-  liveError=String(e.message||e);
-  if(target)target.textContent='당일 시세 직접 조회 실패 · 이전 확정 일봉으로 표시 ('+liveError.slice(0,170)+')';
-  if(el('alert'))el('alert').textContent='누른 시점의 가격 조회를 검증하지 못했습니다. 현재 가격 표시는 마지막 게시 일봉 종가이며 오늘 현재가는 아닙니다. 키움증권에서 확인하세요.';
- }
- render();
+  liveQuotes={};liveSource=null;liveError=String(e.message||e);lastLiveCheckedAt=new Date().toISOString();
+  if(target)target.textContent='당일 시세 미확인 · '+liveError.slice(0,160);
+  if(el('signal'))el('signal').textContent='당일 체결 0/6';
+  if(el('alert'))el('alert').textContent='오늘 현재가를 검증하지 못했습니다. 오래된 일봉을 오늘 가격이라고 표시하지 않으며, 장중 신규 매수 신호를 대기합니다.';
+ }finally{liveBusy=false;render();}
 }
 async function refresh(){
  var button=el('reload'),oldSignature=dataSignature,oldFetchedAt=loadTime;
@@ -611,6 +616,22 @@ el('selection').value=selected;el('selection').onchange=function(){selected=this
 Object.keys(defaults).forEach(function(k){el(k).value=settings[k];el(k).onchange=function(){var v=this.value.trim();settings[k]=k==='dailyBudget'?(valid(v)?Number(v):''):(valid(v)?Number(v):defaults[k]);persist();render();};});
 renderPositions();
 el('reload').onclick=refresh;
+// While this page is open, refresh the public quote approximately every 75 seconds.
+// Browsers may throttle timers in background; never claim push while the app is closed.
+var pollEvery=75000,lastPoll=0;
+async function pulse(){
+ var now=Date.now(),visible=document.visibilityState!=='hidden';
+ if(!visible||liveBusy||now-lastPoll<pollEvery-3000)return;
+ lastPoll=now;
+ if(window.ISA_livePriceFetch?.active?.(new Date()))await refreshLiveQuotes();
+}
+setInterval(pulse,pollEvery);
+document.addEventListener('visibilitychange',function(){
+ if(document.visibilityState!=='hidden'){
+  lastPoll=0;
+  refreshLiveQuotes();
+ }
+});
 refresh();
 })();
 </script><script>
