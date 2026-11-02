@@ -83,19 +83,40 @@ function category(type,title,reason,sourceDate,manual=false){
   return {value:'unknown',label:'자료 확인 필요',reason,sourceDate,manual};
  return {value:'pause',label:'매수 중지 검토',reason,sourceDate,manual};
 }
+function pairInfo(){
+ const p=window.ISA_KR_APP?.pairPlan?.();
+ return p&&typeof p.known==='boolean'?p:{known:false,robot:'wait',space:'wait',reitQty:null,solQty:null,stopped:null,sources:{}};
+}
 function decisions(){
- const kd=krDecisions(),limit=rules();
+ const kd=krDecisions(),pair=pairInfo(),limit=rules();
  const result={};
  for(const id of KR){
   const x=kd[id];
   let v=!x?category('wait','자료 미확인','국내주식 판단 데이터가 아직 로드되지 않았습니다.',null):
     category(x.type,x.title,x.reason,x.quoteDate,!!x.hasIntraday);
-  if(id==='sol'){
-   if(plan.solMode==='standby')v={value:'pause',label:'대체매수 중지 유지',reason:'SOL은 로봇·우주항공이 상한을 넘었을 때만 별도 선택하는 대체매수 종목입니다. 주식모으기는 다른 종목의 상한 초과 여부를 자동 판단해 정지·재개하지 못하므로 기본 중지를 유지합니다.',sourceDate:x?.quoteDate||null};
-   else if(v.value==='keep')v={...v,reason:v.reason+' 로봇·우주항공의 실제 모으기 중지를 증권사에서 확인한 뒤에만 SOL 단독 재개를 검토하세요.'};
+  if(id==='reit'){
+   v=pair.known?{value:'keep',label:'리츠 '+pair.reitQty+'주 적립 검토',
+    reason:'로봇·우주항공 '+pair.stopped+'종목 중지 → 리츠 '+pair.reitQty+'주. 키움 주식모으기 수량은 앱에서 자동 조정되지 않습니다.',
+    sourceDate:x?.quoteDate||null}:
+    {value:'unknown',label:'리츠 수량 확인 필요',reason:'로봇·우주항공의 매수/중지 상태가 불확실해 리츠 1·2·3주를 결정하지 않습니다.',
+     sourceDate:x?.quoteDate||null};
   }
-  if(['robot','space'].includes(id)&&plan.solMode==='exclusive'){
-   v={value:'pause',label:'SOL 단독모드 · 중지 검토',reason:'SOL 대체매수 단독모드가 선택됐습니다. 로봇·우주항공 주식모으기는 증권사에서 별도 중지 확인이 필요합니다.',sourceDate:x?.quoteDate||null};
+  if(id==='sol'){
+   if(!pair.known)v={value:'unknown',label:'SOL 연동조건 확인 필요',
+    reason:'로봇·우주항공이 각각 매수중/중지 중 어디에 해당하는지 확인 필요. SOL을 임의로 0·1주 결정하지 않습니다.',
+    sourceDate:x?.quoteDate||null};
+   else if(pair.solQty===0)v={value:'pause',label:'SOL 0주 · 매수 중지 검토',
+    reason:'로봇·우주항공 모두 매수 → SOL 0주. 이미 매수중이면 키움 주식모으기 중지를 직접 확인해야 합니다.',
+    sourceDate:x?.quoteDate||null};
+   else if(x?.type==='stop')v={value:'pause',label:'SOL 상한 초과 · 매수 중지 검토',
+    reason:'로봇·우주항공 한 종목 이상 중지해 SOL 1주 조건이지만, SOL 매수상한 '+won(limit.sol)+'을 초과해 매수를 보류합니다.',
+    sourceDate:x?.quoteDate||null};
+   else if(x?.type==='wait'&&/미확인|오래된|상한 미설정|수동/.test(x.title||''))v={
+    value:'unknown',label:'SOL 원화가격 확인 필요',reason:'SOL 1주 조건이지만 SOL 시세·매수상한 확인이 불완전합니다. 임의 재개하지 마세요.',
+    sourceDate:x?.quoteDate||null};
+   else v={value:'keep',label:'SOL 1주 매수 검토',
+    reason:'로봇·우주항공 '+pair.stopped+'종목 중지 → SOL 1주. 매수상한 '+won(limit.sol)+' 이내, 키움에서 실제 수량·활성 상태를 별도 확인하세요.',
+    sourceDate:x?.quoteDate||null};
   }
   result[id]=v;
  }
@@ -109,14 +130,14 @@ function decisions(){
  return result;
 }
 function rows(){
- const d=decisions(),r=rules(),result=[];
+ const d=decisions(),r=rules(),pair=pairInfo(),result=[];
  for(const id of KR){
   let info='';
   if(id==='robot')info='가격 상한 '+won(r.robot)+' · 1일 최대 '+plan.robotDaily+'주 (상한 자동 정지 불가)';
   if(id==='space')info='가격 상한 '+won(r.space)+' · 1일 최대 '+plan.spaceDaily+'주 (상한 자동 정지 불가)';
-  if(id==='reit')info='기본 '+plan.reitDaily+'주/거래일 (기본 1주, 조건별 3주 변경은 수동)';
+  if(id==='reit')info=pair.known?'로봇·우주항공 '+pair.stopped+'종목 중지 → 리츠 '+pair.reitQty+'주/거래일 권고 (키움 실제 수량 자동 변경 불가)':'상태 확인 전 리츠 1·2·3주 미확정';
   if(id==='sofr')info=plan.sofrDaily?plan.sofrDaily+'주/거래일 계획':'주식모으기 수량 미입력 · 실제 등록량 확인 필요';
-  if(id==='sol')info='대체매수 상한 '+won(r.sol)+' · 중복매수 방지';
+  if(id==='sol')info='매수·중지 상태에 따라 SOL '+(pair.known?pair.solQty+'주':'미확정')+' · 상한 '+won(r.sol)+' · 키움 실제 주문 미변경';
   result.push({id,name:LABELS[id],broker:'키움증권',mode:'매일 주식모으기',details:info,...d[id]});
  }
  result.push({id:'tr',name:LABELS.tr,broker:'키움증권',mode:'자동감시주문',
@@ -132,28 +153,31 @@ function rows(){
  return result;
 }
 function budget(){
- const r=rules(),qty=id=>Math.max(0,Number(plan[id])||0);
- const dailyKCap=qty('robotDaily')*r.robot+qty('spaceDaily')*r.space;
- const solCap=qty('solDaily')*r.sol;
- const watch=qty('trQty')*r.trPrice;
- const us=qty('usSchdDaily')+qty('usAgncDaily')+qty('usSpymDaily');
- const kPrice=read('isa-daily-quote-note-v1')||{}; // no made-up prices
- const reitQuote=krDecisions().reit?.quote||null,sofrQuote=krDecisions().sofr?.quote||null;
+ const r=rules(),pair=pairInfo(),qty=id=>Math.max(0,Number(plan[id])||0);
+ const shareRobot=pair.known?(pair.robot==='buy'?qty('robotDaily'):0):qty('robotDaily');
+ const shareSpace=pair.known?(pair.space==='buy'?qty('spaceDaily'):0):qty('spaceDaily');
+ const shareReit=pair.known?pair.reitQty:3;
+ const shareSol=pair.known?pair.solQty:1;
+ const uncertain=!pair.known;
+ const rob=shareRobot*r.robot,space=shareSpace*r.space,sol=shareSol*r.sol;
+ const watch=qty('trQty')*r.trPrice,us=qty('usSchdDaily')+qty('usAgncDaily')+qty('usSpymDaily');
+ const kd=krDecisions(),reitQuote=kd.reit?.quote||null,sofrQuote=kd.sofr?.quote||null;
  const reitValid=pos(reitQuote),sofrValid=pos(sofrQuote);
- const kReit=plan.reitDaily&&reitValid?plan.reitDaily*reitQuote:0,
- kSofr=plan.sofrDaily&&sofrValid?plan.sofrDaily*sofrQuote:0;
+ const kReit=reitValid?shareReit*Number(reitQuote):0;
+ const kSofr=qty('sofrDaily')&&sofrValid?qty('sofrDaily')*Number(sofrQuote):0;
  const unknown=[];
- if(plan.reitDaily&&!reitValid)unknown.push('리츠 기준 가격');
- if(plan.sofrDaily&&!sofrValid)unknown.push('SOFR 기준 가격');
- if(!plan.sofrDaily)unknown.push('SOFR 기존 모으기 수량·금액');
- if(!plan.usSchdDaily)unknown.push('SCHD 기존 모으기 금액');
- if(!plan.usAgncDaily)unknown.push('AGNC 기존 모으기 금액');
- if(!plan.usSpymDaily)unknown.push('SPYM 기존 모으기 금액');
- const daily=(plan.solMode==='exclusive'?solCap:dailyKCap)+kReit+kSofr+us;
- const cash=plan.conyCashDaily*plan.conyCashDays;
- const subtotal=daily*plan.tradingDays+watch+cash;
+ if(shareReit&&!reitValid)unknown.push('리츠 현재가');
+ if(qty('sofrDaily')&&!sofrValid)unknown.push('SOFR 현재가');
+ if(!qty('sofrDaily'))unknown.push('SOFR 실제 모으기 수량');
+ if(!qty('usSchdDaily'))unknown.push('SCHD 실제 모으기 금액');
+ if(!qty('usAgncDaily'))unknown.push('AGNC 실제 모으기 금액');
+ if(!qty('usSpymDaily'))unknown.push('SPYM 실제 모으기 금액');
+ if(uncertain)unknown.push('로봇·우주항공 매수/중지 확인 전 · 보수적 최대치 예산 사용');
+ const daily=rob+space+sol+kReit+kSofr+us,cash=qty('conyCashDaily')*qty('conyCashDays');
+ const subtotal=daily*qty('tradingDays')+watch+cash;
  return {daily,watch,cash,subtotal,remaining:plan.monthlyMax-subtotal,unknown,
-  estimatedOnly:unknown.length>0,rates:r,exclusive:plan.solMode==='exclusive'};
+  estimatedOnly:unknown.length>0,rates:r,conditional:pair,shares:{robot:shareRobot,space:shareSpace,reit:shareReit,sol:shareSol},
+  scenario:uncertain?'상태 미확정 → 보수적 최대 매수 가정':'조건별 예상 수량'};
 }
 function mismatch(row){
  const st=note(row.id),today=dateK(),prior=st.date&&st.date<today;
@@ -181,7 +205,7 @@ function render(){
  '<div>단순 잔여 추정<strong>'+won(budgetData.remaining)+'</strong></div></div>'+
  (budgetData.remaining<0?'<p class="uo-danger">월 최대 투자한도 초과 예상 · 매일 모으기 금액·수량 조정이 필요합니다.</p>':'')+
  (budgetData.estimatedOnly?'<p class="uo-danger">예산 미완성: '+budgetData.unknown.map(esc).join(' · ')+'. 등록금액 미확인은 0원으로 계산된 항목이 있으므로 남은 예산이 실제보다 많아 보일 수 있습니다.</p>':'')+
- (budgetData.exclusive?'<p class="uo-danger">SOL 단독 모드: 로봇·1Q 주식모으기가 실제로 자동 중지된 것은 아닙니다. 키움에서 두 종목의 중지를 확인하세요.</p>':'')+
+ '<p class="sub">리츠·SOL 조건별 예상 수량: 리츠 '+(budgetData.conditional.known?budgetData.shares.reit+'주':'미확정')+' / SOL '+(budgetData.conditional.known?budgetData.shares.sol+'주':'미확정')+' · '+esc(budgetData.scenario)+'</p>'+
  '<p class="sub">가격 상한은 참고 기준입니다. 주식모으기는 프로그램의 가격 판단을 따라 자동 중지되지 않습니다. 월 계산은 모든 날 설정액대로 주문되는 가정이며 변동 가격·환율·수수료는 제외합니다.</p>';
  const groups=[['키움증권',data.filter(r=>r.broker==='키움증권')],['토스증권',data.filter(r=>r.broker==='토스증권')]];
  $('uo-order-list').innerHTML=groups.map(([name,items])=>
@@ -243,9 +267,8 @@ function mount(){
  '<details class="uo-settings"><summary>월 예산 및 실제 주식모으기 수량·금액 입력</summary>'+
  '<div class="uo-inputs">'+
  [['monthlyMax','월 투자·유보 예산 한도 (원)',1000],['tradingDays','월 거래일 가정',1],
- ['reitDaily','키움 리츠 매일 수량(주)',1],['robotDaily','키움 로봇 매일 최대 수량(주)',1],
+ ['robotDaily','키움 로봇 매일 최대 수량(주)',1],
  ['spaceDaily','키움 1Q 매일 최대 수량(주)',1],['sofrDaily','키움 SOFR 매일 수량(주)',1],
- ['solDaily','키움 SOL 매일 최대 수량(주)',1],
  ['trQty','KODEX 200TR 감시 매수 수량(주)',1],
  ['usSchdDaily','토스 SCHD 매일 금액(원)',1000],
  ['usAgncDaily','토스 AGNC 매일 금액(원)',1000],
@@ -254,9 +277,7 @@ function mount(){
  ['conyCashDays','CONY 현금 유보 거래일 수',1]
  ].map(([key,label,step])=>'<label>'+label+
  '<input data-uo-plan="'+key+'" type="number" min="0" step="'+step+'" value="'+plan[key]+'"></label>').join('')+
- '<label>SOL 대체 모드<select data-uo-plan="solMode">'+
- '<option value="standby">대체매수 대기/주식모으기 중지</option>'+
- '<option value="exclusive">SOL 단독모드(로봇·1Q 실제 중지 확인 필수)</option></select></label></div>'+
+ '</div>'+ 
  '<p class="sub">0으로 남은 금액은 실제 모으기가 꺼져 있다는 뜻이 아니라 등록금액을 아직 입력하지 않았다는 뜻일 수 있습니다. 증권사에 설정한 금액을 정확히 입력해야 월 예산 계산이 맞습니다.</p></details>'+
  '<div id="uo-order-list" class="uo-list"></div>'+
  '<div class="uo-controls"><button type="button" id="uo-copy">오늘 점검표 복사</button>'+
@@ -266,14 +287,10 @@ function mount(){
  anchor.insertAdjacentElement('afterend',section);
  section.querySelectorAll('[data-uo-plan]').forEach(inp=>{
   const key=inp.dataset.uoPlan;
-  if(key==='solMode')inp.value=plan.solMode;
   inp.addEventListener('change',()=>{
-   if(key==='solMode'){
-    if(!['standby','exclusive'].includes(inp.value))return;
-    plan[key]=inp.value;
-   }else{
+   {
     const val=inp.value.trim()===''?0:Number(inp.value),isDays=['tradingDays','conyCashDays'].includes(key);
-    const isShares=['reitDaily','robotDaily','spaceDaily','sofrDaily','solDaily','trQty'].includes(key);
+    const isShares=['robotDaily','spaceDaily','sofrDaily','trQty'].includes(key);
     if(!Number.isFinite(val)||val<0||val>100000000||(isDays&&(!Number.isInteger(val)||val<1||val>25))||
      (isShares&&!Number.isInteger(val))||(key==='monthlyMax'&&val<1000)){
      inp.value=plan[key];$('uo-message').textContent='금액·정수 수량·거래일(1~25)을 확인하세요.';return;
