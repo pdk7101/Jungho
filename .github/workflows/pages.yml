@@ -8,8 +8,8 @@ on:
   schedule:
     - cron: '25 08 * * 1-5'
     - cron: '15 09 * * 1-5'
-    # KST market 09:00-15:59: delayed public quote snapshot every ~10 minutes.
-    - cron: '*/10 0-6 * * 1-5'
+    # KST market 09:00-15:59: best-effort public quote snapshot every ~5 minutes (scheduled jobs may be delayed).
+    - cron: '*/5 0-6 * * 1-5'
     # New York 16:00 close (both daylight saving and standard time): next day Korea morning.
     - cron: '35 22 * * 1-5'
     - cron: '15 23 * * 1-5'
