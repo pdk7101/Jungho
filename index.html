@@ -265,7 +265,7 @@ details[open]>summary{margin-bottom:12px}
 #intraday-enable-notifications{margin-top:8px;font-size:.8rem;padding:10px}
 </style><script src="./live-prices.js"></script></head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
-<section class="panel flex"><div><b>한국 ETF 자동 시세 재조회 · 약 75초 간격 (페이지 열린 동안)</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
+<section class="panel flex"><div><b>한국 ETF 장중 공개 시세 자동 갱신 · 약 60초 간격 (페이지 열린 동안)</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
 <div id="alert">공개 일봉 종가와 당일 비공식 조회 가격은 다릅니다. 마지막 체결 시각을 확인하지 못하면 최신 가격으로 표시하지 않습니다.</div>
 <div class="legend"><span class="state-buy"><b>●</b> 매수 · 조건 충족(주문 아님)</span><span class="state-stop"><b>●</b> 중지 · 상한 초과</span><span class="state-wait"><b>●</b> 대기 · 미충족·확인 필요</span></div>
 <section class="panel" id="summary"><b>오늘의 매수계획 점검</b><p class="sub">당일 체결시각을 검증한 현재가가 있으면 우선 반영합니다. 5·20일선은 확정 일봉 기준이며 실제 증권사 주문은 실행하지 않습니다.</p><div id="plan">시세 확인 중</div></section>
@@ -319,7 +319,7 @@ details[open]>summary{margin-bottom:12px}
  <div class="notice-block"><b>박스권 하단 30%</b>는 저가 관심, <b>하단 20%</b>는 더 낮은 저가 우선 검토구간입니다. 평단가보다 낮더라도 하락 추세가 지속될 수 있으며, 매수 상한과 예산 조건을 우선합니다.</div>
  <p class="fieldset-note">로봇·우주 모두 매수: 리츠 1주·SOL 0주. 한 종목 중지: 리츠 2주·SOL 1주. 모두 중지: 리츠 3주·SOL 1주. SOFR은 매주 월요일 1주. 200TR은 -5% 자동감시. 매수·중지 권고는 키움 주식모으기 주문을 자동으로 변경하지 않습니다.</p>
 </section>
-<footer><b>가격 정확성 안내</b><p>제공처: 네이버 금융 일봉(비공식). 한국거래소 공식 확정 종가와 다를 수 있습니다. 실제 주문 전 키움증권에서 종가를 대조하세요. 갱신 버튼은 게시 일봉과 네이버 금융의 당일 공개 시세를 재조회합니다. 페이지가 열려 있는 동안 한국장 장중 약 75초마다 자동 조회하며, 공개 시세를 직접 조회하지 못할 때는 게시 지연시세를 보조로 사용합니다. 매수 신호는 체결시각 검증이 가능한 당일 가격에만 의존하고, 실제 키움 주문을 자동 변경하지 않습니다. 페이지를 닫은 뒤 휴대폰 푸시 알림은 지원되지 않습니다. 조회 출처가 CORS 제약·차단·지연을 겪거나 마지막 체결 시각이 불분명하면 기존 일봉만 표시합니다. 증권사 공식 체결가와 차이가 있을 수 있습니다. 시세가 오래되거나 계산값이 부족하면 매수 판단을 보류합니다. 평단가와 보유수량은 해당 브라우저의 로컬 저장소에만 기록됩니다. 표시는 참고용이며 자동주문은 지원하지 않습니다.</p></footer>
+<footer><b>가격 정확성 안내</b><p>제공처: 네이버 금융 일봉(비공식). 한국거래소 공식 확정 종가와 다를 수 있습니다. 실제 주문 전 키움증권에서 종가를 대조하세요. 갱신 버튼은 게시 일봉과 네이버 금융의 당일 공개 시세를 재조회합니다. 페이지가 열려 있는 동안 한국장 장중 약 60초마다 공개 현재가를 자동 조회하며, 공개 시세를 직접 조회하지 못할 때는 게시 지연시세를 보조로 사용합니다. 매수 신호는 체결시각 검증이 가능한 당일 가격에만 의존하고, 실제 키움 주문을 자동 변경하지 않습니다. 페이지를 닫은 뒤 휴대폰 푸시 알림은 지원되지 않습니다. 조회 출처가 CORS 제약·차단·지연을 겪거나 마지막 체결 시각이 불분명하면 기존 일봉만 표시합니다. 증권사 공식 체결가와 차이가 있을 수 있습니다. 시세가 오래되거나 계산값이 부족하면 매수 판단을 보류합니다. 평단가와 보유수량은 해당 브라우저의 로컬 저장소에만 기록됩니다. 표시는 참고용이며 자동주문은 지원하지 않습니다.</p></footer>
 </main>
 <script>
 (function(){
@@ -560,7 +560,7 @@ function render(){
   var x=byId[f.id],v=verdict(f),live=freshQuote(f.id),p=hasBars(x)?current(x,f.id):(live?live.price:null),h=p?holding(f.id,p):null,b=hasBars(x)?band(x,p):null;
   var tag=b?'<span class="band-tag '+(b.name==='하단 20%'?'band20':'')+'">'+b.name+'</span>':'';
   var avgText=h?'<div class="card-detail '+(h.canLower?'avg-down':'avg-up')+'">평단 '+avgMoney(h.avg)+' 대비 '+(h.discount>=0?'+':'')+h.discount.toFixed(2)+'%</div>':'<div class="card-detail">평단가 미입력 / 미보유</div>';
-  return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+safe(f.plan)+'</small><strong>'+(p?money(p):'미확인')+'</strong><small>'+(live?'오늘 비공식 체결가 ('+(live.method==='published'?'게시 시세 · 지연가능':'직접 조회')+') · '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'}):'과거 일봉 종가 · '+(hasBars(x)?day(x.date):'확인 불가'))+'</small>'+avgText+tag+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+actionLabel(v.type)+'</div></div>';
+  return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+safe(f.plan)+'</small><strong>'+(p?money(p):'미확인')+'</strong><small>'+(live?'오늘 공개 체결가 ('+(live.method==='published'?'GitHub 게시 · 지연 가능':'네이버 직접 조회')+') · 체결 '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+' · '+Math.max(0,Math.floor((Date.now()-new Date(live.tradeAt).getTime())/60000))+'분 경과':'과거 일봉 종가 · '+(hasBars(x)?day(x.date):'확인 불가'))+'</small>'+avgText+tag+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+actionLabel(v.type)+'</div></div>';
  }).join('');
  document.dispatchEvent(new Event('isa-rendered'));
  Array.from(list.querySelectorAll('[data-id]')).forEach(function(node){
@@ -613,8 +613,9 @@ async function refreshLiveQuotes(){
   lastLiveCheckedAt=new Date().toISOString();
   var rows=Object.values(liveQuotes),published=rows.filter(q=>q.method==='published').length;
   var count=rows.length,checked=new Date().toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'});
+  var oldestAge=rows.length?Math.max.apply(null,rows.map(function(q){return Math.max(0,Math.floor((Date.now()-new Date(q.tradeAt).getTime())/60000));})):null;
   if(target)target.textContent='조회 '+checked+' · 당일 체결 '+count+'/6 · 직접 '+(count-published)+' / 지연 게시 '+published+
-    ' · 5·20일선은 확정 일봉 기준'+(result.partial?' · 일부 미확인':'');
+    ' · 마지막 체결 후 최대 '+oldestAge+'분 (종목별 상이) · 5·20일선은 확정 일봉 기준'+(result.partial?' · 일부 미확인':'');
   if(el('signal'))el('signal').textContent='당일 체결 '+count+'/6';
   if(el('alert'))el('alert').textContent='검증된 오늘 체결가 '+count+'종목 적용. 게시 보조시세는 지연될 수 있습니다. 미확인 '+(6-count)+
    '종목은 장중 매수 신호 대기. 주식모으기 중지·재개는 증권사에서 별도 실행.';
@@ -659,9 +660,9 @@ el('selection').value=selected;el('selection').onchange=function(){selected=this
 Object.keys(defaults).forEach(function(k){el(k).value=settings[k];el(k).onchange=function(){var v=this.value.trim();settings[k]=k==='dailyBudget'?(valid(v)?Number(v):''):(valid(v)?Number(v):defaults[k]);persist();render();};});
 renderPositions();
 el('reload').onclick=refresh;
-// While this page is open, refresh the public quote approximately every 75 seconds.
+// While this page is visible, refresh public KR quotes approximately once a minute.
 // Browsers may throttle timers in background; never claim push while the app is closed.
-var pollEvery=75000,lastPoll=0;
+var pollEvery=60000,lastPoll=0;
 async function pulse(){
  var now=Date.now(),visible=document.visibilityState!=='hidden';
  if(!visible||liveBusy||now-lastPoll<pollEvery-3000)return;
@@ -674,6 +675,9 @@ document.addEventListener('visibilitychange',function(){
   lastPoll=0;
   refreshLiveQuotes();
  }
+});
+window.addEventListener('online',function(){
+ if(document.visibilityState!=='hidden'){lastPoll=Date.now();refreshLiveQuotes();}
 });
 refresh();
 })();
