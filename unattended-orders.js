@@ -280,18 +280,15 @@ function render(){
    const st=note(row.id),warning=mismatch(row),
     pair=pairInfo(),statusLabel=row.value==='keep'?'매수 유지':row.value==='pause'?'매수 중지':row.value==='watch'?'자동감시':'자료 확인';
    const badge=US.includes(row.id)?(st.value==='running'?'매수중 · 사용자 확인':st.value==='paused'?'일시중지 · 사용자 확인':'실제 상태 미확인'):
-    (row.id==='sofr'?'월요일 1주 정기적립':
-    row.id==='reit'&&pair.known?'리츠 '+pair.reitQty+'주':
-    row.id==='sol'&&pair.known&&row.value==='keep'?'SOL '+pair.solQty+'주':
-    row.id==='sol'&&pair.known&&pair.solQty===0?'SOL 0주 · 중지':statusLabel);
+    KR.includes(row.id)?(st.value==='running'?'키움 매수중 · 사용자 확인':st.value==='paused'?'키움 중지 · 사용자 확인':'키움 실제 상태 미확인'):statusLabel;
    const options=row.id==='tr'?
     [['unknown','미확인'],['watching','감시중 확인'],['paused','감시중지 확인'],['filled','체결 확인'],['expired','만료/취소 확인']]:
     [['unknown','미확인'],['running','주식모으기 매수중 확인'],['paused','주식모으기 중지 확인']];
    return '<details class="uo-order"><summary class="uo-order-top"><b>'+esc(row.name)+'</b>'+
-    '<span>'+esc(row.mode)+'</span><em class="uo-action action-'+(US.includes(row.id)?(st.value==='running'?'keep':st.value==='paused'?'pause':'unknown'):row.value)+'">'+esc(badge)+'</em></summary>'+
-    '<p class="uo-state"><b>'+(US.includes(row.id)?'투자 계획:':'프로그램 판단:')+'</b> '+esc(row.label)+'</p>'+
+    '<span>'+esc(row.mode)+'</span><em class="uo-action action-'+(US.includes(row.id)||KR.includes(row.id)?(st.value==='running'?'keep':st.value==='paused'?'pause':'unknown'):row.value)+'">'+esc(badge)+'</em></summary>'+
+    (KR.includes(row.id)?'':'<p class="uo-state"><b>'+(US.includes(row.id)?'투자 계획:':'프로그램 판단:')+'</b> '+esc(row.label)+'</p>')+
     '<p class="sub">'+esc(row.details)+'</p>'+ (US.includes(row.id)?'<p class="sub">토스 주문상태: <b>'+esc(st.value==='running'?'매수중':st.value==='paused'?'일시중지':'미확인')+'</b> · '+esc(st.date||'확인일 없음')+' 사용자 확인 기록 (실시간 연동 아님)</p>':'')+
-    '<p class="sub"><b>판단 이유:</b> '+esc(row.reason)+'</p>'+
+    (KR.includes(row.id)?'':'<p class="sub"><b>판단 이유:</b> '+esc(row.reason)+'</p>')+
     (row.id==='sofr'?'<p class="sub">정기매수 기준: 매주 월요일 1주 · 이동평균선 매수조건 없음</p>':
     row.sourceDate?'<p class="sub">분석 일봉 기준: '+esc(row.sourceDate)+(row.manual?' · 당일 시세 참고':'')+'</p>':
     '<p class="sub">분석 일봉 기준: 자료 확인 필요</p>')+
@@ -333,7 +330,7 @@ function checklist(){
 function mount(){
  const anchor=$('summary');if(!anchor)return;
  const section=document.createElement('section');section.className='panel uo-panel';section.id='unattended-orders';
- section.innerHTML='<h2>매일 주식모으기 매수·중지 점검</h2>'+
+ section.innerHTML='<h2>매일 주식모으기 실제 주문 상태·예산 확인</h2>'+
  '<p class="sub"><b>키움:</b> 리츠·로봇·1Q·SOL은 매일 주식모으기, <b>SOFR은 매주 월요일 1주</b>, KODEX 200TR만 자동감시주문. <b>토스:</b> 미국주식은 매일 원화 소수점 주식모으기입니다. 실제 증권사 설정은 별도로 확인하세요.</p>'+
  '<p class="sub"><b>확인시점:</b> <span id="uo-today">'+dateK()+'</span> · 확정 일봉/비공식 가격 참고 · 이 웹페이지는 계좌에 접속하거나 자동매수를 중지·재개하지 않습니다.</p>'+
  '<div id="uo-budget"></div>'+
