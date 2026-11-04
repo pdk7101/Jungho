@@ -46,8 +46,11 @@ function decodePortfolio(encoded){
    all.tossTotal={amount,pnl};
   }else throw Error('잔고 정보 형식이 맞지 않습니다');
  }
- if(KR.some(id=>!all.kr[id])||US.some(id=>!all.us[id])||!all.tossTotal)
-  throw Error('키움 6종목·토스 5종목·계좌 합계가 모두 필요합니다');
+ if(KR.some(id=>!all.kr[id]))throw Error('키움 ISA 6종목의 보유수량·평단이 모두 필요합니다');
+ const hasUS=US.some(id=>!!all.us[id])||!!all.tossTotal;
+ if(hasUS&&(US.some(id=>!all.us[id])||!all.tossTotal))
+  throw Error('토스 종목 기록을 추가할 경우 미국 5종목·계좌 합계가 모두 필요합니다');
+ all.krOnly=!hasUS;
  return all;
 }
 function importSnapshot(){
@@ -68,7 +71,7 @@ function importSnapshot(){
   }
   // Keep any directly supplied cost basis and cumulative net distributions.
   // If missing, a USD-stock KRW cost basis may be estimated from valuation - P/L.
-  for(const id of US.filter(x=>x!=='spacex')){
+  for(const id of parsed.krOnly?[]:US.filter(x=>x!=='spacex')){
    const old=usOld[id]||{},v=parsed.us[id];
    if(old.krwSnapshotDate&&old.krwSnapshotDate>parsed.date){kept++;continue;}
    const next={...old,qty:v.qty,krwSnapshotDate:parsed.date};
@@ -85,15 +88,23 @@ function importSnapshot(){
   // Save in the user's browser, not GitHub. Roll back on a storage failure.
   const backup=Object.fromEntries([KEY,KRKEY,USKEY].map(k=>[k,localStorage.getItem(k)]));
   try{
-   store(KRKEY,kr);store(USKEY,us);store(KEY,parsed);
+   store(KRKEY,kr);
+   if(!parsed.krOnly)store(USKEY,us);
+   // Preserve previous US screenshot and US holdings during a KR-only update.
+   const combined=parsed.krOnly?
+    {...parsed,us:existing?.us||{},tossTotal:existing?.tossTotal||null,usDate:existing?.usDate||existing?.date||null}:
+    {...parsed,usDate:parsed.date};
+   store(KEY,combined);
   }catch(err){
    for(const [key,val] of Object.entries(backup)){
     try{if(val===null)localStorage.removeItem(key);else localStorage.setItem(key,val);}catch(_){}
    }
    throw Error('이 브라우저에 저장할 수 없어 원래 정보를 유지했습니다');
   }
-  report={kind:'success',message:parsed.date+' 화면 기준 국내 '+krApplied+'종목 · 미국 '+usApplied+
-   '종목 보유수량 저장. 미국 원화 평단 '+derived+'종목은 사진 손익 역산 추정이며, 스페이스X는 별도 스냅샷에만 보관.'+
+  report={kind:'success',message:parsed.date+' 화면 기준 국내 '+krApplied+'종목 보유수량·평단 저장.'+
+   (parsed.krOnly?' 기존 미국주식 보유정보는 변경하지 않았습니다.':
+    ' 미국 '+usApplied+'종목 보유수량 저장. 미국 원화 평단 '+derived+
+    '종목은 사진 손익 역산 추정이며, 스페이스X는 별도 스냅샷에만 보관.')+
    (kept?' 최신으로 입력된 '+kept+'종목은 유지.':'')};
  }catch(err){report={kind:'error',message:String(err.message||err)};}
  finally{
@@ -122,10 +133,13 @@ function renderSnapshot(){
  '<p class="sub">보내주신 증권사 화면의 기록입니다. 오늘 이후 시세·체결에 따라 달라질 수 있으며, 실제 실시간 계좌조회가 아닙니다.</p>'+
  (report?.kind==='success'?'<p class="sub" role="status">'+escapeHtml(report.message)+'</p>':'')+
  '<details><summary>키움 ISA 보유 6종목 · '+KR.reduce((n,id)=>n+d.kr[id].qty,0)+'주</summary>'+rows('K',d.kr)+'</details>'+
- '<details><summary>토스 사진에 표시된 미국주식 5종목 · 전체계좌 평가 '+money(d.tossTotal.amount)+'</summary>'+
+ (US.every(id=>d.us&&d.us[id])&&d.tossTotal?
+ '<details><summary>토스 사진에 표시된 미국주식 5종목 · 전체계좌 평가 '+money(d.tossTotal.amount)+
+ (d.usDate?' · 별도 기록 '+escapeHtml(d.usDate):'')+'</summary>'+
  rows('U',d.us)+'<p class="sub">토스 화면 전체 계좌 손익 '+signed(d.tossTotal.pnl)+
  ' · 화면 전체 합계는 위 미국 5종목만의 합계가 아닐 수 있습니다.</p>'+
- '<p class="sub">스페이스X 표시 종목은 앱의 미국 4종목 분석에 포함되지 않습니다. 기존 미국주식 평단은 유지했으며, 평단이 없던 종목의 역산값은 참고용입니다.</p></details>';
+ '<p class="sub">스페이스X 표시 종목은 앱의 미국 4종목 분석에 포함되지 않습니다. 기존 미국주식 평단은 유지했으며, 평단이 없던 종목의 역산값은 참고용입니다.</p></details>':
+ '<p class="sub">미국주식 보유정보는 이 사진에 없어 이전 입력을 유지했습니다.</p>');
 }
 const report=importSnapshot();
 if(report.kind!=='none'){
