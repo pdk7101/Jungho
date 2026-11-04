@@ -132,7 +132,7 @@ function renderSnapshot(){
  host.innerHTML='<h2>내 보유현황 · 사진 기록 '+escapeHtml(d.date)+'</h2>'+
  '<p class="sub">보내주신 증권사 화면의 기록입니다. 오늘 이후 시세·체결에 따라 달라질 수 있으며, 실제 실시간 계좌조회가 아닙니다.</p>'+
  (report?.kind==='success'?'<p class="sub" role="status">'+escapeHtml(report.message)+'</p>':'')+
- '<details><summary>키움 ISA 보유 6종목 · '+KR.reduce((n,id)=>n+d.kr[id].qty,0)+'주</summary>'+rows('K',d.kr)+'</details>'+
+ '<details><summary>키움 ISA 보유 6종목 · '+KR.reduce((n,id)=>n+d.kr[id].qty,0)+'주 · 사진 손익 '+signed(KR.reduce((n,id)=>n+d.kr[id].pnl,0))+'</summary>'+rows('K',d.kr)+'</details>'+
  (US.every(id=>d.us&&d.us[id])&&d.tossTotal?
  '<details><summary>토스 사진에 표시된 미국주식 5종목 · 전체계좌 평가 '+money(d.tossTotal.amount)+
  (d.usDate?' · 별도 기록 '+escapeHtml(d.usDate):'')+'</summary>'+
