@@ -24,7 +24,7 @@ function localDay(){
 function decodePortfolio(encoded){
  const tokens=decodeURIComponent(encoded).split(';'),date=tokens.shift();
  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>localDay())throw Error('기준일이 올바르지 않습니다');
- const all={date,kr:{},us:{},tossTotal:null};
+ const all={date,kr:{},us:{},usPositions:{},tossTotal:null};
  for(const token of tokens){
   const p=token.split(':'),group=p.shift();
   if(group==='K'&&p.length===5){
@@ -39,6 +39,13 @@ function decodePortfolio(encoded){
     !Number.isFinite(value)||value<0||!Number.isFinite(pnl)||value-pnl<0)
     throw Error('토스 종목·평가금액·손익을 확인해 주세요');
    all.us[id]={qty,value,pnl};
+  }else if(group==='B'&&p.length===3){
+   // Private per-share KRW average + quantity from the Toss holding screen.
+   const [id,q,a]=p,qty=Number(q),avg=Number(a);
+   if(!US.includes(id)||all.usPositions[id]||!Number.isFinite(qty)||qty<0||qty>10000000||
+    !Number.isFinite(avg)||avg<=0||avg>1000000000)
+    throw Error('토스 보유수량·원화 평균매수가를 확인해 주세요');
+   all.usPositions[id]={qty,avg};
   }else if(group==='T'&&p.length===2){
    const [val,pl]=p,amount=Number(val),pnl=Number(pl);
    if(all.tossTotal||!Number.isFinite(amount)||amount<0||!Number.isFinite(pnl))
@@ -48,12 +55,16 @@ function decodePortfolio(encoded){
  }
  const hasKR=KR.some(id=>!!all.kr[id]);
  const hasUS=US.some(id=>!!all.us[id])||!!all.tossTotal;
- if(!hasKR&&!hasUS)throw Error('적용할 보유 종목이 없습니다');
+ const hasBalance=US.some(id=>!!all.usPositions[id]);
+ if(!hasKR&&!hasUS&&!hasBalance)throw Error('적용할 보유 종목이 없습니다');
  if(hasKR&&KR.some(id=>!all.kr[id]))throw Error('키움 ISA 6종목의 보유수량·평단이 모두 필요합니다');
  if(hasUS&&(US.some(id=>!all.us[id])||!all.tossTotal))
   throw Error('토스 종목 기록은 미국 5종목·전체계좌 합계가 모두 필요합니다');
- all.krOnly=hasKR&&!hasUS;
- all.usOnly=hasUS&&!hasKR;
+ if(hasBalance&&US.some(id=>!all.usPositions[id]))
+  throw Error('토스 평단·수량은 5종목 전부 확인해야 합니다');
+ all.krOnly=hasKR&&!hasUS&&!hasBalance;
+ all.usOnly=(hasUS||hasBalance)&&!hasKR;
+ all.balanceOnly=hasBalance&&!hasUS&&!hasKR;
  return all;
 }
 function importSnapshot(){
@@ -75,17 +86,23 @@ function importSnapshot(){
   // Keep any directly supplied cost basis and cumulative net distributions.
   // If missing, a USD-stock KRW cost basis may be estimated from valuation - P/L.
   for(const id of parsed.krOnly?[]:US.filter(x=>x!=='spacex')){
-   const old=usOld[id]||{},v=parsed.us[id];
+   const old=usOld[id]||{},v=parsed.us[id],balance=parsed.usPositions[id];
    if(old.krwSnapshotDate&&old.krwSnapshotDate>parsed.date){kept++;continue;}
-   const next={...old,qty:v.qty,krwSnapshotDate:parsed.date};
-   if(!(Number(next.krwAvg)>0)&&v.qty>0){
+   const next={...old,qty:balance?balance.qty:v.qty,krwSnapshotDate:parsed.date};
+   if(balance){
+    next.krwAvg=balance.avg;
+    next.krwAvgSource='explicit-toss-screenshot';
+   }else if(!(Number(next.krwAvg)>0)&&v.qty>0){
     next.krwAvg=Math.round(((v.value-v.pnl)/v.qty)*100)/100;
     next.krwAvgSource='estimated-from-screenshot-valuation-pnl';
     derived++;
    }
-   // Do not use screenshot valuation as a current executable quote.
-   delete next.krwCurrent;
-   delete next.krwDay;
+   // Valuation screenshots must never be mistaken for executable real-time quotes.
+   // A cost-basis/quantity-only update leaves any independently supplied current quote alone.
+   if(!parsed.balanceOnly){
+    delete next.krwCurrent;
+    delete next.krwDay;
+   }
    us[id]=next;usApplied++;
   }
   // Save in the user's browser, not GitHub. Roll back on a storage failure.
@@ -99,9 +116,13 @@ function importSnapshot(){
     date:parsed.date,
     kr:parsed.usOnly?(existing?.kr||{}):parsed.kr,
     krDate:parsed.usOnly?(existing?.krDate||(KR.every(id=>existing?.kr?.[id])?existing?.date:null)||null):parsed.date,
-    us:parsed.krOnly?(existing?.us||{}):parsed.us,
-    usDate:parsed.krOnly?(existing?.usDate||(US.every(id=>existing?.us?.[id])?existing?.date:null)||null):parsed.date,
-    tossTotal:parsed.krOnly?(existing?.tossTotal||null):parsed.tossTotal
+    us:parsed.krOnly?(existing?.us||{}):
+     parsed.balanceOnly?Object.fromEntries(US.map(id=>[id,{
+      ...(existing?.us?.[id]||{}),...parsed.usPositions[id]}])):parsed.us,
+    usDate:parsed.krOnly?(existing?.usDate||(US.every(id=>existing?.us?.[id])?existing?.date:null)||null):
+     parsed.balanceOnly?(existing?.usDate||null):parsed.date,
+    usPositionDate:parsed.balanceOnly?parsed.date:(existing?.usPositionDate||null),
+    tossTotal:parsed.krOnly||parsed.balanceOnly?(existing?.tossTotal||null):parsed.tossTotal
    };
    store(KEY,combined);
   }catch(err){
@@ -111,11 +132,12 @@ function importSnapshot(){
    throw Error('이 브라우저에 저장할 수 없어 원래 정보를 유지했습니다');
   }
   report={kind:'success',message:parsed.date+' 화면 기준 '+
-   (parsed.usOnly?'토스 미국주식 ':parsed.krOnly?'키움 ISA ':'키움 ISA 및 토스 ')+
-   (parsed.usOnly?'4종목':parsed.krOnly?krApplied+'종목':krApplied+'종목·미국 '+usApplied+'종목')+
-   ' 보유수량 저장.'+
-   (parsed.usOnly?' 키움 ISA 보유수량·평단·매수조건은 변경하지 않았습니다.':parsed.krOnly?' 미국주식 보유정보는 변경하지 않았습니다.':'')+
-   (!parsed.krOnly?' 미국 원화 평단 '+derived+'종목은 화면 손익으로 역산한 참고값이며, 스페이스X는 별도 사진 기록에만 보관.':'')+
+   (parsed.balanceOnly?'토스 5종목 수량·원화 평단 직접 반영. ':
+    (parsed.usOnly?'토스 미국주식 ':parsed.krOnly?'키움 ISA ':'키움 ISA 및 토스 ')+
+    (parsed.usOnly?'4종목':parsed.krOnly?krApplied+'종목':krApplied+'종목·미국 '+usApplied+'종목')+' 보유수량 저장. ')+
+   (parsed.usOnly?'키움 ISA 보유수량·평단·매수조건은 변경하지 않았습니다. ':parsed.krOnly?'미국주식 보유정보는 변경하지 않았습니다. ':'')+
+   (!parsed.krOnly&&!parsed.balanceOnly?'미국 원화 평단 '+derived+'종목은 화면 손익으로 역산한 참고값입니다. ':'')+
+   (!parsed.krOnly?'스페이스X는 별도 사진 기록에만 보관했습니다.':'')+
    (kept?' 최신으로 입력된 '+kept+'종목은 유지.':'')};
  }catch(err){report={kind:'error',message:String(err.message||err)};}
  finally{
@@ -134,10 +156,11 @@ function renderSnapshot(){
   const order=group==='K'?KR:US;
   return '<div class="portfolio-shot-list">'+order.map(id=>{
    const x=data[id],primary=group==='K'?'평단 '+money(x.avg)+' · 화면가 '+money(x.current):
-     '화면 평가액 '+money(x.value);
+     (Number(x.avg)>0?'토스 원화 평단 '+money(x.avg)+(Number.isFinite(x.value)?' · ':''):
+      '')+(Number.isFinite(x.value)?'화면 평가액 '+money(x.value):'사진 평가액 없음');
    return '<div class="portfolio-shot-row"><span><b>'+escapeHtml(NAMES[id])+'</b>'+
     '<small>'+comma(x.qty)+'주 · '+primary+'</small></span>'+
-    '<strong class="'+(x.pnl>=0?'good':'error')+'">'+signed(x.pnl)+'</strong></div>';
+    '<strong class="'+(x.pnl>=0?'good':'error')+'">'+(Number.isFinite(x.pnl)?signed(x.pnl):'손익 미입력')+'</strong></div>';
   }).join('')+'</div>';
  };
  host.innerHTML='<h2>내 보유현황 · 사진 기록 '+escapeHtml(d.date)+'</h2>'+
@@ -147,12 +170,14 @@ function renderSnapshot(){
  '<details><summary>키움 ISA 보유 6종목 · '+KR.reduce((n,id)=>n+d.kr[id].qty,0)+'주 · 사진 손익 '+signed(KR.reduce((n,id)=>n+d.kr[id].pnl,0))+
  (d.krDate?' · 별도 기록 '+escapeHtml(d.krDate):'')+'</summary>'+rows('K',d.kr)+'</details>':
  '<p class="sub">키움 ISA 사진 기록은 이 브라우저에 없어 이전에 입력한 보유정보를 그대로 유지했습니다.</p>')+
- (US.every(id=>d.us&&d.us[id])&&d.tossTotal?
- '<details><summary>토스 사진에 표시된 미국주식 5종목 · 전체계좌 평가 '+money(d.tossTotal.amount)+
- (d.usDate?' · 별도 기록 '+escapeHtml(d.usDate):'')+'</summary>'+
- rows('U',d.us)+'<p class="sub">토스 화면 전체 계좌 손익 '+signed(d.tossTotal.pnl)+
- ' · 화면 전체 합계는 위 미국 5종목만의 합계가 아닐 수 있습니다.</p>'+
- '<p class="sub">스페이스X 표시 종목은 앱의 미국 4종목 분석에 포함되지 않습니다. 기존 미국주식 평단은 유지했으며, 평단이 없던 종목의 역산값은 참고용입니다.</p></details>':
+ (US.every(id=>d.us&&d.us[id])?
+ '<details><summary>토스 미국주식 5종목 · 보유수량·평단'+
+ (d.usPositionDate?' '+escapeHtml(d.usPositionDate):'')+
+ (d.tossTotal?' · 전체계좌 평가 '+money(d.tossTotal.amount):'')+'</summary>'+
+ rows('U',d.us)+
+ (d.tossTotal?'<p class="sub">이전 토스 화면 전체 계좌 손익 '+signed(d.tossTotal.pnl)+
+ ' · 전체계좌 합계는 위 미국 5종목만의 합계가 아닐 수 있습니다.</p>':'')+
+ '<p class="sub">스페이스X는 보유기록만 저장하며 미국 ETF 4종목의 매수판단에는 포함되지 않습니다. 원화 평단과 수량은 사진 기록으로서 실시간 호가와 구분합니다.</p></details>':
  '<p class="sub">미국주식 보유정보는 이 사진에 없어 이전 입력을 유지했습니다.</p>');
 }
 const report=importSnapshot();
