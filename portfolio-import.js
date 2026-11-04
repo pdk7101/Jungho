@@ -78,7 +78,7 @@ function importSnapshot(){
    const old=usOld[id]||{},v=parsed.us[id];
    if(old.krwSnapshotDate&&old.krwSnapshotDate>parsed.date){kept++;continue;}
    const next={...old,qty:v.qty,krwSnapshotDate:parsed.date};
-   if(v.qty>0&&(!(Number(next.krwAvg)>0)||next.krwAvgSource==='estimated-from-screenshot-valuation-pnl')){
+   if(!(Number(next.krwAvg)>0)&&v.qty>0){
     next.krwAvg=Math.round(((v.value-v.pnl)/v.qty)*100)/100;
     next.krwAvgSource='estimated-from-screenshot-valuation-pnl';
     derived++;
