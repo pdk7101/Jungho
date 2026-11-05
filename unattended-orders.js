@@ -145,21 +145,15 @@ function decisions(){
      sourceDate:x?.quoteDate||null};
   }
   if(id==='sol'){
-   if(!pair.known)v={value:'unknown',label:'SOL 연동조건 확인 필요',
-    reason:'로봇·우주항공이 각각 매수중/중지 중 어디에 해당하는지 확인 필요. SOL을 임의로 0·1주 결정하지 않습니다.',
-    sourceDate:x?.quoteDate||null};
-   else if(pair.solQty===0)v={value:'pause',label:'SOL 0주 · 매수 중지 검토',
-    reason:'로봇·우주항공 모두 매수 → SOL 0주. 이미 매수중이면 키움 주식모으기 중지를 직접 확인해야 합니다.',
-    sourceDate:x?.quoteDate||null};
-   else if(x?.type==='stop')v={value:'pause',label:'SOL 상한 초과 · 매수 중지 검토',
-    reason:'로봇·우주항공 한 종목 이상 중지해 SOL 1주 조건이지만, SOL 매수상한 '+won(limit.sol)+'을 초과해 매수를 보류합니다.',
-    sourceDate:x?.quoteDate||null};
-   else if(x?.type==='wait'&&/미확인|오래된|상한 미설정|수동/.test(x.title||''))v={
-    value:'unknown',label:'SOL 원화가격 확인 필요',reason:'SOL 1주 조건이지만 SOL 시세·매수상한 확인이 불완전합니다. 임의 재개하지 마세요.',
-    sourceDate:x?.quoteDate||null};
-   else v={value:'keep',label:'SOL 1주 매수 검토',
-    reason:'로봇·우주항공 '+pair.stopped+'종목 오늘 매수 안 함 → SOL 1주. 매수상한 '+won(limit.sol)+' 이내, 키움에서 실제 수량·활성 상태를 별도 확인하세요.',
-    sourceDate:x?.quoteDate||null};
+   if(!pair.known)v={value:'unknown',label:'SOL 연동조건 확인 대기',
+    reason:'SOL 일일 판별: '+pair.solReason+'. 로봇·우주 시세/판단 미확인',sourceDate:x?.quoteDate||null};
+   else if(pair.solQty===null)v={value:'unknown',label:'SOL 일일 판별 자료 확인 대기',
+    reason:pair.solReason+'. 자료 미확인을 매수 불가로 간주하여 리츠 4주 매수하지 않음',sourceDate:x?.quoteDate||null};
+   else if(pair.solQty===0)v={value:'pause',
+    label:pair.solNeeded?'SOL 일일 매수조건 미충족 · 0주':'SOL 대체매수 미발동 · 0주',
+    reason:pair.solReason+' / '+(pair.solNeeded?'리츠 4주 대체 검토':'로봇·우주 모두 매수 가능'),sourceDate:x?.quoteDate||null};
+   else v={value:'keep',label:'SOL 일일조건 충족 · 1주',
+    reason:pair.solReason+' / 실제 키움 주식모으기 변경 없음',sourceDate:x?.quoteDate||null};
   }
   result[id]=v;
  }
