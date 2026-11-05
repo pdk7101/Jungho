@@ -123,7 +123,7 @@ function category(type,title,reason,sourceDate,manual=false){
 }
 function pairInfo(){
  const p=window.ISA_KR_APP?.pairPlan?.();
- return p&&typeof p.known==='boolean'?p:{known:false,robot:'wait',space:'wait',reitQty:null,solQty:null,stopped:null,sources:{}};
+ return p&&typeof p.known==='boolean'?p:{known:false,robot:'wait',space:'wait',reitQty:null,solQty:null,solStatus:'wait',solReason:'자료 확인 필요',stopped:null,sources:{}};
 }
 function decisions(){
  const kd=krDecisions(),pair=pairInfo(),limit=rules();
@@ -139,9 +139,9 @@ function decisions(){
   }
   if(id==='reit'){
    v=pair.known?{value:'keep',label:'리츠 '+pair.reitQty+'주 적립 검토',
-    reason:'로봇·우주항공 '+pair.stopped+'종목 매수 안 함 → 리츠 '+pair.reitQty+'주. 키움 주식모으기 수량은 앱에서 자동 조정되지 않습니다.',
+    reason:'로봇·우주 '+pair.stopped+'종목 매수 불가 · SOL 매일 판별 '+pair.solReason+' → 리츠 '+pair.reitQty+'주. 실제 주식모으기는 자동 변경되지 않습니다.',
     sourceDate:x?.quoteDate||null}:
-    {value:'keep',label:'리츠 기본 1주 유지 · 추가 수량 미확정',reason:'기존 매 거래일 리츠 1주 적립은 유지하며, 로봇·우주항공 가격/상태 미확인으로 추가 1~2주만 보류합니다.',
+    {value:'keep',label:'리츠 기본 1주 유지 · 추가 수량 미확정',reason:'기존 매 거래일 리츠 1주 적립은 유지하며, 로봇·우주항공 가격/상태 미확인으로 추가매수를 보류합니다.',
      sourceDate:x?.quoteDate||null};
   }
   if(id==='sol'){
@@ -175,9 +175,9 @@ function rows(){
   let info='';
   if(id==='robot')info='가격 상한 '+won(r.robot)+' · 1일 최대 '+plan.robotDaily+'주 (상한 자동 정지 불가)';
   if(id==='space')info='가격 상한 '+won(r.space)+' · 1일 최대 '+plan.spaceDaily+'주 (상한 자동 정지 불가)';
-  if(id==='reit')info=pair.known?'로봇·우주항공 '+pair.stopped+'종목 중지 → 리츠 '+pair.reitQty+'주/거래일 권고 (키움 실제 수량 자동 변경 불가)':'리츠 기본 1주/거래일 유지 · 추가 1~2주 미확정';
+  if(id==='reit')info=pair.known?'로봇·우주 '+pair.stopped+'종목 매수 불가 / SOL '+pair.solStatus+' → 리츠 '+pair.reitQty+'주/거래일 검토 (실제 주문 자동 변경 불가)':'리츠 기본 1주/거래일 유지 · 추가수량 미확정';
   if(id==='sofr')info=plan.sofrWeekly?'매주 월요일 '+plan.sofrWeekly+'주 정기 주식모으기 · 월 '+mondaysThisMonth()+'회 예정':'매주 월요일 정기매수 수량 0주 · 설정 확인 필요';
-  if(id==='sol')info='매수·중지 상태에 따라 SOL '+(pair.known?pair.solQty+'주':'미확정')+' · 상한 '+won(r.sol)+' · 키움 실제 주문 미변경';
+  if(id==='sol')info='SOL 매일 상한 '+won(r.sol)+' + 박스권/5·20일선 검사: '+(pair.solReason||'자료 확인 대기')+' / 주문 수량 '+(pair.solQty===null?'미확정':pair.solQty+'주')+' · 실제 주문 미변경';
   result.push({id,name:LABELS[id],broker:'키움증권',mode:id==='sofr'?'매주 월요일 주식모으기':'매일 주식모으기',details:info,...d[id]});
  }
  result.push({id:'tr',name:LABELS.tr,broker:'키움증권',mode:'자동감시주문',
@@ -204,9 +204,9 @@ function budget(){
  const r=rules(),pair=pairInfo(),qty=id=>Math.max(0,Number(plan[id])||0);
  const shareRobot=pair.known?(pair.robot==='buy'?qty('robotDaily'):0):qty('robotDaily');
  const shareSpace=pair.known?(pair.space==='buy'?qty('spaceDaily'):0):qty('spaceDaily');
- const shareReit=pair.known?pair.reitQty:3;
- const shareSol=pair.known?pair.solQty:1;
- const uncertain=!pair.known;
+ const uncertain=!pair.known||pair.solQty===null;
+ const shareReit=uncertain?4:pair.reitQty;
+ const shareSol=uncertain?1:pair.solQty;
  const rob=shareRobot*r.robot,space=shareSpace*r.space,sol=shareSol*r.sol;
  const watch=qty('trQty')*r.trPrice,us=qty('usSchdDaily')+qty('usAgncDaily')+qty('usSpymDaily');
  const kd=krDecisions(),reitQuote=kd.reit?.quote||null,sofrQuote=kd.sofr?.quote||null;
@@ -220,11 +220,11 @@ function budget(){
  if(!qty('usSchdDaily'))unknown.push('SCHD 실제 모으기 금액');
  if(!qty('usAgncDaily'))unknown.push('AGNC 실제 모으기 금액');
  if(!qty('usSpymDaily'))unknown.push('SPYM 실제 모으기 금액');
- if(uncertain)unknown.push('로봇·우주항공 매수/중지 확인 전 · 보수적 최대치 예산 사용');
+ if(uncertain)unknown.push('로봇·우주·SOL 일부 미확인 · 리츠 최대 4주 + SOL 1주 보수적 예산 가정');
  const daily=rob+space+sol+kReit+us,cash=qty('conyCashDaily')*qty('conyCashDays');
  const subtotal=daily*qty('tradingDays')+sofrMonthly+watch+cash;
  return {daily,watch,cash,subtotal,remaining:plan.monthlyMax-subtotal,unknown,
-  estimatedOnly:unknown.length>0,rates:r,conditional:pair,sofrMondays:monthMondays,sofrWeekly:qty('sofrWeekly'),sofrMonthly,shares:{robot:shareRobot,space:shareSpace,reit:shareReit,sol:shareSol},
+  estimatedOnly:unknown.length>0,rates:r,conditional:{...pair,known:!uncertain},sofrMondays:monthMondays,sofrWeekly:qty('sofrWeekly'),sofrMonthly,shares:{robot:shareRobot,space:shareSpace,reit:shareReit,sol:shareSol},
   scenario:uncertain?'상태 미확정 → 보수적 최대 매수 가정':'조건별 예상 수량'};
 }
 function mismatch(row){
