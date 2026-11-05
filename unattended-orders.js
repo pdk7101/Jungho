@@ -88,8 +88,20 @@ function importTossConfirmation(){
 }
 function rules(){
  const s=read('isa-rules')||{},val=(k,f)=>pos(s[k])?Number(s[k]):f;
- const robot=val('robotCap',9500),space=val('spaceCap',9700),sol=val('solCap',10000),trBase=val('trBase',31150);
- return {robot,space,sol,trBase,trPrice:Math.floor(trBase*.95/5)*5};
+ const manual={robot:val('robotCap',9500),space:val('spaceCap',9700),sol:val('solCap',10000)};
+ const mode=s.capMode==='manual'?'manual':'auto';
+ // The Korean decision engine is the single source for effective MA and manual caps.
+ const capInfo={};
+ for(const id of ['robot','space','sol']){
+  const result=window.ISA_KR_APP?.effectiveCap?.(id);
+  capInfo[id]=result||{value:mode==='manual'?manual[id]:null,mode,reason:'일봉·이평선 확인 대기'};
+ }
+ const caps={};
+ for(const id of ['robot','space','sol']){
+  caps[id]=pos(capInfo[id].value)?Number(capInfo[id].value):manual[id];
+ }
+ const trBase=val('trBase',31150);
+ return {...caps,trBase,trPrice:Math.floor(trBase*.95/5)*5,mode,manual,capInfo};
 }
 function krDecisions(){
  const a=window.ISA_KR_APP?.decisions?.();
@@ -173,11 +185,11 @@ function rows(){
  const d=decisions(),r=rules(),pair=pairInfo(),result=[];
  for(const id of KR){
   let info='';
-  if(id==='robot')info='가격 상한 '+won(r.robot)+' · 1일 최대 '+plan.robotDaily+'주 (상한 자동 정지 불가)';
-  if(id==='space')info='가격 상한 '+won(r.space)+' · 1일 최대 '+plan.spaceDaily+'주 (상한 자동 정지 불가)';
+  if(id==='robot')info='적용 상한 '+(pos(r.capInfo.robot.value)?won(r.capInfo.robot.value):'자동 계산 대기')+' ('+r.capInfo.robot.reason+') · 1일 최대 '+plan.robotDaily+'주 · 키움 주문 자동 중지 불가';
+  if(id==='space')info='적용 상한 '+(pos(r.capInfo.space.value)?won(r.capInfo.space.value):'자동 계산 대기')+' ('+r.capInfo.space.reason+') · 1일 최대 '+plan.spaceDaily+'주 · 키움 주문 자동 중지 불가';
   if(id==='reit')info=pair.known?'로봇·우주 '+pair.stopped+'종목 매수 불가 / SOL '+pair.solStatus+' → 리츠 '+pair.reitQty+'주/거래일 검토 (실제 주문 자동 변경 불가)':'리츠 기본 1주/거래일 유지 · 추가수량 미확정';
   if(id==='sofr')info=plan.sofrWeekly?'매주 월요일 '+plan.sofrWeekly+'주 정기 주식모으기 · 월 '+mondaysThisMonth()+'회 예정':'매주 월요일 정기매수 수량 0주 · 설정 확인 필요';
-  if(id==='sol')info='SOL 매일 상한 '+won(r.sol)+' + 박스권/5·20일선 검사: '+(pair.solReason||'자료 확인 대기')+' / 주문 수량 '+(pair.solQty===null?'미확정':pair.solQty+'주')+' · 실제 주문 미변경';
+  if(id==='sol')info='SOL 매일 적용 상한 '+(pos(r.capInfo.sol.value)?won(r.capInfo.sol.value):'자동 계산 대기')+' + 저가/이평선 조건: '+(pair.solReason||'자료 대기')+' / 검토 수량 '+(pair.solQty===null?'미확정':pair.solQty+'주')+' · 실제 주문 미변경';
   result.push({id,name:LABELS[id],broker:'키움증권',mode:id==='sofr'?'매주 월요일 주식모으기':'매일 주식모으기',details:info,...d[id]});
  }
  result.push({id:'tr',name:LABELS.tr,broker:'키움증권',mode:'자동감시주문',
@@ -204,7 +216,7 @@ function budget(){
  const r=rules(),pair=pairInfo(),qty=id=>Math.max(0,Number(plan[id])||0);
  const shareRobot=pair.known?(pair.robot==='buy'?qty('robotDaily'):0):qty('robotDaily');
  const shareSpace=pair.known?(pair.space==='buy'?qty('spaceDaily'):0):qty('spaceDaily');
- const uncertain=!pair.known||pair.solQty===null;
+ const uncertain=!pair.known||pair.solQty===null||r.mode==='auto'&&['robot','space','sol'].some(id=>!pos(r.capInfo[id].value));
  const shareReit=uncertain?4:pair.reitQty;
  const shareSol=uncertain?1:pair.solQty;
  const rob=shareRobot*r.robot,space=shareSpace*r.space,sol=shareSol*r.sol;
@@ -220,7 +232,7 @@ function budget(){
  if(!qty('usSchdDaily'))unknown.push('SCHD 실제 모으기 금액');
  if(!qty('usAgncDaily'))unknown.push('AGNC 실제 모으기 금액');
  if(!qty('usSpymDaily'))unknown.push('SPYM 실제 모으기 금액');
- if(uncertain)unknown.push('로봇·우주·SOL 일부 미확인 · 리츠 최대 4주 + SOL 1주 보수적 예산 가정');
+ if(uncertain)unknown.push('로봇·우주·SOL 가격/자동상한 일부 미확인 · 직접 상한 기준으로 리츠 최대 4주 + SOL 1주 보수적 예산 가정');
  const daily=rob+space+sol+kReit+us,cash=qty('conyCashDaily')*qty('conyCashDays');
  const subtotal=daily*qty('tradingDays')+sofrMonthly+watch+cash;
  return {daily,watch,cash,subtotal,remaining:plan.monthlyMax-subtotal,unknown,
