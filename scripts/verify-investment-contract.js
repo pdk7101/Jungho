@@ -97,6 +97,7 @@ app.setQuotes({robot:trade(9300),space:{...trade(9701),tradeAt:'2026-11-01T06:30
 equal(app.freshQuote('space'),null,'prior-day quote rejected');
 
 // Moving-average mode: compare each validated intraday price with dynamic cap.
+delete app.manual.robot; // Clear the earlier manual-price test override.
 app.settings.capMode='auto';
 app.byId.robot=bars('robot',9300);
 app.byId.space=bars('space',9350);
