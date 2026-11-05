@@ -373,26 +373,38 @@ function capStop(id){
  var cap=settings[id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap'];
  return verified(id)&&valid(cap)&&current(byId[id],id)>cap;
 }
+function solDailyEntry(){
+ // Check verified same-day SOL price and daily technical eligibility regardless of substitution.
+ var x=byId.sol,q=freshQuote('sol'),cap=settings.solCap;
+ if(!valid(cap))return {state:'wait',reason:'SOL 상한 미설정'};
+ if(!q)return {state:'wait',reason:'SOL 검증된 당일 체결가 미확인'};
+ if(Number(q.price)>Number(cap))return {state:'stop',reason:'SOL 체결가 '+money(q.price)+' > 상한 '+money(cap)};
+ if(!hasBars(x)||stale(x))return {state:'wait',reason:'SOL 확정 일봉 및 박스권·이동평균 자료 부족'};
+ var p=Number(q.price),b=band(x,p),h=holding('sol',p),t=x.trend;
+ var lowEntry=b.low&&(!h||h.canLower),trendEntry=!!(t.twoDaysAbove&&t.maRising&&t.ma5Above20);
+ if(lowEntry||trendEntry)return {state:'buy',reason:'SOL '+money(p)+' · '+(lowEntry?b.name+(h?' / 평단 인하 가능':''):'5·20일선 상승 추세')+' · 상한 이내'};
+ return {state:'stop',reason:'SOL '+money(p)+' · 상한 이내지만 박스권 저가/평단인하 및 5·20일선 상승 매수조건 미충족'};
+}
 function pairPlan(){
- // Broker activation notes are separate from price-based BUY/STOP advice.
  var states={},sources={};
  ['robot','space'].forEach(function(id){
   var v=verdict(FUNDS.find(function(f){return f.id===id;})),q=freshQuote(id);
-  // Confirmed price but no entry condition means no BUY today.
-  // Missing/unverified prices remain WAIT, never inferred as a market STOP.
   var evaluatedNoBuy=v.type==='wait'&&!!q&&
    ['저가 관심 · 평단 입력','저가·추세 확인 대기','추세/가격 조건 대기'].includes(v.title);
   states[id]=v.type==='buy'?'buy':v.type==='stop'||evaluatedNoBuy?'stop':'wait';
   sources[id]=evaluatedNoBuy?
-   '오늘 비공식 체결가 '+money(q.price)+' · 추가매수 조건 미충족(오늘 매수 안 함, 실제 키움 중지 아님)':
-   q?'검증된 비공식 당일 체결가 '+money(q.price)+' · '+
-   new Date(q.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'}):
-   '확정 일봉 '+day(byId[id]?.date)+' 기준 · 실시간 미확인';
+   '오늘 검증 체결가 '+money(q.price)+' · 추가매수 기술조건 미충족':
+   q?'당일 체결가 '+money(q.price)+' · '+new Date(q.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'}):
+   '확정 일봉 '+day(byId[id]?.date)+' · 당일 시세 확인 대기';
  });
  var known=states.robot!=='wait'&&states.space!=='wait';
  var stopped=(states.robot==='stop'?1:0)+(states.space==='stop'?1:0);
+ var sol=solDailyEntry(),needsSol=known&&stopped>0;
+ // Four REIT shares only on a CONFIRMED SOL no-buy. Missing evidence => no forced increase.
+ var reitQty=known?(needsSol&&sol.state==='stop'?4:stopped+1):1;
+ var solQty=!known?null:!needsSol?0:sol.state==='buy'?1:sol.state==='stop'?0:null;
  return {known:known,robot:states.robot,space:states.space,stopped:known?stopped:null,
-  reitQty:known?stopped+1:1,solQty:known&&stopped>0?1:known?0:null,sources:sources};
+  reitQty:reitQty,solQty:solQty,solStatus:sol.state,solReason:sol.reason,solNeeded:needsSol,sources:sources};
 }
 function reitCount(){return pairPlan().reitQty;}
 
