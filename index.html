@@ -378,16 +378,45 @@ function freshQuote(id){
 }
 function current(x,id){var q=freshQuote(id);return q?Number(q.price):valid(manual[id])?Number(manual[id]):Number(x.close);}
 function verified(id){return !!(hasBars(byId[id])&&!stale(byId[id]));}
+function effectiveCap(id){
+ if(!['robot','space','sol'].includes(id))return {value:null,reason:'상한 대상 종목 아님'};
+ var key=id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap',manualCap=settings[key];
+ if(!valid(manualCap))return {value:null,reason:'직접 지정 상한 없음'};
+ if(settings.capMode==='manual')return {value:Number(manualCap),manual:Number(manualCap),auto:null,reason:'직접 지정',mode:'manual'};
+ var x=byId[id];
+ if(!verified(id))return {value:null,manual:Number(manualCap),auto:null,reason:'확정 일봉/이동평균 데이터 확인 대기',mode:'auto'};
+ var t=x.trend;
+ if(!valid(t.ma20)||!valid(t.ma5))return {value:null,manual:Number(manualCap),auto:null,reason:'5·20일 이동평균선 부족',mode:'auto'};
+ var up=Number(t.ma5)>Number(t.ma20)&&!!t.maRising;
+ var down=Number(t.ma5)<Number(t.ma20)&&!t.maRising;
+ var scale=up?1.02:down?0.98:1;
+ var auto=round5(Number(t.ma20)*scale);
+ if(!valid(auto))return {value:null,manual:Number(manualCap),auto:null,reason:'자동 상한 계산 실패',mode:'auto'};
+ return {value:Math.min(auto,Number(manualCap)),manual:Number(manualCap),auto:auto,
+  reason:up?'상승: 20일선 × 102%':down?'약세: 20일선 × 98%':'중립: 20일선 × 100%',
+  mode:'auto',sourceDate:x.date};
+}
 function capStop(id){
- var cap=settings[id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap'];
- return verified(id)&&valid(cap)&&current(byId[id],id)>cap;
+ var cap=effectiveCap(id);
+ return verified(id)&&valid(cap.value)&&current(byId[id],id)>cap.value;
+}
+function renderCaps(){
+ var host=el('cap-preview');if(!host)return;
+ host.innerHTML=['robot','space','sol'].map(function(id){
+  var label=id==='robot'?'RISE AI&로봇':id==='space'?'1Q 미국우주항공':'SOL 200타겟';
+  var cap=effectiveCap(id),q=freshQuote(id);
+  return '<p><b>'+label+'</b> · 적용 매수상한 <b>'+(valid(cap.value)?money(cap.value):'계산 대기')+
+   '</b> ('+safe(cap.reason)+(cap.mode==='auto'&&valid(cap.auto)?
+   ' · 자동 '+money(cap.auto)+' / 내가 정한 상한 '+money(cap.manual):'')+
+   ') · '+(q?'당일 체결가 '+money(q.price):'당일 가격 확인 대기')+'</p>';
+ }).join('');
 }
 function solDailyEntry(){
  // Check verified same-day SOL price and daily technical eligibility regardless of substitution.
- var x=byId.sol,q=freshQuote('sol'),cap=settings.solCap;
- if(!valid(cap))return {state:'wait',reason:'SOL 상한 미설정'};
+ var x=byId.sol,q=freshQuote('sol'),cap=effectiveCap('sol');
+ if(!valid(cap.value))return {state:'wait',reason:'SOL 매수상한 계산 대기 · '+cap.reason};
  if(!q)return {state:'wait',reason:'SOL 검증된 당일 체결가 미확인'};
- if(Number(q.price)>Number(cap))return {state:'stop',reason:'SOL 체결가 '+money(q.price)+' > 상한 '+money(cap)};
+ if(Number(q.price)>Number(cap.value))return {state:'stop',reason:'SOL 체결가 '+money(q.price)+' > 적용 상한 '+money(cap.value)+' ('+cap.reason+')'};
  if(!hasBars(x)||stale(x))return {state:'wait',reason:'SOL 확정 일봉 및 박스권·이동평균 자료 부족'};
  var p=Number(q.price),b=band(x,p),h=holding('sol',p),t=x.trend;
  var lowEntry=b.low&&(!h||h.canLower),trendEntry=!!(t.twoDaysAbove&&t.maRising&&t.ma5Above20);
@@ -446,9 +475,9 @@ function projected(id,p,buyQty){
 function verdict(f){
  var id=f.id,x=byId[id],quote=freshQuote(id);
  if(['robot','space','sol'].includes(id)&&quote){
-  var top=settings[id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap'];
-  if(valid(top)&&quote.price>top)return {type:'stop',title:'오늘 체결가 상한 초과',qty:0,
-   info:'당일 비공식 체결가 '+money(quote.price)+' > 상한 '+money(top)+'. 체결 '+new Date(quote.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+'. 실제 키움 주식모으기 중지는 별도 확인.'};
+  var top=effectiveCap(id);
+  if(valid(top.value)&&quote.price>top.value)return {type:'stop',title:'오늘 체결가 상한 초과',qty:0,
+   info:'당일 비공식 체결가 '+money(quote.price)+' > 적용 상한 '+money(top.value)+' ('+top.reason+'). 체결 '+new Date(quote.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+'. 실제 키움 주식모으기 중지는 별도 확인.'};
  }
  if(id==='sofr'){
   const isMonday=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',weekday:'short'}).format(new Date())==='Mon';
@@ -472,9 +501,9 @@ function verdict(f){
  var decline=Number(x.close)<Number(t.ma20)||!t.maRising;
  var liveNote=quote?' 당일 조회 현재가로 계산한 잠정 판단입니다. 5·20일선은 '+day(x.date)+'까지의 확정 일봉 기준입니다.':'';
  if(['robot','space','sol'].includes(id)){
-  var cap=settings[id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap'];
-  if(!valid(cap))return {type:'wait',title:'상한 미설정',info:'먼저 상한을 입력하세요.',qty:0};
-  if(p>cap)return {type:'stop',title:'매수 중단',info:'기존 매수 상한 '+money(cap)+' 초과. 박스권 저가 여부와 관계없이 추격매수 중단.'+liveNote,qty:0};
+  var cap=effectiveCap(id);
+  if(!valid(cap.value))return {type:'wait',title:'자동상한 자료 확인 대기',info:cap.reason+' · 신규매수 보류.',qty:0};
+  if(p>cap.value)return {type:'stop',title:'매수 중단',info:'적용 매수상한 '+money(cap.value)+' 초과 ('+cap.reason+'). 추격매수 중단.'+liveNote,qty:0};
  }
  if(id==='reit'){
  var pair=pairPlan(),n=pair.reitQty;
@@ -519,6 +548,7 @@ function actionLabel(type){
 window.ISA_KR_APP={
  pairPlan:pairPlan,
  solDailyEntry:solDailyEntry,
+ effectiveCap:effectiveCap,
  refreshLive:function(){return refreshLiveQuotes();},
  quoteStatus:function(){var quotes={};FUNDS.forEach(function(f){var q=freshQuote(f.id);if(q)quotes[f.id]=q;});return {quotes:quotes,error:liveError,source:liveSource,checkedAt:lastLiveCheckedAt};},
  decisions:function(){
@@ -580,13 +610,15 @@ function renderPlan(){
  el('plan').innerHTML=message;
 }
 function render(){
+ renderCaps();
  renderPlan();
  var list=el('funds');
  list.innerHTML=FUNDS.map(function(f){
   var x=byId[f.id],v=verdict(f),live=freshQuote(f.id),p=hasBars(x)?current(x,f.id):(live?live.price:null),h=p?holding(f.id,p):null,b=hasBars(x)?band(x,p):null;
   var tag=b?'<span class="band-tag '+(b.name==='하단 20%'?'band20':'')+'">'+b.name+'</span>':'';
   var avgText=h?'<div class="card-detail '+(h.canLower?'avg-down':'avg-up')+'">평단 '+avgMoney(h.avg)+' 대비 '+(h.discount>=0?'+':'')+h.discount.toFixed(2)+'%</div>':'<div class="card-detail">평단가 미입력 / 미보유</div>';
-  return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+safe(f.plan)+'</small><strong>'+(p?money(p):'미확인')+'</strong><small>'+(live?'오늘 공개 체결가 ('+(live.method==='published'?'GitHub 게시 · 지연 가능':'네이버 직접 조회')+') · 체결 '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+' · '+Math.max(0,Math.floor((Date.now()-new Date(live.tradeAt).getTime())/60000))+'분 경과':'과거 일봉 종가 · '+(hasBars(x)?day(x.date):'확인 불가'))+'</small>'+avgText+tag+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+actionLabel(v.type)+'</div></div>';
+  return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+safe(f.plan)+'</small><strong>'+(p?money(p):'미확인')+'</strong><small>'+(live?'오늘 공개 체결가 ('+(live.method==='published'?'GitHub 게시 · 지연 가능':'네이버 직접 조회')+') · 체결 '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+' · '+Math.max(0,Math.floor((Date.now()-new Date(live.tradeAt).getTime())/60000))+'분 경과':'과거 일봉 종가 · '+(hasBars(x)?day(x.date):'확인 불가'))+'</small>'+
+  (['robot','space','sol'].includes(f.id)?'<small>매수 적용상한 '+(valid(effectiveCap(f.id).value)?money(effectiveCap(f.id).value):'확인 대기')+' · '+safe(effectiveCap(f.id).reason)+'</small>':'')+avgText+tag+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+actionLabel(v.type)+'</div></div>';
  }).join('');
  document.dispatchEvent(new Event('isa-rendered'));
  Array.from(list.querySelectorAll('[data-id]')).forEach(function(node){
