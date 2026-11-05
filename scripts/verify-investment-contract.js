@@ -104,7 +104,7 @@ app.byId.sol=bars('sol',9750);
 app.setQuotes({robot:trade(9300),space:trade(9350),sol:trade(9400)});
 equal(app.effectiveCap('robot').value,9260,'weak trend auto cap is 98% of MA20 rounded to 5 KRW');
 equal(verdict('robot').type,'stop','live market quote over dynamic cap blocks new robot purchase');
-equal(app.solDailyEntry().state,'buy','SOL qualifies with today's quote below its dynamic cap and low-zone signal');
+equal(app.solDailyEntry().state,'buy',"SOL qualifies with verified intraday quote below its dynamic cap and low-zone signal");
 const trendRobot=app.byId.robot.trend;
 trendRobot.ma5=9100;trendRobot.ma20=9000;trendRobot.maRising=true;
 equal(app.effectiveCap('robot').value,9180,'rising trend auto cap is 102% of MA20');
