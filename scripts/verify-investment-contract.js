@@ -25,7 +25,7 @@ const FixedDate=class extends Date{constructor(...args){super(...(args.length?ar
 const appCode=html.slice(html.indexOf('var FUNDS='),html.indexOf('function chart(bars){'));
 truth(appCode.includes('window.ISA_KR_APP='),'domestic decision module is present');
 const app=new Function('window','localStorage','document','Date',appCode+
- '\nreturn {FUNDS,defaults,positions,byId,manual,verdict,pairPlan,current,freshQuote,setQuotes:q=>liveQuotes=q};')(
+ '\nreturn {FUNDS,defaults,positions,byId,manual,verdict,pairPlan,solDailyEntry,current,freshQuote,setQuotes:q=>liveQuotes=q};')(
  win,loc,{getElementById:()=>null},FixedDate);
 equal(app.FUNDS.map(x=>[x.id,x.code]),[
  ['reit','329200'],['robot','469070'],['space','0131V0'],
@@ -44,42 +44,50 @@ app.positions.robot={avg:9500,qty:3};
 app.positions.space={avg:9600,qty:3};
 const trade=p=>({price:p,tradeAt:'2026-11-02T05:00:00.000Z',date:today,method:'published'});
 const verdict=id=>app.verdict(app.FUNDS.find(f=>f.id===id));
-for(const [robot,space,reit,sol] of [
- [9300,9350,1,0],[9501,9350,2,1],[9300,9701,2,1],[9501,9701,3,1]
+for(const [robot,space,solPrice,reit,sol] of [
+ [9300,9350,9400,1,0],[9501,9350,9400,2,1],
+ [9300,9701,9400,2,1],[9501,9701,9400,3,1],
+ [9501,9350,9750,4,0],[9501,9701,9750,4,0],
+ [9501,9701,10001,4,0]
 ]){
- app.setQuotes({robot:trade(robot),space:trade(space),sol:trade(9750)});
+ app.setQuotes({robot:trade(robot),space:trade(space),sol:trade(solPrice)});
  equal([app.pairPlan().reitQty,app.pairPlan().solQty],[reit,sol],
-  'robot='+robot+' aerospace='+space+' -> REIT '+reit+' SOL '+sol);
+  'robot='+robot+' space='+space+' SOL '+solPrice+' -> REIT '+reit+' SOL '+sol);
  equal([verdict('reit').qty,verdict('sol').qty],[reit,sol],
-  'visible shares match approved conditional rule');
+  'visible share quantities match daily SOL and REIT rules');
 }
+equal(app.solDailyEntry().state,'stop','SOL over price cap is no-buy');
+app.setQuotes({robot:trade(9501),space:trade(9701)});
+equal([app.pairPlan().reitQty,app.pairPlan().solQty],[3,null],
+ 'unconfirmed SOL quote does not trigger a four-share fallback');
+equal(app.solDailyEntry().state,'wait','SOL missing quote is unknown rather than confirmed stop');
 loc.setItem('isa-unattended-order-status-v1',JSON.stringify({
  robot:{status:'running',checkedDate:parts.year+'-'+parts.month+'-'+parts.day},
  space:{status:'running',checkedDate:parts.year+'-'+parts.month+'-'+parts.day}
 }));
-app.setQuotes({robot:trade(9501),space:trade(9701),sol:trade(9750)});
-equal(app.pairPlan().reitQty,3,'broker-running log never overrides actual over-cap BUY/STOP decision');
-app.setQuotes({robot:trade(9300),space:trade(9685),sol:trade(9750)});
+app.setQuotes({robot:trade(9501),space:trade(9701),sol:trade(9400)});
+equal(app.pairPlan().reitQty,3,'broker-running log cannot override price-based entry decision');
+app.setQuotes({robot:trade(9300),space:trade(9685),sol:trade(9400)});
 equal(verdict('space').type,'wait','below price cap alone is not sufficient for BUY');
 equal(app.pairPlan().known,true,'fresh-price technical WAIT is no BUY today for the paired plan');
 equal([app.pairPlan().reitQty,app.pairPlan().solQty],[2,1],
  'robot BUY and aerospace priced no-BUY -> REIT 2 shares and SOL 1 share');
 equal(verdict('sol').qty,1,'SOL follows confirmed one-no-buy plan under its own price cap');
-app.setQuotes({robot:trade(9300),sol:trade(9750)});
+app.setQuotes({robot:trade(9300),sol:trade(9400)});
 equal(app.pairPlan().known,false,'no verified aerospace price keeps conditional extras unknown');
 equal(app.pairPlan().reitQty,1,'REIT base one share remains when space price unavailable');
 equal(verdict('reit').qty,1,'REIT base one share still displayed as BUY');
-app.setQuotes({robot:trade(9300),space:trade(9685),sol:trade(9750)});
+app.setQuotes({robot:trade(9300),space:trade(9685),sol:trade(9400)});
 app.manual.robot=25000;
 equal(app.current(app.byId.robot,'robot'),9300,'verified quote outranks manually entered old price');
 app.setQuotes({});
 app.byId.robot=bars('robot',9300,'20260102');
 equal(verdict('robot').type,'wait','stale daily candle cannot generate a new BUY');
 equal(verdict('tr').type,'wait','KODEX 200TR remains watch order, not a trading command');
-app.setQuotes({robot:trade(9300),space:{...trade(9701),tradeAt:'2026-11-02T04:00:00Z'},sol:trade(9750)});
+app.setQuotes({robot:trade(9300),space:{...trade(9701),tradeAt:'2026-11-02T04:00:00Z'},sol:trade(9400)});
 equal(app.freshQuote('space'),null,'60-minute-old intraday quote rejected');
 equal(verdict('space').type,'wait','expired quote cannot trigger BUY or STOP');
-app.setQuotes({robot:trade(9300),space:{...trade(9701),tradeAt:'2026-11-01T06:30:00Z'},sol:trade(9750)});
+app.setQuotes({robot:trade(9300),space:{...trade(9701),tradeAt:'2026-11-01T06:30:00Z'},sol:trade(9400)});
 equal(app.freshQuote('space'),null,'prior-day quote rejected');
 const isMonday=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',weekday:'short'})
  .format(new Date())==='Mon';
