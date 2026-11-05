@@ -25,14 +25,19 @@ const FixedDate=class extends Date{constructor(...args){super(...(args.length?ar
 const appCode=html.slice(html.indexOf('var FUNDS='),html.indexOf('function chart(bars){'));
 truth(appCode.includes('window.ISA_KR_APP='),'domestic decision module is present');
 const app=new Function('window','localStorage','document','Date',appCode+
- '\nreturn {FUNDS,defaults,positions,byId,manual,verdict,pairPlan,solDailyEntry,current,freshQuote,setQuotes:q=>liveQuotes=q};')(
+ '\nreturn {FUNDS,defaults,settings,positions,byId,manual,verdict,pairPlan,solDailyEntry,effectiveCap,current,freshQuote,setQuotes:q=>liveQuotes=q};')(
  win,loc,{getElementById:()=>null},FixedDate);
 equal(app.FUNDS.map(x=>[x.id,x.code]),[
  ['reit','329200'],['robot','469070'],['space','0131V0'],
  ['sofr','455030'],['tr','278530'],['sol','0167B0']
 ],'Korean symbols and code identifiers');
 equal([app.defaults.robotCap,app.defaults.spaceCap,app.defaults.solCap,app.defaults.trBase],
- [9500,9700,10000,31150],'Korean price caps and KODEX watch base');
+ [9500,9700,10000,31150],'Korean direct price caps and KODEX watch base');
+equal(app.defaults.capMode,'auto','moving-average calculation enabled by default');
+truth(html.indexOf('id="cap-settings"')<html.indexOf('id="summary"'),
+ 'manual limit controls appear above Korean stock recommendations');
+for(const id of ['robotCap','spaceCap','solCap'])
+ equal(html.split('id="'+id+'"').length-1,1,id+' manual cap input exists exactly once');
 const bars=(id,price,date=today)=>({id,ok:true,date,close:price,low20:8800,high20:11500,
  bars:Array.from({length:40},()=>({date,open:price,high:price+50,low:price-50,close:price})),
  trend:{ma5:price-50,previousMa5:price-35,ma20:price+150,previousMa20:price+120,
@@ -44,6 +49,7 @@ app.positions.robot={avg:9500,qty:3};
 app.positions.space={avg:9600,qty:3};
 const trade=p=>({price:p,tradeAt:'2026-11-02T05:00:00.000Z',date:today,method:'published'});
 const verdict=id=>app.verdict(app.FUNDS.find(f=>f.id===id));
+app.settings.capMode='manual'; // Preserve the legacy manual-price tests while evaluating new auto mode independently.
 for(const [robot,space,solPrice,reit,sol] of [
  [9300,9350,9400,1,0],[9501,9350,9400,2,1],
  [9300,9701,9400,2,1],[9501,9701,9400,3,1],
@@ -89,6 +95,33 @@ equal(app.freshQuote('space'),null,'60-minute-old intraday quote rejected');
 equal(verdict('space').type,'wait','expired quote cannot trigger BUY or STOP');
 app.setQuotes({robot:trade(9300),space:{...trade(9701),tradeAt:'2026-11-01T06:30:00Z'},sol:trade(9400)});
 equal(app.freshQuote('space'),null,'prior-day quote rejected');
+
+// Moving-average mode: compare each validated intraday price with dynamic cap.
+app.settings.capMode='auto';
+app.byId.robot=bars('robot',9300);
+app.byId.space=bars('space',9350);
+app.byId.sol=bars('sol',9750);
+app.setQuotes({robot:trade(9300),space:trade(9350),sol:trade(9400)});
+equal(app.effectiveCap('robot').value,9260,'weak trend auto cap is 98% of MA20 rounded to 5 KRW');
+equal(verdict('robot').type,'stop','live market quote over dynamic cap blocks new robot purchase');
+equal(app.solDailyEntry().state,'buy','SOL qualifies with today's quote below its dynamic cap and low-zone signal');
+const trendRobot=app.byId.robot.trend;
+trendRobot.ma5=9100;trendRobot.ma20=9000;trendRobot.maRising=true;
+equal(app.effectiveCap('robot').value,9180,'rising trend auto cap is 102% of MA20');
+app.setQuotes({robot:trade(9150),space:trade(9350),sol:trade(9400)});
+equal(verdict('robot').type,'buy','fresh robot quote below dynamic cap still respects existing entry conditions');
+app.settings.robotCap=9000;
+equal(app.effectiveCap('robot').value,9000,'user-defined cap is always a hard upper bound in auto mode');
+equal(verdict('robot').type,'stop','manual user cap overrides higher moving-average cap');
+app.settings.robotCap=9500;
+app.settings.capMode='manual';
+equal(app.effectiveCap('robot').value,9500,'manual mode bypasses automatic MA cap');
+app.settings.capMode='auto';
+app.byId.sol=bars('sol',9750,'20260102');
+equal(app.solDailyEntry().state,'wait','missing/expired SOL daily bars cannot produce a substitute trade');
+equal(app.effectiveCap('sol').value,null,'invalid MA data never invents a dynamic upper limit');
+app.byId.sol=bars('sol',9750);
+app.settings.capMode='manual';
 const isMonday=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',weekday:'short'})
  .format(new Date())==='Mon';
 equal(verdict('sofr').qty,1,'SOFR 1 share on fixed Monday');
@@ -112,7 +145,7 @@ truth(planHost.innerHTML.includes('KODEX 미국달러SOFR 1주 (월요일 정기
 
 const head=source=>source.slice(0,source.indexOf('function mount(){'))
  .replace(/^\/\*[\s\S]*?\*\/\s*\(function\(\)\{\s*'use strict';/,'');
-win.ISA_KR_APP={pairPlan:app.pairPlan,decisions:()=>app.FUNDS.map(f=>{
+win.ISA_KR_APP={pairPlan:app.pairPlan,effectiveCap:app.effectiveCap,decisions:()=>app.FUNDS.map(f=>{
  const d=app.verdict(f),x=app.byId[f.id];
  return {id:f.id,type:d.type,title:d.title,reason:d.info,qty:d.qty,quote:x?.close,
   quoteDate:parts.year+'-'+parts.month+'-'+parts.day,hasIntraday:false};
