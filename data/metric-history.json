@@ -51,6 +51,16 @@
         "divergencePct": -0.44421217663966894,
         "volume": 5035759,
         "tradingValueKRW": 19046000000
+      },
+      {
+        "date": "20261105",
+        "marketCapKRW": 1504900000000,
+        "impliedShares": 400239362,
+        "estimatedAUMKRW": 1512504548998,
+        "nav": 3779,
+        "divergencePct": -0.5027785128340789,
+        "volume": 4387429,
+        "tradingValueKRW": 16563000000
       }
     ],
     "robot": [
@@ -103,6 +113,16 @@
         "divergencePct": 0.05589714924538747,
         "volume": 232638,
         "tradingValueKRW": 2035000000
+      },
+      {
+        "date": "20261105",
+        "marketCapKRW": 293500000000,
+        "impliedShares": 33852364,
+        "estimatedAUMKRW": 294414009708,
+        "nav": 8697,
+        "divergencePct": -0.31045187995860646,
+        "volume": 229856,
+        "tradingValueKRW": 2015000000
       }
     ],
     "space": [
@@ -155,6 +175,16 @@
         "divergencePct": -1.7783291976840365,
         "volume": 132244,
         "tradingValueKRW": 1256000000
+      },
+      {
+        "date": "20261105",
+        "marketCapKRW": 308900000000,
+        "impliedShares": 32294825,
+        "estimatedAUMKRW": 310869985450,
+        "nav": 9626,
+        "divergencePct": -0.6337003947641806,
+        "volume": 127617,
+        "tradingValueKRW": 1224000000
       }
     ],
     "sofr": [
@@ -207,6 +237,16 @@
         "divergencePct": 0.03480985118788915,
         "volume": 78369,
         "tradingValueKRW": 898000000
+      },
+      {
+        "date": "20261105",
+        "marketCapKRW": 532100000000,
+        "impliedShares": 46350174,
+        "estimatedAUMKRW": 532934300652,
+        "nav": 11498,
+        "divergencePct": -0.15654896503739524,
+        "volume": 53812,
+        "tradingValueKRW": 618000000
       }
     ],
     "tr": [
@@ -259,6 +299,16 @@
         "divergencePct": -0.14122992846397064,
         "volume": 1357012,
         "tradingValueKRW": 43825000000
+      },
+      {
+        "date": "20261105",
+        "marketCapKRW": 6075000000000,
+        "impliedShares": 197850513,
+        "estimatedAUMKRW": 6070647290379,
+        "nav": 30683,
+        "divergencePct": 0.07170094188964082,
+        "volume": 1304000,
+        "tradingValueKRW": 40344000000
       }
     ],
     "sol": [
@@ -311,6 +361,16 @@
         "divergencePct": -0.2835538752362976,
         "volume": 956819,
         "tradingValueKRW": 8881000000
+      },
+      {
+        "date": "20261105",
+        "marketCapKRW": 529500000000,
+        "impliedShares": 58898776,
+        "estimatedAUMKRW": 528380919496,
+        "nav": 8971,
+        "divergencePct": 0.21179355701705926,
+        "volume": 1232321,
+        "tradingValueKRW": 11165000000
       }
     ]
   }
