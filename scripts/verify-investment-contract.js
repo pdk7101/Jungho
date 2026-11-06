@@ -214,4 +214,27 @@ equal(privateStore.read('isa-us-holdings-v1').cony.qty,17.5,
 equal(privateStore.read('isa-us-holdings-v1').cony.krwNet,12345,
  'existing cumulative post-tax distributions preserved');
 equal(location.hash,'','private holdings fragment removed from URL');
+// Combined same-date user-screenshot import: Kiwoom, US quantities, Toss KR and CONY notes.
+const combinedSample=['2026-11-05',
+ ...['space','sol','tr','reit','sofr','robot'].map(id=>'K:'+id+':5:8000:7500:-2500'),
+ ...['schd','spym','cony','agnc','spacex'].map(id=>'U:'+id+':2.5:40000:-800'),
+ ...['schd','spym','cony','agnc','spacex'].map(id=>'B:'+id+':2.5:15000'),
+ ...['tsofr','treit','ttr','biotech','tspace','media','trobot','hongah','sensor']
+  .map(id=>'D:'+id+':9:26000:-7500'),
+ 'N:cony:5000:1000'].join(';');
+location.hash='#portfolio='+encodeURIComponent(combinedSample);
+equal(importer.importSnapshot().kind,'success','all market groups import together without Toss whole-account total');
+equal(privateStore.read('isa-private-positions-v1').robot.qty,5,'Kiwoom snapshot updated from new date');
+equal(privateStore.read('isa-us-holdings-v1').cony.krwAvg,15000,'exact Toss KRW average cost applied');
+equal(privateStore.read('isa-us-holdings-v1').cony.krwNet,12345,
+ 'existing CONY confirmed net distribution amount is never overridden by note');
+equal(privateStore.read('isa-private-toss-domestic-snapshot-v1').rows.treit.qty,9,
+ 'Toss domestic holdings stored separately from Kiwoom');
+equal(privateStore.read('isa-user-portfolio-snapshot-v1').conyNote.total,5000,
+ 'gross/unspecified CONY dividends stored only as separate note');
+equal(privateStore.read('isa-user-portfolio-snapshot-v1').conyNote.increment,1000,
+ 'recent increase in CONY dividend note preserved');
+equal(location.hash,'','complete portfolio fragment removed from browser address');
+truth(!portfolioCode.includes('isa-us-distributions-krw-v1'),
+ 'import never writes to verified payout ledger');
 console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
