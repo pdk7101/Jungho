@@ -380,22 +380,27 @@ function freshQuote(id){
 function current(x,id){var q=freshQuote(id);return q?Number(q.price):valid(manual[id])?Number(manual[id]):Number(x.close);}
 function verified(id){return !!(hasBars(byId[id])&&!stale(byId[id]));}
 function effectiveCap(id){
+ // Three independent modes: moving-average only, user cap only, and lower of both.
  if(!['robot','space','sol'].includes(id))return {value:null,reason:'상한 대상 종목 아님'};
- var key=id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap',manualCap=settings[key];
- if(!valid(manualCap))return {value:null,reason:'직접 지정 상한 없음'};
- if(settings.capMode==='manual')return {value:Number(manualCap),manual:Number(manualCap),auto:null,reason:'직접 지정',mode:'manual'};
+ var key=id==='robot'?'robotCap':id==='space'?'spaceCap':'solCap';
+ var mode=['ma','manual','both'].includes(settings.capMode)?settings.capMode:'ma';
+ var manualCap=valid(settings[key])?Number(settings[key]):null;
+ if(mode==='manual')return {value:manualCap,manual:manualCap,auto:null,mode:mode,
+  reason:manualCap===null?'직접 지정 상한 입력 필요':'직접 지정 상한'};
+ if(mode==='both'&&manualCap===null)return {value:null,manual:null,auto:null,mode:mode,reason:'직접 지정 상한 입력 필요'};
  var x=byId[id];
- if(!verified(id))return {value:null,manual:Number(manualCap),auto:null,reason:'확정 일봉/이동평균 데이터 확인 대기',mode:'auto'};
+ if(!verified(id))return {value:null,manual:manualCap,auto:null,mode:mode,reason:'확정 일봉·이동평균선 확인 대기'};
  var t=x.trend;
- if(!valid(t.ma20)||!valid(t.ma5))return {value:null,manual:Number(manualCap),auto:null,reason:'5·20일 이동평균선 부족',mode:'auto'};
+ if(!valid(t.ma20)||!valid(t.ma5))return {value:null,manual:manualCap,auto:null,mode:mode,reason:'5·20일선 자료 부족'};
  var up=Number(t.ma5)>Number(t.ma20)&&!!t.maRising;
  var down=Number(t.ma5)<Number(t.ma20)&&!t.maRising;
  var scale=up?1.02:down?0.98:1;
  var auto=round5(Number(t.ma20)*scale);
- if(!valid(auto))return {value:null,manual:Number(manualCap),auto:null,reason:'자동 상한 계산 실패',mode:'auto'};
- return {value:Math.min(auto,Number(manualCap)),manual:Number(manualCap),auto:auto,
-  reason:up?'상승: 20일선 × 102%':down?'약세: 20일선 × 98%':'중립: 20일선 × 100%',
-  mode:'auto',sourceDate:x.date};
+ if(!valid(auto))return {value:null,manual:manualCap,auto:null,mode:mode,reason:'이동평균선 상한 계산 실패'};
+ var reason=up?'상승: 20일선 × 102%':down?'약세: 20일선 × 98%':'중립: 20일선 × 100%';
+ if(mode==='ma')return {value:auto,manual:manualCap,auto:auto,mode:mode,reason:'이동평균선 자동 · '+reason,sourceDate:x.date};
+ return {value:Math.min(auto,manualCap),manual:manualCap,auto:auto,mode:mode,
+  reason:'이동평균선 & 직접 지정 · '+reason+' · 더 낮은 상한 선택',sourceDate:x.date};
 }
 function capStop(id){
  var cap=effectiveCap(id);
@@ -407,8 +412,10 @@ function renderCaps(){
   var label=id==='robot'?'RISE AI&로봇':id==='space'?'1Q 미국우주항공':'SOL 200타겟';
   var cap=effectiveCap(id),q=freshQuote(id);
   return '<p><b>'+label+'</b> · 적용 매수상한 <b>'+(valid(cap.value)?money(cap.value):'계산 대기')+
-   '</b> ('+safe(cap.reason)+(cap.mode==='auto'&&valid(cap.auto)?
-   ' · 자동 '+money(cap.auto)+' / 내가 정한 상한 '+money(cap.manual):'')+
+   '</b> ('+safe(cap.reason)+(cap.mode==='both'&&valid(cap.auto)&&valid(cap.manual)?
+   ' · 이동평균선 '+money(cap.auto)+' / 직접 지정 '+money(cap.manual):
+   cap.mode==='ma'&&valid(cap.auto)?' · 자동 계산 '+money(cap.auto):
+   cap.mode==='manual'&&valid(cap.manual)?' · 직접 입력 '+money(cap.manual):'')+
    ') · '+(q?'당일 체결가 '+money(q.price):'당일 가격 확인 대기')+'</p>';
  }).join('');
 }
