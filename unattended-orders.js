@@ -89,15 +89,16 @@ function importTossConfirmation(){
 function rules(){
  const s=read('isa-rules')||{},val=(k,f)=>pos(s[k])?Number(s[k]):f;
  const manual={robot:val('robotCap',9500),space:val('spaceCap',9700),sol:val('solCap',10000)};
- const mode=s.capMode==='manual'?'manual':'auto';
+ const mode=['ma','manual','both'].includes(s.capMode)?s.capMode:'ma';
  // The Korean decision engine is the single source for effective MA and manual caps.
  const capInfo={};
  for(const id of ['robot','space','sol']){
   const result=window.ISA_KR_APP?.effectiveCap?.(id);
-  capInfo[id]=result||{value:mode==='manual'?manual[id]:null,mode,reason:'일봉·이평선 확인 대기'};
+  capInfo[id]=result||{value:mode==='manual'?manual[id]:null,mode,reason:mode==='manual'?'직접 지정 상한':'이동평균선 자료 확인 대기'};
  }
  const caps={};
  for(const id of ['robot','space','sol']){
+  // Missing dynamic ceilings do not become manual trading ceilings: fallback is for conservative budget estimates only.
   caps[id]=pos(capInfo[id].value)?Number(capInfo[id].value):manual[id];
  }
  const trBase=val('trBase',31150);
@@ -216,7 +217,7 @@ function budget(){
  const r=rules(),pair=pairInfo(),qty=id=>Math.max(0,Number(plan[id])||0);
  const shareRobot=pair.known?(pair.robot==='buy'?qty('robotDaily'):0):qty('robotDaily');
  const shareSpace=pair.known?(pair.space==='buy'?qty('spaceDaily'):0):qty('spaceDaily');
- const uncertain=!pair.known||pair.solQty===null||r.mode==='auto'&&['robot','space','sol'].some(id=>!pos(r.capInfo[id].value));
+ const uncertain=!pair.known||pair.solQty===null||r.mode!=='manual'&&['robot','space','sol'].some(id=>!pos(r.capInfo[id].value));
  const shareReit=uncertain?4:pair.reitQty;
  const shareSol=uncertain?1:pair.solQty;
  const rob=shareRobot*r.robot,space=shareSpace*r.space,sol=shareSol*r.sol;
