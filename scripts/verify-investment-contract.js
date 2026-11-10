@@ -33,7 +33,8 @@ equal(app.FUNDS.map(x=>[x.id,x.code]),[
 ],'Korean symbols and code identifiers');
 equal([app.defaults.robotCap,app.defaults.spaceCap,app.defaults.solCap,app.defaults.trBase],
  [9500,9700,10000,31150],'Korean direct price caps and KODEX watch base');
-equal(app.defaults.capMode,'auto','moving-average calculation enabled by default');
+equal(app.defaults.capMode,'ma','moving-average-only is the default buy cap mode');
+for(const mode of ['ma','manual','both'])truth(html.includes('value="'+mode+'"'),mode+' appears in mode selector');
 truth(html.indexOf('id="cap-settings"')<html.indexOf('id="summary"'),
  'manual limit controls appear above Korean stock recommendations');
 for(const id of ['robotCap','spaceCap','solCap'])
@@ -98,7 +99,7 @@ equal(app.freshQuote('space'),null,'prior-day quote rejected');
 
 // Moving-average mode: compare each validated intraday price with dynamic cap.
 delete app.manual.robot; // Clear the earlier manual-price test override.
-app.settings.capMode='auto';
+app.settings.capMode='ma';
 app.byId.robot=bars('robot',9300);
 app.byId.space=bars('space',9350);
 app.byId.sol=bars('sol',9750);
@@ -112,15 +113,29 @@ equal(app.effectiveCap('robot').value,9180,'rising trend auto cap is 102% of MA2
 app.setQuotes({robot:trade(9150),space:trade(9350),sol:trade(9400)});
 equal(verdict('robot').type,'buy','fresh robot quote below dynamic cap still respects existing entry conditions');
 app.settings.robotCap=9000;
-equal(app.effectiveCap('robot').value,9000,'user-defined cap is always a hard upper bound in auto mode');
-equal(verdict('robot').type,'stop','manual user cap overrides higher moving-average cap');
-app.settings.robotCap=9500;
+equal(app.effectiveCap('robot').value,9180,'MA-only uses calculated upper cap and ignores lower manual price limit');
+equal(verdict('robot').type,'buy','MA-only decision independent from manually entered ceiling');
+app.settings.capMode='both';
+equal(app.effectiveCap('robot').value,9000,'combined chooses lower of MA and manual upper cap');
+equal(verdict('robot').type,'stop','combined cap blocks live price over the manually specified limit');
 app.settings.capMode='manual';
-equal(app.effectiveCap('robot').value,9500,'manual mode bypasses automatic MA cap');
-app.settings.capMode='auto';
+equal(app.effectiveCap('robot').value,9000,'manual-only uses exactly the user-entered upper cap');
+equal(verdict('robot').type,'stop','manual-only blocks quote above user-entered price limit');
+app.settings.robotCap=9500;
+equal(app.effectiveCap('robot').value,9500,'manual-only ignores lower moving-average ceiling');
+equal(verdict('robot').type,'buy','manual-only permits quote under manual cap when other criteria hold');
+app.settings.capMode='both';
+equal(app.effectiveCap('robot').value,9180,'combined selects MA cap when it is lower than manual cap');
+app.settings.capMode='ma';
+app.settings.capMode='ma';
 app.byId.sol=bars('sol',9750,'20260102');
 equal(app.solDailyEntry().state,'wait','missing/expired SOL daily bars cannot produce a substitute trade');
 equal(app.effectiveCap('sol').value,null,'invalid MA data never invents a dynamic upper limit');
+app.settings.capMode='manual';
+equal(app.effectiveCap('sol').value,10000,'manual cap value remains available without recent MA bars');
+app.settings.capMode='both';
+equal(app.effectiveCap('sol').value,null,'combined mode refuses to fabricate a missing MA cap');
+app.settings.capMode='ma';
 app.byId.sol=bars('sol',9750);
 app.settings.capMode='manual';
 const isMonday=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',weekday:'short'})
