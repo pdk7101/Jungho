@@ -26,7 +26,7 @@ const FixedDate=class extends Date{constructor(...args){super(...(args.length?ar
 const appCode=html.slice(html.indexOf('var FUNDS='),html.indexOf('function chart(bars){'));
 truth(appCode.includes('window.ISA_KR_APP='),'domestic decision module is present');
 const app=new Function('window','localStorage','document','Date',appCode+
- '\nreturn {FUNDS,defaults,settings,positions,byId,manual,verdict,pairPlan,solDailyEntry,effectiveCap,current,freshQuote,setQuotes:q=>liveQuotes=q};')(
+ '\nreturn {FUNDS,defaults,settings,positions,byId,manual,verdict,pairPlan,solDailyEntry,effectiveCap,ma20Comparison,current,freshQuote,setQuotes:q=>liveQuotes=q};')(
  win,loc,{getElementById:()=>null},FixedDate);
 equal(app.FUNDS.map(x=>[x.id,x.code]),[
  ['reit','329200'],['sol','0167B0'],['robot','469070'],
@@ -57,6 +57,20 @@ app.positions.robot={avg:9500,qty:3};
 app.positions.space={avg:9600,qty:3};
 const trade=p=>({price:p,tradeAt:'2026-11-02T05:00:00.000Z',date:today,method:'published'});
 const verdict=id=>app.verdict(app.FUNDS.find(f=>f.id===id));
+truth(html.indexOf('id="ma20-panel"')<html.indexOf('id="summary"'),
+ '20-day moving average overview is visible before the buy-plan summary');
+truth(html.includes('id="ma20-list"'),
+ '20-day comparison list has its own display container');
+equal(app.ma20Comparison('reit').ma20,3955,'20-day moving average is derived from confirmed bar data');
+equal(app.ma20Comparison('reit').delta,-150,'20-day price difference uses latest confirmed close');
+truth(app.ma20Comparison('reit').note.includes('하락 추세 주의'),
+ '20-day bearish reading is an observation, not a forced BUY');
+app.setQuotes({reit:{price:4000,tradeAt:'2026-11-02T05:00:00.000Z',date:today,method:'published'}});
+equal(app.ma20Comparison('reit').price,4000,'verified same-day quote is compared against confirmed 20-day mean');
+app.byId.reit=bars('reit',3805,'20260102');
+equal(app.ma20Comparison('reit').ready,false,'stale moving average is not shown as current');
+app.byId.reit=bars('reit',3805);
+app.setQuotes({});
 app.settings.capMode='manual'; // Preserve the legacy manual-price tests while evaluating new auto mode independently.
 for(const [robot,space,solPrice,reit,sol] of [
  [9300,9350,9400,1,0],[9501,9350,9400,2,1],
