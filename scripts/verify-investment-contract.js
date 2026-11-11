@@ -57,10 +57,14 @@ app.positions.robot={avg:9500,qty:3};
 app.positions.space={avg:9600,qty:3};
 const trade=p=>({price:p,tradeAt:'2026-11-02T05:00:00.000Z',date:today,method:'published'});
 const verdict=id=>app.verdict(app.FUNDS.find(f=>f.id===id));
-truth(html.indexOf('id="ma20-panel"')<html.indexOf('id="summary"'),
- '20-day moving average overview is visible before the buy-plan summary');
-truth(html.includes('id="ma20-list"'),
- '20-day comparison list has its own display container');
+truth(!html.includes('id="ma20-panel"'),
+ 'standalone top 20-day moving average panel has been removed');
+truth(html.includes('function renderMa20InCard(id)'),
+ 'moving average is rendered directly inside each ETF card');
+truth(html.includes('avgText+renderMa20InCard(f.id)+tag'),
+ 'moving average appears after average-cost comparison and before buy status');
+truth(html.includes('20일선 대비'),
+ 'card shows price-to-MA20 distance in KRW and percent');
 equal(app.ma20Comparison('reit').ma20,3955,'20-day moving average is derived from confirmed bar data');
 equal(app.ma20Comparison('reit').delta,-150,'20-day price difference uses latest confirmed close');
 truth(app.ma20Comparison('reit').note.includes('하락 추세 주의'),
