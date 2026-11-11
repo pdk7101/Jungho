@@ -336,11 +336,11 @@ details[open]>summary{margin-bottom:12px}
 'use strict';
 var FUNDS=[
 {id:'reit',name:'TIGER 리츠부동산인프라',code:'329200',plan:'로봇·우주 매수 2/1/0종목에 따라 1/2/3주 적립'},
+{id:'sol',name:'SOL 200타겟위클리커버드콜',code:'0167B0',plan:'대체매수 최대 1주'},
 {id:'robot',name:'RISE AI&로봇',code:'469070',plan:'9,500원 상한 · 소액 분할 검토'},
 {id:'space',name:'1Q 미국우주항공테크',code:'0131V0',plan:'9,700원 상한 · 소액 분할 검토'},
 {id:'sofr',name:'KODEX 미국달러SOFR',code:'455030',plan:'키움 주식모으기 매주 월요일 1주'},
-{id:'tr',name:'KODEX 200TR',code:'278530',plan:'기준가 대비 -5% 감시'},
-{id:'sol',name:'SOL 200타겟위클리커버드콜',code:'0167B0',plan:'대체매수 최대 1주'}
+{id:'tr',name:'KODEX 200TR',code:'278530',plan:'기준가 대비 -5% 감시'}
 ];
 var defaults={robotCap:9500,spaceCap:9700,solCap:10000,trBase:31150,dailyBudget:'',capMode:'ma'},settings=Object.assign({},defaults);
 var positions={},byId={},liveQuotes={},liveSource=null,liveError=null,liveBusy=false,lastLiveCheckedAt=null,selected='reit',manual={},loadTime=null,dataSignature=null;
