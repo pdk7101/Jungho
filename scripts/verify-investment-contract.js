@@ -28,9 +28,15 @@ const app=new Function('window','localStorage','document','Date',appCode+
  '\nreturn {FUNDS,defaults,settings,positions,byId,manual,verdict,pairPlan,solDailyEntry,effectiveCap,current,freshQuote,setQuotes:q=>liveQuotes=q};')(
  win,loc,{getElementById:()=>null},FixedDate);
 equal(app.FUNDS.map(x=>[x.id,x.code]),[
- ['reit','329200'],['robot','469070'],['space','0131V0'],
- ['sofr','455030'],['tr','278530'],['sol','0167B0']
-],'Korean symbols and code identifiers');
+ ['reit','329200'],['sol','0167B0'],['robot','469070'],
+ ['space','0131V0'],['sofr','455030'],['tr','278530']
+],'Korean ETF cards and symbols ordered REIT SOL Robot Space SOFR 200TR');
+truth(html.indexOf('id="funds"')<html.indexOf('id="us-panel"'),
+ 'all six Korean ETF cards appear before the US stocks section');
+truth(brokerCode.includes("const KR=['reit','sol','robot','space','sofr']"),
+ 'broker checklist preserves same Korean ETF order before the TR watch item');
+truth(portfolioCode.includes("const KR=['reit','sol','robot','space','sofr','tr']"),
+ 'stored portfolio snapshot uses the same Korean ETF order');
 equal([app.defaults.robotCap,app.defaults.spaceCap,app.defaults.solCap,app.defaults.trBase],
  [9500,9700,10000,31150],'Korean direct price caps and KODEX watch base');
 equal(app.defaults.capMode,'ma','moving-average-only is the default buy cap mode');
