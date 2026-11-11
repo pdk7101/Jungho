@@ -7,6 +7,7 @@ import fs from 'node:fs';
 const txt=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const html=txt('index.html'), brokerCode=txt('unattended-orders.js');
 const liveCode=txt('live-prices.js'), portfolioCode=txt('portfolio-import.js');
+const usKrwCode=txt('us-krw.js');
 let n=0;
 function equal(a,b,label){assert.deepEqual(a,b,label);console.log('OK',++n,label)}
 function truth(v,label){assert.ok(v,label);console.log('OK',++n,label)}
@@ -258,4 +259,22 @@ equal(privateStore.read('isa-user-portfolio-snapshot-v1').conyNote.increment,100
 equal(location.hash,'','complete portfolio fragment removed from browser address');
 truth(!portfolioCode.includes('isa-us-distributions-krw-v1'),
  'import never writes to verified payout ledger');
+truth(html.includes('data-auto-kr-id='),'Korean holding editor has automatically sourced read-only reference prices');
+truth(html.includes("querySelectorAll('input[data-pos]')"),
+ 'read-only Korean prices never trigger cost-basis/quantity edits');
+truth(html.includes('확정 일봉 종가 · 당일 현재가 아님'),
+ 'Korean previous close is identified as historical, not a live price');
+truth(usKrwCode.includes('data-auto-krw-id='),
+ 'US holding editor displays an automatically calculated KRW price');
+truth(usKrwCode.includes('data-auto-krw-id="'+String.fromCharCode(39)),
+ 'US editor uses distinct non-editable auto quote input');
+truth(usKrwCode.includes("querySelectorAll('input[data-krw-id]')"),
+ 'US auto quote display is excluded from manual-holdings save handler');
+truth(usKrwCode.includes("window.addEventListener('isa-us-quotes-refreshed',()=>render())"),
+ 'US auto quote display refreshes after published US market data changes');
+truth(usKrwCode.includes("if(k==='krwCurrent')p.krwDay="),
+ 'US Toss user-confirmed manual price still expires daily');
+truth(usKrwCode.includes("const LEDGER_KEY='isa-us-distributions-krw-v1'"),
+ 'US historical distribution ledger remains untouched');
+
 console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
