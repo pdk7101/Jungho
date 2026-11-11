@@ -263,6 +263,14 @@ details[open]>summary{margin-bottom:12px}
 .intraday-signal-row p{font-size:.75rem;margin:6px 0}
 .intraday-signal-changes{color:#c4dafa;font-size:.81rem;margin:8px 0}
 #intraday-enable-notifications{margin-top:8px;font-size:.8rem;padding:10px}
+.ma20-list{display:grid;gap:7px;margin-top:10px}
+.ma20-item{border:1px solid #42536d;border-radius:10px;padding:11px 12px;background:#16253b}
+.ma20-item-head{display:flex;gap:8px;justify-content:space-between;align-items:baseline;flex-wrap:wrap}
+.ma20-item-head strong{font-size:.91rem}
+.ma20-item-head b{font-size:1.06rem;color:#e6efff}
+.ma20-item-line{font-size:.82rem;line-height:1.65;color:#c8d5e9;margin-top:3px}
+.ma20-item-note{font-size:.78rem;color:#b6c4db;margin-top:3px;line-height:1.6}
+.ma20-negative{color:#8dd0fb}.ma20-positive{color:#f1a7ad}
 </style><script src="./live-prices.js"></script></head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel flex"><div><b>한국 ETF 장중 공개 시세 자동 갱신 · 약 60초 간격 (페이지 열린 동안)</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
@@ -281,6 +289,12 @@ details[open]>summary{margin-bottom:12px}
  </div>
  <div id="cap-preview" class="context" role="status">5·20일선 확인 후 적용 상한을 표시합니다.</div>
  <p class="fieldset-note">이동평균선 자동: 상승 추세는 20일선 × 102%, 약세는 × 98%, 나머지는 × 100%의 자동 상한만 적용합니다. 직접 지정: 입력한 상한만 적용합니다. 이동평균선 & 직접 지정: 두 상한 중 낮은 값을 적용합니다. 이동평균선은 확정 일봉, 가격 비교는 당일 공개 체결가입니다. 자료 미확인 시 매수판단은 대기합니다.</p>
+</section>
+<section class="panel" id="ma20-panel">
+ <h2>20일 이동평균선 가격 · 매수 시점 참고</h2>
+ <p class="sub">6종목의 확정 20거래일 종가 평균과 현재 확인 가능한 가격의 거리(원·%)를 비교합니다. 당일 가격이 미확인되면 기준일을 표시한 확정 종가를 사용합니다.</p>
+ <div id="ma20-list" class="ma20-list">20일 이동평균 자료 확인 중입니다.</div>
+ <p class="fieldset-note">20일선 아래라는 이유만으로 매수하지 않습니다. 20일선 방향·5일선·기존 매수상한도 함께 확인하세요. '관찰' 표시는 실제 주문이나 매수 신호가 아닙니다. 자료가 오래되면 비교를 보류합니다.</p>
 </section>
 <div class="legend"><span class="state-buy"><b>●</b> 매수 · 조건 충족(주문 아님)</span><span class="state-stop"><b>●</b> 중지 · 상한 초과</span><span class="state-wait"><b>●</b> 대기 · 미충족·확인 필요</span></div>
 <section class="panel" id="summary"><b>오늘의 매수계획 점검</b><p class="sub">당일 체결시각을 검증한 현재가가 있으면 우선 반영합니다. 5·20일선은 확정 일봉 기준이며 실제 증권사 주문은 실행하지 않습니다.</p><div id="plan">시세 확인 중</div></section>
@@ -405,6 +419,38 @@ function effectiveCap(id){
 function capStop(id){
  var cap=effectiveCap(id);
  return verified(id)&&valid(cap.value)&&current(byId[id],id)>cap.value;
+}
+function ma20Comparison(id){
+ var x=byId[id],q=freshQuote(id);
+ if(!verified(id))return {ready:false,reason:'확정 20거래일 종가·이동평균 자료가 부족하거나 오래됨'};
+ var ma20=Number(x.trend.ma20),ma5=Number(x.trend.ma5);
+ if(!valid(ma20)||!valid(ma5))return {ready:false,reason:'20일선·5일선 계산값 확인 불가'};
+ var price=q?Number(q.price):Number(x.close);
+ if(!valid(price))return {ready:false,reason:'당일 가격 또는 확정 종가 확인 불가'};
+ var delta=price-ma20,ratio=100*delta/ma20,t=x.trend;
+ var note=Math.abs(ratio)<=1?'20일선 근접 · 지지/저항 확인 필요':
+  ratio<0?(t.maRising?'20일선 아래 · 반등 확인 필요':'20일선 아래 · 하락 추세 주의'):
+  ratio>3?'20일선에서 이격 확대 · 추격매수 주의':
+  t.maRising&&t.ma5Above20?'20일선 위 · 상승 추세 유지 관찰':'20일선 위 · 5일선/20일선 방향 확인';
+ return {ready:true,ma20:ma20,ma5:ma5,price:price,delta:delta,ratio:ratio,
+  note:note,maRising:!!t.maRising,ma5Above20:!!t.ma5Above20,day:day(x.date),
+  source:q?'당일 공개 체결가'+(q.method==='published'?' (지연 게시 가능)':''):
+   '확정 일봉 종가 (당일 현재가 아님)'};
+}
+function renderMa20(){
+ var host=el('ma20-list');if(!host)return;
+ host.innerHTML=FUNDS.map(function(f){
+  var z=ma20Comparison(f.id);
+  if(!z.ready)return '<div class="ma20-item"><div class="ma20-item-head"><strong>'+safe(f.name)+
+   '</strong><b>20일선 자료 대기</b></div><div class="ma20-item-note">'+safe(z.reason)+'</div></div>';
+  var gap=(z.delta>=0?'+':'')+avgMoney(z.delta),pct=(z.ratio>=0?'+':'')+z.ratio.toFixed(2)+'%';
+  return '<div class="ma20-item"><div class="ma20-item-head"><strong>'+safe(f.name)+'</strong>'+
+   '<span>20일선 <b>'+avgMoney(z.ma20)+'</b></span></div>'+
+   '<div class="ma20-item-line">비교가격 '+money(z.price)+' · 20일선 대비 <b class="'+
+   (z.delta>=0?'ma20-positive':'ma20-negative')+'">'+gap+' ('+pct+')</b></div>'+
+   '<div class="ma20-item-note">'+safe(z.note)+' · 5일선 '+avgMoney(z.ma5)+
+   ' · 20일선 '+(z.maRising?'상승·횡보':'하락')+' · '+safe(z.day)+' 기준 · '+safe(z.source)+'</div></div>';
+ }).join('');
 }
 function renderCaps(){
  var host=el('cap-preview');if(!host)return;
@@ -557,6 +603,7 @@ window.ISA_KR_APP={
  pairPlan:pairPlan,
  solDailyEntry:solDailyEntry,
  effectiveCap:effectiveCap,
+ ma20Comparison:ma20Comparison,
  refreshLive:function(){return refreshLiveQuotes();},
  quoteStatus:function(){var quotes={};FUNDS.forEach(function(f){var q=freshQuote(f.id);if(q)quotes[f.id]=q;});return {quotes:quotes,error:liveError,source:liveSource,checkedAt:lastLiveCheckedAt};},
  decisions:function(){
@@ -636,6 +683,7 @@ function renderPlan(){
 }
 function render(){
  updateKrAutoPriceFields();
+ renderMa20();
  renderCaps();
  renderPlan();
  var list=el('funds');
