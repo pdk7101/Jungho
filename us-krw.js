@@ -36,6 +36,35 @@ function priceKrw(id,priceUsd){
  return null;
 }
 
+// Automated public reference quote for the editor; never stored as a Toss override.
+function automaticReferenceKrw(id){
+ const data=window.ISA_US_APP?.getData?.();
+ const x=data?.items?.find(item=>item&&item.id===id);
+ if(!x?.ok||!finitePositive(x.close)||!/[0-9]{8}/.test(String(x.date||''))||String(x.date).length!==8)return null;
+ const dateString=String(x.date);
+ const d=new Date(dateString.slice(0,4)+'-'+dateString.slice(4,6)+'-'+dateString.slice(6,8)+'T12:00:00Z');
+ const age=Date.now()-d.getTime();
+ if(!Number.isFinite(age)||age < -86400000||age > 8*86400000)return null;
+ const referenceFx=fx();
+ if(!referenceFx)return null;
+ const amount=Number(x.close)*referenceFx.rate;
+ if(!finitePositive(amount))return null;
+ return {amount,asOf:dateString.slice(0,4)+'-'+dateString.slice(4,6)+'-'+dateString.slice(6,8),
+  source:usd(x.close)+' (USD 확정 종가) × '+referenceFx.source+' '+won(referenceFx.rate,2)};
+}
+function refreshAutoQuoteFields(){
+ const area=$('us-krw-editor');if(!area)return;
+ for(const ticker of ITEMS){
+  const id=ticker.toLowerCase(),q=automaticReferenceKrw(id);
+  const input=area.querySelector('input[data-auto-krw-id="'+id+'"]');
+  const status=area.querySelector('[data-auto-krw-label="'+id+'"]');
+  if(input)input.value=q?String(Math.round(q.amount*100)/100):'';
+  if(status)status.textContent=q?
+    '기준 '+q.asOf+' · '+q.source+' · 토스 앱의 실제 현재가와 다를 수 있음':
+    '공개 USD 종가 또는 환율 미확인 · 미국장 자료 조회 시 자동 표시';
+ }
+}
+
 /* Private, user-entered Korean-won dividend/distribution ledger.
  * The public price feed never claims to know actual after-tax Korean receipts. */
 const LEDGER_KEY='isa-us-distributions-krw-v1';
@@ -293,11 +322,14 @@ function renderForm(){
   return '<div class="us-krw-form-row"><strong>'+ticker+'</strong>'+
    '<label>보유수량 (주)<input data-krw-id="'+id+'" data-k="qty" type="number" min="0" step="0.000001" value="'+fmt(p.qty)+'"></label>'+
    '<label>토스 원화 평단 (원)<input data-krw-id="'+id+'" data-k="krwAvg" type="number" min="0" step="0.01" value="'+fmt(p.krwAvg)+'"></label>'+
-   '<label>토스 현재가 (원 · 당일만)<input data-krw-id="'+id+'" data-k="krwCurrent" type="number" min="0" step="0.01" value="'+(p.krwDay===day()?fmt(p.krwCurrent):'')+'"></label>'+
+   '<label>자동 원화 참고현재가 (원 · 확정 일봉)<input type="number" data-auto-krw-id="'+id+'" readonly aria-readonly="true" placeholder="미국장 조회 후 표시" value=""></label>'+
+   '<small class="us-small" data-auto-krw-label="'+id+'">공개 확정 종가와 환율 조회 중</small>'+
+   '<label>토스 원화 현재가 직접 보정 (원 · 오늘만, 선택)<input data-krw-id="'+id+'" data-k="krwCurrent" type="number" min="0" step="0.01" placeholder="자동 참고가 사용 시 공란" value="'+(p.krwDay===day()?fmt(p.krwCurrent):'')+'"></label>'+
    '<label>누적 세후 배당·분배금 (원)<input data-krw-id="'+id+'" data-k="krwNet" type="number" min="0" step="0.01" value="'+fmt(p.krwNet)+'"></label>'+
    '</div>';
  }).join('');
- area.querySelectorAll('input').forEach(input=>input.addEventListener('change',()=>{
+ refreshAutoQuoteFields();
+ area.querySelectorAll('input[data-krw-id]').forEach(input=>input.addEventListener('change',()=>{
   const id=input.dataset.krwId,k=input.dataset.k;
   const h=holdings(),p={...(h[id]||{})},value=input.value.trim()===''?null:Number(input.value);
   if(value!==null&&Number.isFinite(value)&&value>=0&&(k!=='krwAvg'||value>0)&&(k!=='krwCurrent'||value>0))p[k]=value;
@@ -400,6 +432,7 @@ function showRate(){
  area.textContent=r?'적용 환율: 1 USD = '+won(r.rate,2)+' · '+r.source+' ('+r.when+')':'환율 확인 실패 · 환율 직접 입력 또는 토스 현재가를 사용하세요.';
 }
 function render(){
+ refreshAutoQuoteFields();
  showRate();
  showHoldingsCheck();
  showTotal();
@@ -413,14 +446,14 @@ function mount(){
  const holder=document.createElement('div');
  holder.id='us-krw-panel';holder.className='us-krw-panel';
  holder.innerHTML='<h3>미국주식 원화 평단·손익</h3>'+
- '<p class="us-small">달러 일봉과 별도로 토스 원화 현재가·평단을 표시합니다. 개인정보는 GitHub에 전송하지 않고 이 기기에만 저장합니다.</p>'+
+ '<p class="us-small">공개 미국장 확정 종가 × 참고환율을 원화 참고현재가로 자동 표시합니다. 토스 원화 현재가 직접 보정은 선택이며, 실제 주문가격과 다를 수 있습니다. 보유정보는 기기에만 저장합니다.</p>'+
  '<div id="us-krw-rate-status" class="us-small">환율 확인 중…</div>'+
  '<div id="us-krw-holdings-check" class="us-holdings-check"></div>'+
  '<div id="us-krw-total" class="us-total-summary"></div>'+
  '<p id="us-krw-applied" class="us-small" aria-live="polite"></p>'+
  '<label>선택: 직접 적용할 USD/KRW 환율 (원)<input id="us-krw-fx" type="number" min="700" max="3000" step="0.01" placeholder="비워두면 수집한 참고 환율 사용" value="'+(manualFx||'')+'"></label>'+
- '<details id="us-krw-details"><summary>토스 보유수량·원화 평단·현재가 입력</summary>'+
- '<p class="us-small">현재가는 입력 당일에만 사용하고 다음 날에는 만료합니다. 1줄에 티커 / 수량 / 원화 평단 / 현재가 순으로 붙여넣으면 한 번에 저장할 수 있습니다.</p>'+
+ '<details id="us-krw-details"><summary>토스 보유수량·원화 평단·자동 참고현재가</summary>'+
+ '<p class="us-small">참고현재가는 공개 미국장 확정 종가×참고환율로 자동 표시됩니다. 직접 보정 현재가만 당일 유효하며 다음 날 만료합니다. 기존 붙여넣기는 티커 / 수량 / 원화 평단 / 확인한 토스 현재가 순입니다.</p>'+
  '<textarea id="us-krw-import" rows="5" placeholder="SCHD 10 50000 49000&#10;SPYM 5 120000 118000"></textarea>'+
  '<button type="button" id="us-krw-import-button" class="us-header-button">입력한 4종목 저장</button>'+
  '<div id="us-krw-editor"></div>'+
