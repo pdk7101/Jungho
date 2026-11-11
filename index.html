@@ -263,14 +263,12 @@ details[open]>summary{margin-bottom:12px}
 .intraday-signal-row p{font-size:.75rem;margin:6px 0}
 .intraday-signal-changes{color:#c4dafa;font-size:.81rem;margin:8px 0}
 #intraday-enable-notifications{margin-top:8px;font-size:.8rem;padding:10px}
-.ma20-list{display:grid;gap:7px;margin-top:10px}
-.ma20-item{border:1px solid #42536d;border-radius:10px;padding:11px 12px;background:#16253b}
-.ma20-item-head{display:flex;gap:8px;justify-content:space-between;align-items:baseline;flex-wrap:wrap}
-.ma20-item-head strong{font-size:.91rem}
-.ma20-item-head b{font-size:1.06rem;color:#e6efff}
-.ma20-item-line{font-size:.82rem;line-height:1.65;color:#c8d5e9;margin-top:3px}
-.ma20-item-note{font-size:.78rem;color:#b6c4db;margin-top:3px;line-height:1.6}
-.ma20-negative{color:#8dd0fb}.ma20-positive{color:#f1a7ad}
+.fund-ma20{margin:11px 0 8px;padding:11px 12px;border:1px solid #526c90;border-radius:9px;background:#12273f;line-height:1.55}
+.fund-ma20-main{font-size:.91rem;color:#e3eefc}
+.fund-ma20-main strong{font-size:1.05rem;color:#f0f7ff}
+.fund-ma20-gap{font-size:.85rem;color:#d7e7f9;margin-top:3px}
+.fund-ma20-detail{font-size:.77rem;color:#b3c9df;margin-top:3px}
+.fund-ma20-up{color:#ffb1b5}.fund-ma20-down{color:#8ad0f9}
 </style><script src="./live-prices.js"></script></head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel flex"><div><b>한국 ETF 장중 공개 시세 자동 갱신 · 약 60초 간격 (페이지 열린 동안)</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
@@ -289,12 +287,6 @@ details[open]>summary{margin-bottom:12px}
  </div>
  <div id="cap-preview" class="context" role="status">5·20일선 확인 후 적용 상한을 표시합니다.</div>
  <p class="fieldset-note">이동평균선 자동: 상승 추세는 20일선 × 102%, 약세는 × 98%, 나머지는 × 100%의 자동 상한만 적용합니다. 직접 지정: 입력한 상한만 적용합니다. 이동평균선 & 직접 지정: 두 상한 중 낮은 값을 적용합니다. 이동평균선은 확정 일봉, 가격 비교는 당일 공개 체결가입니다. 자료 미확인 시 매수판단은 대기합니다.</p>
-</section>
-<section class="panel" id="ma20-panel">
- <h2>20일 이동평균선 가격 · 매수 시점 참고</h2>
- <p class="sub">6종목의 확정 20거래일 종가 평균과 현재 확인 가능한 가격의 거리(원·%)를 비교합니다. 당일 가격이 미확인되면 기준일을 표시한 확정 종가를 사용합니다.</p>
- <div id="ma20-list" class="ma20-list">20일 이동평균 자료 확인 중입니다.</div>
- <p class="fieldset-note">20일선 아래라는 이유만으로 매수하지 않습니다. 20일선 방향·5일선·기존 매수상한도 함께 확인하세요. '관찰' 표시는 실제 주문이나 매수 신호가 아닙니다. 자료가 오래되면 비교를 보류합니다.</p>
 </section>
 <div class="legend"><span class="state-buy"><b>●</b> 매수 · 조건 충족(주문 아님)</span><span class="state-stop"><b>●</b> 중지 · 상한 초과</span><span class="state-wait"><b>●</b> 대기 · 미충족·확인 필요</span></div>
 <section class="panel" id="summary"><b>오늘의 매수계획 점검</b><p class="sub">당일 체결시각을 검증한 현재가가 있으면 우선 반영합니다. 5·20일선은 확정 일봉 기준이며 실제 증권사 주문은 실행하지 않습니다.</p><div id="plan">시세 확인 중</div></section>
@@ -437,20 +429,20 @@ function ma20Comparison(id){
   source:q?'당일 공개 체결가'+(q.method==='published'?' (지연 게시 가능)':''):
    '확정 일봉 종가 (당일 현재가 아님)'};
 }
-function renderMa20(){
- var host=el('ma20-list');if(!host)return;
- host.innerHTML=FUNDS.map(function(f){
-  var z=ma20Comparison(f.id);
-  if(!z.ready)return '<div class="ma20-item"><div class="ma20-item-head"><strong>'+safe(f.name)+
-   '</strong><b>20일선 자료 대기</b></div><div class="ma20-item-note">'+safe(z.reason)+'</div></div>';
-  var gap=(z.delta>=0?'+':'')+avgMoney(z.delta),pct=(z.ratio>=0?'+':'')+z.ratio.toFixed(2)+'%';
-  return '<div class="ma20-item"><div class="ma20-item-head"><strong>'+safe(f.name)+'</strong>'+
-   '<span>20일선 <b>'+avgMoney(z.ma20)+'</b></span></div>'+
-   '<div class="ma20-item-line">비교가격 '+money(z.price)+' · 20일선 대비 <b class="'+
-   (z.delta>=0?'ma20-positive':'ma20-negative')+'">'+gap+' ('+pct+')</b></div>'+
-   '<div class="ma20-item-note">'+safe(z.note)+' · 5일선 '+avgMoney(z.ma5)+
-   ' · 20일선 '+(z.maRising?'상승·횡보':'하락')+' · '+safe(z.day)+' 기준 · '+safe(z.source)+'</div></div>';
- }).join('');
+function renderMa20InCard(id){
+ var z=ma20Comparison(id);
+ if(!z.ready)return '<div class="fund-ma20"><div class="fund-ma20-main"><b>20일 이동평균선</b> · 자료 확인 대기</div>'+
+  '<div class="fund-ma20-detail">'+safe(z.reason)+' · 확인되지 않은 가격은 추정하지 않습니다.</div></div>';
+ var delta=(z.delta>=0?'+':'')+avgMoney(z.delta);
+ var pct=(z.ratio>=0?'+':'')+z.ratio.toFixed(2)+'%';
+ return '<div class="fund-ma20" data-ma20="'+safe(id)+'">'+
+  '<div class="fund-ma20-main">20일 이동평균선 <strong>'+avgMoney(z.ma20)+'</strong></div>'+
+  '<div class="fund-ma20-gap">비교가격 '+money(z.price)+' · 20일선 대비 <b class="'+
+  (z.delta>=0?'fund-ma20-up':'fund-ma20-down')+'">'+delta+' ('+pct+')</b></div>'+
+  '<div class="fund-ma20-detail">'+safe(z.note)+' · 5일선 '+avgMoney(z.ma5)+
+  ' · 20일선 '+(z.maRising?'상승·횡보':'하락')+'</div>'+
+  '<div class="fund-ma20-detail">20일선 기준 '+safe(z.day)+' · '+safe(z.source)+
+  ' · 관찰용 (매수 신호 아님)</div></div>';
 }
 function renderCaps(){
  var host=el('cap-preview');if(!host)return;
@@ -683,7 +675,7 @@ function renderPlan(){
 }
 function render(){
  updateKrAutoPriceFields();
- renderMa20();
+
  renderCaps();
  renderPlan();
  var list=el('funds');
@@ -692,7 +684,7 @@ function render(){
   var tag=b?'<span class="band-tag '+(b.name==='하단 20%'?'band20':'')+'">'+b.name+'</span>':'';
   var avgText=h?'<div class="card-detail '+(h.canLower?'avg-down':'avg-up')+'">평단 '+avgMoney(h.avg)+' 대비 '+(h.discount>=0?'+':'')+h.discount.toFixed(2)+'%</div>':'<div class="card-detail">평단가 미입력 / 미보유</div>';
   return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+safe(f.plan)+'</small><strong>'+(p?money(p):'미확인')+'</strong><small>'+(live?'오늘 공개 체결가 ('+(live.method==='published'?'GitHub 게시 · 지연 가능':'네이버 직접 조회')+') · 체결 '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+' · '+Math.max(0,Math.floor((Date.now()-new Date(live.tradeAt).getTime())/60000))+'분 경과':'과거 일봉 종가 · '+(hasBars(x)?day(x.date):'확인 불가'))+'</small>'+
-  (['robot','space','sol'].includes(f.id)?'<small>매수 적용상한 '+(valid(effectiveCap(f.id).value)?money(effectiveCap(f.id).value):'확인 대기')+' · '+safe(effectiveCap(f.id).reason)+'</small>':'')+avgText+tag+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+actionLabel(v.type)+'</div></div>';
+  (['robot','space','sol'].includes(f.id)?'<small>매수 적용상한 '+(valid(effectiveCap(f.id).value)?money(effectiveCap(f.id).value):'확인 대기')+' · '+safe(effectiveCap(f.id).reason)+'</small>':'')+avgText+renderMa20InCard(f.id)+tag+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+actionLabel(v.type)+'</div></div>';
  }).join('');
  document.dispatchEvent(new Event('isa-rendered'));
  Array.from(list.querySelectorAll('[data-id]')).forEach(function(node){
