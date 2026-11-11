@@ -5,7 +5,7 @@
 'use strict';
 const KEY='isa-user-portfolio-snapshot-v1';
 const KRKEY='isa-private-positions-v1',USKEY='isa-us-holdings-v1',TDKEY='isa-private-toss-domestic-snapshot-v1';
-const KR=['space','sol','tr','reit','sofr','robot'];
+const KR=['reit','sol','robot','space','sofr','tr'];
 const US=['schd','spym','cony','agnc','spacex'];
 const TD=['tsofr','treit','ttr','biotech','tspace','media','trobot','hongah','sensor'];
 const NAMES={space:'1Q 미국우주항공테크',sol:'SOL 200타겟',tr:'KODEX 200TR',
