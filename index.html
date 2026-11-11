@@ -35,7 +35,7 @@ footer{font-size:.77rem;color:#a8b5ce;line-height:1.5;margin-top:16px}
 
 details>summary{cursor:pointer;font-weight:700;line-height:1.5}
 details[open]>summary{margin-bottom:12px}
-.pos-row{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr) minmax(0,1fr);gap:9px;align-items:end;padding:10px 0;border-bottom:1px solid #35435a}
+.pos-row{display:grid;grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,1fr));gap:9px;align-items:end;padding:10px 0;border-bottom:1px solid #35435a}
 .pos-row:last-child{border-bottom:0}
 .pos-name{font-size:.84rem;font-weight:650;line-height:1.4}
 .pos-sub{font-size:.73rem;color:#98aac6}
@@ -317,7 +317,7 @@ details[open]>summary{margin-bottom:12px}
 <section class="panel">
   <details id="posDetails">
     <summary>내 보유 평단가 · 수량 입력 <span class="pill">기기 안에만 저장</span></summary>
-    <p class="fieldset-note">키움 ISA의 매입가(평단가)와 보유수량을 입력하세요. 입력값은 이 브라우저에만 저장되고 공개 GitHub에는 전송되지 않습니다. 휴대전화·태블릿 간에는 자동 동기화되지 않으며, 보유량이 변하면 갱신해야 합니다. 미보유는 수량 0으로 적고 평단은 비워두세요.</p>
+    <p class="fieldset-note">키움 ISA의 평단가와 보유수량을 입력하세요. 현재가는 검증된 공개 체결가 또는 기준일이 표시된 확정 일봉 종가를 자동 표시합니다. 실제 키움 호가와 다를 수 있습니다. 입력값은 이 브라우저에만 저장되고 공개 GitHub에는 전송되지 않습니다. 휴대전화·태블릿 간에는 자동 동기화되지 않으며, 보유량이 변하면 갱신해야 합니다. 미보유는 수량 0으로 적고 평단은 비워두세요.</p>
     <div id="positions"></div>
     <p id="positionMessage" class="fieldset-note">평단가를 입력하면 박스권 30%·20% 매수 기회와 예상 매수 후 평단가를 볼 수 있습니다.</p>
   </details>
@@ -576,13 +576,30 @@ function chart(bars){
  var plot=function(values){return values.map(function(v,i){return (12+i*276/(values.length-1)).toFixed(1)+','+(83-68*(v-lo)/diff).toFixed(1);}).join(' ');};
  return '<svg viewBox="0 0 300 100" aria-label="20거래일 종가 파랑, 5일선 초록, 20일선 노랑"><line x1="12" y1="83" x2="288" y2="83" stroke="#52627a"/><polyline points="'+plot(all)+'" fill="none" stroke="#60a5fa" stroke-width="2.8"/><polyline points="'+plot(ma5s)+'" fill="none" stroke="#24bf9a" stroke-width="2.3"/><polyline points="'+plot(ma20s)+'" fill="none" stroke="#eab308" stroke-width="2.3"/></svg>';
 }
+function updateKrAutoPriceFields(){
+ var root=el('positions');if(!root)return;
+ FUNDS.forEach(function(f){
+  var id=f.id,live=freshQuote(id),x=byId[id];
+  var close=!live&&verified(id)?Number(x.close):null;
+  var price=live?Number(live.price):close;
+  var input=root.querySelector('input[data-auto-kr-id="'+id+'"]');
+  var status=root.querySelector('[data-auto-kr-source="'+id+'"]');
+  if(input)input.value=valid(price)?String(price):'';
+  if(status)status.textContent=live?
+    '당일 검증 체결가 '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+
+      ' · '+(live.method==='published'?'지연 게시 가능':'네이버 직접 조회'):
+    valid(close)?day(x.date)+' 확정 일봉 종가 · 당일 현재가 아님':
+    '검증된 공개 가격 없음 · 자동 조회 대기';
+ });
+}
 function renderPositions(){
  var place=el('positions');
  place.innerHTML=FUNDS.map(function(f){
   var h=positions[f.id]||{},avg=valid(h.avg)?h.avg:'',qty=qtyValid(h.qty)?h.qty:'';
-  return '<div class="pos-row"><div class="pos-name">'+safe(f.name)+'<div class="pos-sub">'+f.code+'</div></div><label>평단가 (원)<input data-pos="'+f.id+'" data-kind="avg" type="number" min="0" step="0.01" placeholder="평균매수가" value="'+avg+'"></label><label>보유 수량 (주)<input data-pos="'+f.id+'" data-kind="qty" type="number" min="0" step="1" placeholder="수량" value="'+qty+'"></label></div>';
+  return '<div class="pos-row"><div class="pos-name">'+safe(f.name)+'<div class="pos-sub">'+f.code+'</div></div><label>평단가 (원)<input data-pos="'+f.id+'" data-kind="avg" type="number" min="0" step="0.01" placeholder="평균매수가" value="'+avg+'"></label><label>보유 수량 (주)<input data-pos="'+f.id+'" data-kind="qty" type="number" min="0" step="1" placeholder="수량" value="'+qty+'"></label><label>자동 조회 가격 (원)<input data-auto-kr-id="'+f.id+'" readonly aria-readonly="true" placeholder="시세 확인 중" value=""><small class="sub" data-auto-kr-source="'+f.id+'">공개 시세 확인 중</small></label></div>';
  }).join('');
- Array.from(place.querySelectorAll('input')).forEach(function(input){
+ updateKrAutoPriceFields();
+ Array.from(place.querySelectorAll('input[data-pos]')).forEach(function(input){
   input.addEventListener('change',function(){
    var id=this.dataset.pos,kind=this.dataset.kind;
    var h=positions[id]||{avg:'',qty:''},v=this.value.trim();
@@ -618,6 +635,7 @@ function renderPlan(){
  el('plan').innerHTML=message;
 }
 function render(){
+ updateKrAutoPriceFields();
  renderCaps();
  renderPlan();
  var list=el('funds');
