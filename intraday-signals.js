@@ -6,7 +6,7 @@ const $=id=>document.getElementById(id);
 const safe=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&quot;',"'":'&#39;'}[c]));
 const cash=x=>Number(x).toLocaleString('ko-KR',{maximumFractionDigits:0})+'원';
 const NAMES={reit:'TIGER 리츠',robot:'RISE AI&로봇',space:'1Q 미국우주항공',sofr:'KODEX SOFR',tr:'KODEX 200TR',sol:'SOL 200타겟'};
-const order=['robot','space','reit','sol','sofr','tr'];
+const order=['reit','sol','robot','space','sofr','tr'];
 const colors={buy:'매수 검토',stop:'매수 중지',wait:'확인 대기'};
 const prior=new Map();let initialized=false;
 function notice(item){
