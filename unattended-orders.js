@@ -12,7 +12,7 @@ const LABELS={
  sofr:'KODEX 미국달러SOFR',sol:'SOL 200타겟위클리커버드콜',tr:'KODEX 200TR',
  schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY'
 };
-const KR=['reit','robot','space','sofr','sol'],US=['schd','agnc','spym','cony'];
+const KR=['reit','sol','robot','space','sofr'],US=['schd','agnc','spym','cony'];
 const $=id=>document.getElementById(id);
 const won=n=>Math.round(Number(n)).toLocaleString('ko-KR')+'원';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
