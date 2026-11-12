@@ -96,21 +96,27 @@ function cards(){
   const brokerNote=window.ISA_ORDER_PLAN?.note?.(f.id);
   const brokerStatus=brokerNote?.value||'unknown';
   const status=brokerStatus==='running'?'buy':brokerStatus==='paused'?'stop':'wait';
-  const actualText=brokerStatus==='running'?'매수중':brokerStatus==='paused'?'일시중지':'실제 상태 미확인';
-  const decisionText='토스 사용자 확인 기록 '+(brokerNote?.date||'미등록')+' · 기술 판단은 상세화면 참고';
+  const actualText=brokerStatus==='running'?'매수중 기록':brokerStatus==='paused'?'일시중지 기록':'실제 상태 미확인';
+  const decisionText='토스 사용자 확인 기록 '+(brokerNote?.date||'미등록')+' · 실시간 증권사 주문상태 아님';
   const wonPrice=wonQuote&&Number.isFinite(wonQuote.amount)&&wonQuote.amount>0?
    Math.round(wonQuote.amount).toLocaleString('ko-KR')+'원':'원화 미확인';
   const summary=window.ISA_US_KRW?.compactLine?.(f.id,px)||'보유수량·원화 평단 입력 필요';
+  const quoteBasis=wonQuote?.manual?
+   '토스 직접 입력한 당일 원화 가격 · 자동 실시간 시세 아님':
+   x?'미국장 '+date(x.date)+' 확정 종가 × 참고 환율 · 실시간 호가 아님':
+   '미국장 확정 종가 미확인 · 실시간 호가 미연동';
   const selectedClass=selected===f.id?'us-selected':'';
   return '<button class="us-card us-list-row '+selectedClass+'" type="button" data-us="'+f.id+
-   '" aria-label="'+text(f.ticker+' 현재가 '+wonPrice+' '+decisionText+' '+summary)+
+   '" aria-label="'+text(f.ticker+' 원화 참고 표시가격 '+wonPrice+' '+quoteBasis+' '+decisionText+' '+summary)+
    '" aria-pressed="'+(selected===f.id?'true':'false')+'">'+
    '<span class="us-list-top"><strong class="us-list-ticker">'+f.ticker+'</strong>'+
    '<b class="us-list-price">'+text(wonPrice)+'</b>'+
    '<span class="us-list-state state-'+status+'">'+text(actualText)+'</span>'+
    '<span class="us-list-arrow" aria-hidden="true">›</span></span>'+
+   '<span class="us-list-meta">'+text(quoteBasis)+'</span>'+
    '<span class="us-list-meta">'+text(summary)+'</span>'+
-   '<span class="us-list-meta">토스 '+text(brokerNote?.date?'사용자 확인 '+brokerNote.date:'실제 주문 확인 필요')+' · '+text('매일 원화 소수점 적립')+'</span></button>';
+   '<span class="us-list-meta">토스 주문상태 '+text(brokerNote?.date?'마지막 사용자 확인 '+brokerNote.date:'확인 기록 없음')+
+   ' · 증권사 실시간 연동 아님</span></button>';
  }).join('');
  host.querySelectorAll('[data-us]').forEach(btn=>btn.onclick=()=>{
   selected=btn.dataset.us;
@@ -191,7 +197,7 @@ async function refresh(){
   data=d;loadTime=d.fetchedAt;
   const count=FUNDS.filter(f=>market(f)).length;
   const time=loadTime?new Date(loadTime).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'미확인';
-  el.textContent='미국장 완료 일봉 '+count+'/4 · 마지막 수집 '+time+' · 원화 우선(USD 참고) · 실시간 호가 아님';
+  el.textContent='미국장 완료 일봉 '+count+'/4 · 마지막 수집 '+time+' · 미국장 종가×환율 참고 · 실시간 체결가 미연동';
  }catch(e){data=null;if(el)el.textContent='미국장 자료 확인 실패: '+String(e.message||e);}
  render();
  window.dispatchEvent(new Event('isa-us-quotes-refreshed'));
