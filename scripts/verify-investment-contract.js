@@ -8,6 +8,7 @@ const txt=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const html=txt('index.html'), brokerCode=txt('unattended-orders.js');
 const liveCode=txt('live-prices.js'), portfolioCode=txt('portfolio-import.js');
 const usKrwCode=txt('us-krw.js');
+const usDashboardCode=txt('us-dashboard.js');
 let n=0;
 function equal(a,b,label){assert.deepEqual(a,b,label);console.log('OK',++n,label)}
 function truth(v,label){assert.ok(v,label);console.log('OK',++n,label)}
@@ -295,4 +296,12 @@ truth(usKrwCode.includes("if(k==='krwCurrent')p.krwDay="),
 truth(usKrwCode.includes("const LEDGER_KEY='isa-us-distributions-krw-v1'"),
  'US historical distribution ledger remains untouched');
 
+truth(usDashboardCode.includes("date(x.date)+' 확정 종가 × 참고 환율 · 실시간 호가 아님'"),
+ 'US cards clearly label per-symbol date of completed close');
+truth(usDashboardCode.includes("'매수중 기록'")&&usDashboardCode.includes("'일시중지 기록'"),
+ 'US historic broker notes cannot appear as authenticated live broker states');
+truth(usDashboardCode.includes('마지막 사용자 확인 '),
+ 'US card identifies last manual confirmation date');
+truth(usDashboardCode.includes("fetch('./us-quotes.json?refresh="),
+ 'US source remains an explicitly non-live published JSON data file');
 console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
