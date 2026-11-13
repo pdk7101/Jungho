@@ -262,66 +262,6 @@ function mismatch(row){
  if(prior)return '증권사 상태 기록이 오늘 확인한 것이 아님';
  return '';
 }
-function render(){
- const root=$('unattended-orders');if(!root)return;
- const data=rows(),budgetData=budget(),loc=$('uo-budget');
- const tossActual=US.map(id=>({id,...note(id)})),
-  running=tossActual.filter(x=>x.value==='running').length,
-  paused=tossActual.filter(x=>x.value==='paused').length,
-  missing=tossActual.filter(x=>x.value==='unknown').length;
- loc.innerHTML='<div class="uo-summary-grid">'+
- '<div>월 계획 한도<strong>'+won(plan.monthlyMax)+'</strong></div>'+
- '<div>확인된 설정 기반 추정<strong>'+won(budgetData.subtotal)+'</strong></div>'+
- '<div>CONY 별도 현금 유보<strong>'+won(budgetData.cash)+'</strong></div>'+
- '<div>단순 잔여 추정<strong>'+won(budgetData.remaining)+'</strong></div></div>'+
- '<p class="sub"><b>토스 사용자 확인 상태:</b> 매수중 '+running+'종목 · 일시중지 '+paused+'종목 · 미확인 '+missing+'종목. 실시간 토스 계좌 조회가 아닌 이 기기의 기록입니다.</p>'+ 
- (budgetData.remaining<0?'<p class="uo-danger">월 최대 투자한도 초과 예상 · 매일 모으기 금액·수량 조정이 필요합니다.</p>':'')+
- (budgetData.estimatedOnly?'<p class="uo-danger">예산 미완성: '+budgetData.unknown.map(esc).join(' · ')+'. 등록금액 미확인은 0원으로 계산된 항목이 있으므로 남은 예산이 실제보다 많아 보일 수 있습니다.</p>':'')+
- '<p class="sub">SOFR은 매주 월요일 '+budgetData.sofrWeekly+'주 · 이번 달 월요일 '+budgetData.sofrMondays+'회 · 월간 예상 매수대금 '+(budgetData.sofrMonthly?won(budgetData.sofrMonthly):'가격 확인 대기')+' (월요일 공휴일이면 실제 체결일은 달라질 수 있음)</p>'+ 
- '<p class="sub">리츠·SOL 조건별 예상 수량: 리츠 '+(budgetData.conditional.known?budgetData.shares.reit+'주':'미확정')+' / SOL '+(budgetData.conditional.known?budgetData.shares.sol+'주':'미확정')+' · '+esc(budgetData.scenario)+'</p>'+
- '<p class="sub">로봇·우주의 당일 키움 사용자 확인 기록이 있으면 우선 사용하며, 없으면 시세 기반 판단을 참고합니다. 주식모으기 수량이나 중지 상태는 키움에서 자동 변경되지 않습니다. 금액·환율·수수료에 따라 예산은 달라질 수 있습니다.</p>';
- const groups=[['키움증권',data.filter(r=>r.broker==='키움증권')],['토스증권',data.filter(r=>r.broker==='토스증권')]];
- $('uo-order-list').innerHTML=groups.map(([name,items])=>
-  '<h3 class="uo-broker-title">'+esc(name)+'</h3>'+
-  items.map(row=>{
-   const st=note(row.id),warning=mismatch(row),
-    pair=pairInfo(),statusLabel=row.value==='keep'?'매수 유지':row.value==='pause'?'매수 중지':row.value==='watch'?'자동감시':'자료 확인';
-   const badge=US.includes(row.id)?(st.value==='running'?'매수중 · 사용자 확인':st.value==='paused'?'일시중지 · 사용자 확인':'실제 상태 미확인'):
-    KR.includes(row.id)?(st.value==='running'?'키움 매수중 · 사용자 확인':st.value==='paused'?'키움 중지 · 사용자 확인':'키움 실제 상태 미확인'):statusLabel;
-   const options=row.id==='tr'?
-    [['unknown','미확인'],['watching','감시중 확인'],['paused','감시중지 확인'],['filled','체결 확인'],['expired','만료/취소 확인']]:
-    [['unknown','미확인'],['running','주식모으기 매수중 확인'],['paused','주식모으기 중지 확인']];
-   return '<details class="uo-order"><summary class="uo-order-top"><b>'+esc(row.name)+'</b>'+
-    '<span>'+esc(row.mode)+'</span><em class="uo-action action-'+(US.includes(row.id)||KR.includes(row.id)?(st.value==='running'?'keep':st.value==='paused'?'pause':'unknown'):row.value)+'">'+esc(badge)+'</em></summary>'+
-    (KR.includes(row.id)?'':'<p class="uo-state"><b>'+(US.includes(row.id)?'투자 계획:':'프로그램 판단:')+'</b> '+esc(row.label)+'</p>')+
-    '<p class="sub">'+esc(row.details)+'</p>'+ (US.includes(row.id)?'<p class="sub">토스 주문상태: <b>'+esc(st.value==='running'?'매수중':st.value==='paused'?'일시중지':'미확인')+'</b> · '+esc(st.date||'확인일 없음')+' 사용자 확인 기록 (실시간 연동 아님)</p>':'')+
-    (KR.includes(row.id)?'':'<p class="sub"><b>판단 이유:</b> '+esc(row.reason)+'</p>')+
-    (row.id==='sofr'?'<p class="sub">정기매수 기준: 매주 월요일 1주 · 이동평균선 매수조건 없음</p>':
-    row.sourceDate?'<p class="sub">분석 일봉 기준: '+esc(row.sourceDate)+(row.manual?' · 당일 시세 참고':'')+'</p>':
-    '<p class="sub">분석 일봉 기준: 자료 확인 필요</p>')+
-    (warning?'<p class="uo-danger">'+esc(warning)+'</p>':'')+
-    '<div class="uo-record"><label>실제 증권사 상태 (사용자 확인 기록)<select data-uo-status="'+row.id+'">'+
-    options.map(([v,l])=>'<option value="'+v+'"'+(st.value===v?' selected':'')+'>'+l+'</option>').join('')+
-    '</select></label><label>'+(row.id==='tr'?'자동감시 만료일':'마지막 직접 확인 날짜')+
-    (row.id==='tr'?'<input type="date" data-uo-expiry="'+row.id+'" value="'+esc(st.expiry)+'">':
-    '<input type="text" readonly value="'+esc(st.date||'확인기록 없음')+'">')+'</label></div>'+
-    '</details>';
-  }).join('')).join('');
- root.querySelectorAll('[data-uo-status]').forEach(ctrl=>ctrl.addEventListener('change',()=>{
-  const id=ctrl.dataset.uoStatus;
-  records[id]={...(records[id]||{}),status:ctrl.value,checkedDate:dateK()};
-  if(!save(STATE,records)){$('uo-message').textContent='이 기기에 상태를 저장하지 못했습니다.';return;}
-  $('uo-message').textContent=dateK()+' 사용자가 확인한 증권사 상태만 기록했습니다. 실제 증권사 주문은 바뀌지 않았습니다.';
-  render();
- }));
- root.querySelectorAll('[data-uo-expiry]').forEach(ctrl=>ctrl.addEventListener('change',()=>{
-  const id=ctrl.dataset.uoExpiry;
-  records[id]={...(records[id]||{}),expiry:ctrl.value,checkedDate:dateK()};
-  if(!save(STATE,records)){$('uo-message').textContent='이 기기에 만료일을 저장하지 못했습니다.';return;}
-  $('uo-message').textContent='만료일을 기록했습니다. 실제 감시 상태는 키움에서 확인해야 합니다.';
-  render();
- }));
-}
 function checklist(){
  const rs=rows(),a=budget();
  return ['출근 전 주식모으기 매수·중지 점검 '+dateK(),
@@ -334,64 +274,6 @@ function checklist(){
    ' / '+r.details+' / '+r.reason;
   })].join('\n');
 }
-function mount(){
- const anchor=$('summary');if(!anchor)return;
- const section=document.createElement('section');section.className='panel uo-panel';section.id='unattended-orders';
- section.innerHTML='<h2>매일 주식모으기 실제 주문 상태·예산 확인</h2>'+
- '<p class="sub"><b>키움:</b> 리츠·로봇·1Q·SOL은 매일 주식모으기, <b>SOFR은 매주 월요일 1주</b>, KODEX 200TR만 자동감시주문. <b>토스:</b> 미국주식은 매일 원화 소수점 주식모으기입니다. 실제 증권사 설정은 별도로 확인하세요.</p>'+
- '<p class="sub"><b>확인시점:</b> <span id="uo-today">'+dateK()+'</span> · 확정 일봉/비공식 가격 참고 · 이 웹페이지는 계좌에 접속하거나 자동매수를 중지·재개하지 않습니다.</p>'+
- '<div id="uo-budget"></div>'+
- '<details class="uo-settings"><summary>월 예산 및 실제 주식모으기 수량·금액 입력</summary>'+
- '<div class="uo-inputs">'+
- [['monthlyMax','월 투자·유보 예산 한도 (원)',1000],['tradingDays','월 거래일 가정',1],
- ['robotDaily','키움 로봇 매일 최대 수량(주)',1],
- ['spaceDaily','키움 1Q 매일 최대 수량(주)',1],['sofrWeekly','키움 SOFR 월요일마다 매수(주)',1],
- ['trQty','KODEX 200TR 감시 매수 수량(주)',1],
- ['usSchdDaily','토스 SCHD 매일 금액(원)',1000],
- ['usAgncDaily','토스 AGNC 매일 금액(원)',1000],
- ['usSpymDaily','토스 SPYM 매일 금액(원)',1000],
- ['conyCashDaily','CONY 중단으로 유보하는 현금(원/일)',1000],
- ['conyCashDays','CONY 현금 유보 거래일 수',1]
- ].map(([key,label,step])=>'<label>'+label+
- '<input data-uo-plan="'+key+'" type="number" min="0" step="'+step+'" value="'+plan[key]+'"></label>').join('')+
- '</div>'+ 
- '<p class="sub">0으로 남은 금액은 실제 모으기가 꺼져 있다는 뜻이 아니라 등록금액을 아직 입력하지 않았다는 뜻일 수 있습니다. 증권사에 설정한 금액을 정확히 입력해야 월 예산 계산이 맞습니다.</p></details>'+
- '<div id="uo-order-list" class="uo-list"></div>'+
- '<div class="uo-controls"><button type="button" id="uo-copy">오늘 점검표 복사</button>'+
- '<button type="button" id="uo-refresh">상태 다시 확인</button></div>'+
- '<textarea id="uo-copy-area" rows="7" hidden readonly aria-label="오늘 점검표"></textarea>'+
- '<p class="sub" id="uo-message">매일 주식모으기 유지·중지 판단은 앱을 열었을 때 표시됩니다. GitHub Pages가 증권사 계좌를 실시간 변경하지는 않습니다.</p>';
- anchor.insertAdjacentElement('afterend',section);
- const importedToss=importTossConfirmation();
- if(importedToss)$('uo-message').textContent=importedToss;
- section.querySelectorAll('[data-uo-plan]').forEach(inp=>{
-  const key=inp.dataset.uoPlan;
-  inp.addEventListener('change',()=>{
-   {
-    const val=inp.value.trim()===''?0:Number(inp.value),isDays=['tradingDays','conyCashDays'].includes(key);
-    const isShares=['robotDaily','spaceDaily','sofrWeekly','trQty'].includes(key);
-    if(!Number.isFinite(val)||val<0||val>100000000||(isDays&&(!Number.isInteger(val)||val<1||val>25))||
-     (isShares&&!Number.isInteger(val))||(key==='monthlyMax'&&val<1000)){
-     inp.value=plan[key];$('uo-message').textContent='금액·정수 수량·거래일(1~25)을 확인하세요.';return;
-    }
-    plan[key]=val;
-   }
-   if(!save(PLAN,plan))$('uo-message').textContent='기기 저장소에 예산을 저장하지 못했습니다.';
-   else $('uo-message').textContent='계획만 기기에 저장했습니다. 실제 증권사 주식모으기 상태에는 영향을 주지 않습니다.';
-   render();
-  });
- });
- $('uo-copy').onclick=async()=>{
-  const box=$('uo-copy-area'),value=checklist();box.hidden=false;box.value=value;
-  try{await navigator.clipboard.writeText(value);$('uo-message').textContent='점검표를 복사했습니다.';}
-  catch(_){box.focus();box.select();$('uo-message').textContent='텍스트를 길게 눌러 복사해 주세요.';}
- };
- $('uo-refresh').onclick=()=>{render();$('uo-message').textContent='현재 페이지에 로드된 자료로 판단을 다시 계산했습니다. 증권사 실제 상태를 다시 조회한 것은 아닙니다.';};
- document.addEventListener('isa-rendered',render);
- window.ISA_US_APP?.rerender?.();
- window.addEventListener('isa-us-quotes-refreshed',render);
- render();
-}
 window.ISA_ORDER_PLAN={rows,decisions,rules,budget,mondaysThisMonth,note,checklist,mismatch,tossDailyKrw,importTossConfirmation};
-mount();
+// No order-state/budget panel is mounted. Existing local records are left untouched.
 })();
