@@ -92,10 +92,21 @@ function cards(){
   const wonPrice=wonQuote&&Number.isFinite(wonQuote.amount)&&wonQuote.amount>0?
    Math.round(wonQuote.amount).toLocaleString('ko-KR')+'원':'원화 미확인';
   const summary=window.ISA_US_KRW?.compactLine?.(f.id,px)||'보유수량·원화 평단 입력 필요';
+  const state=window.ISA_PERSONAL_US?.state?.();
+  const nyParts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',
+    year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+  const nyDate=Object.fromEntries(nyParts.map(v=>[v.type,v.value]));
+  const nyToday=nyDate.year+'-'+nyDate.month+'-'+nyDate.day;
+  // A completed EOD candle is not today's intraday trade. Keep both dates explicit.
+  const fallbackNote=state?.fetching?'장중 시세 조회 중':
+    !state?.configured?'장중 시세 연결 필요':
+    state?.error?'장중 시세 조회 실패':'최근 장중 체결 미수신·만료';
   const quoteBasis=wonQuote?.kind==='finnhub-private'?
-   'Finnhub 체결 '+new Date(wonQuote.stamp).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+' · 참고환율':
-   wonQuote?.manual?'토스 직접 입력 당일 가격':
-   x?'확정 종가 '+date(x.date)+' · 참고환율':'원화 참고가격 미확인';
+   'Finnhub 장중 체결 '+new Date(wonQuote.stamp).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',
+     year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})+' · 참고환율':
+   wonQuote?.manual?'토스 당일 원화 가격 직접 입력 · 자동 시세 아님':
+   x?fallbackNote+' · 미국 현지 '+nyToday+' 기준 직전 확정 종가 '+date(x.date)+
+    '로 대체 표시 (실시간 가격 아님)':'장중 및 확정 종가 미확인';
   const selectedClass=selected===f.id?'us-selected':'';
   return '<button class="us-card us-list-row '+selectedClass+'" type="button" data-us="'+f.id+
    '" aria-label="'+text(f.ticker+' 원화 참고 표시가격 '+wonPrice+' '+quoteBasis+' '+summary)+
