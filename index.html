@@ -269,7 +269,15 @@ details[open]>summary{margin-bottom:12px}
 .fund-ma20-gap{font-size:.85rem;color:#d7e7f9;margin-top:3px}
 .fund-ma20-detail{font-size:.77rem;color:#b3c9df;margin-top:3px}
 .fund-ma20-up{color:#ffb1b5}.fund-ma20-down{color:#8ad0f9}
-</style><script src="./live-prices.js"></script></head><body><main>
+/* TradingView's public USD intraday widget is self-contained; its quotes do not become app prices. */
+#us-intraday{margin:12px 0 14px;padding:12px 11px;border:1px solid #5078ae;border-radius:11px;background:#14243a}
+#us-intraday .tv-us-title{font-size:.93rem;font-weight:800;margin:0 0 7px}
+#us-intraday tv-ticker-tape{display:block;width:100%;min-height:82px}
+#us-intraday .tv-us-note{font-size:.79rem;color:#bbcee3;line-height:1.6;margin-top:7px}
+#us-intraday .tv-us-links{display:flex;flex-wrap:wrap;gap:9px;margin-top:8px;font-size:.77rem}
+#us-intraday .tv-us-links a{color:#a7d3ff}
+</style><script src="./live-prices.js"></script>
+<script type="module" src="https://widgets.tradingview-widget.com/w/en/tv-ticker-tape.js"></script></head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel flex"><div><b>한국 ETF 장중 공개 시세 자동 갱신 · 약 60초 간격 (페이지 열린 동안)</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
 <div id="alert">공개 일봉 종가와 당일 비공식 조회 가격은 다릅니다. 마지막 체결 시각을 확인하지 못하면 최신 가격으로 표시하지 않습니다.</div>
@@ -293,10 +301,28 @@ details[open]>summary{margin-bottom:12px}
 <section id="funds" class="funds"></section>
 <section id="us-panel" class="panel">
  <div class="us-head">
-  <div><h2>미국장 4종목 · SCHD / AGNC / SPYM / CONY</h2><p class="sub">원화 가격·평단 우선 표시 · 달러 종가 및 환율 참고 · ISA와 별도 관리</p></div>
+  <div><h2>미국장 4종목 · SCHD / AGNC / SPYM / CONY</h2><p class="sub">상단: 장중 지연시세(달러) · 아래: 확정 종가 환산(원화) · ISA와 별도 관리</p></div>
   <button class="us-header-button" id="us-refresh" type="button">↻ 미국장 자료 확인</button>
  </div>
  <p class="sub" id="us-updated">미국장 최신 게시 일봉 확인 중</p>
+ <section id="us-intraday" aria-label="미국주식 장중 시세 - 거래소 지연 가능">
+  <div class="tv-us-title">미국장 장중 자동 갱신 시세 (USD · 거래소 지연 가능)</div>
+  <tv-ticker-tape
+    symbols="AMEX:SCHD,NASDAQ:AGNC,AMEX:SPYM,AMEX:CONY"
+    direction="horizontal"
+    hide-chart
+    locale="ko"
+    aria-label="TradingView 제공 미국 주식 4종목 장중 가격">
+    외부 장중 시세 위젯 로드 중입니다.
+  </tv-ticker-tape>
+  <p class="tv-us-note">TradingView 제공 별도 시세 화면입니다. 거래소 정책에 따라 지연(미국 주식 약 15분 등)되며 미국장 외에는 직전 거래가격이 표시될 수 있습니다. 아래 원화 종가환산 카드와 시점이 다릅니다. 위젯 수치는 현재 매수판단·평가손익에 자동 반영되지 않습니다.</p>
+  <nav class="tv-us-links" aria-label="미국 주식 시세 제공처 원본 보기">
+   <a href="https://www.tradingview.com/symbols/AMEX-SCHD/" target="_blank" rel="noopener noreferrer">SCHD</a>
+   <a href="https://www.tradingview.com/symbols/NASDAQ-AGNC/" target="_blank" rel="noopener noreferrer">AGNC</a>
+   <a href="https://www.tradingview.com/symbols/AMEX-SPYM/" target="_blank" rel="noopener noreferrer">SPYM</a>
+   <a href="https://www.tradingview.com/symbols/AMEX-CONY/" target="_blank" rel="noopener noreferrer">CONY</a>
+  </nav>
+ </section>
  <!-- US_BUILD_VERSION -->
  <div class="us-cards" id="us-cards"></div>
  <label>미국주식 자세히 보기<select id="us-selector"></select></label>
