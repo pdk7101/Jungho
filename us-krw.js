@@ -30,7 +30,11 @@ function priceKrw(id,priceUsd){
  if(finitePositive(p.krwCurrent)&&p.krwDay===day()){
   return {amount:Number(p.krwCurrent),manual:true,source:'토스 현재가 직접 입력',stamp:p.krwDay};
  }
- const rate=fx();
+ const rate=fx(),tv=window.ISA_US_APP?.observedQuote?.(id);
+ // This amount was typed and confirmed by the user, not scraped/read from TradingView.
+ if(rate&&tv&&finitePositive(tv.usd))
+  return {amount:tv.usd*rate.rate,manual:true,kind:'tv-user-confirmed',
+   source:'트레이딩뷰 화면 사용자 입력 USD × '+rate.source,stamp:tv.confirmedAt};
  if(rate&&finitePositive(priceUsd))return {amount:Number(priceUsd)*rate.rate,manual:false,
   source:'미국장 USD 종가 × '+rate.source,stamp:rate.when};
  return null;
@@ -115,7 +119,8 @@ function primaryPrice(id,priceUsd){
  const q=priceKrw(id,priceUsd);
  const dollar=finitePositive(priceUsd)?usd(priceUsd):'달러 시세 미확인';
  if(q)return '<span class="us-won-main">'+won(q.amount)+'</span>'+
-  '<small>'+(q.manual?'토스 당일 직접 입력':'환율 환산 참고 가격')+' · '+dollar+'</small>';
+  '<small>'+(q.kind==='tv-user-confirmed'?'TradingView 화면 가격 직접 입력 × 환율 (30분 유효)':
+   q.manual?'토스 당일 직접 입력':'환율 환산 참고 가격')+' · '+dollar+'</small>';
  return '<span class="us-won-main">원화 미확인</span>'+
   '<small>환율 정보가 없어 환산 보류 · 달러 원본 '+dollar+'</small>';
 }
@@ -489,6 +494,7 @@ function mount(){
  window.ISA_US_KRW={cardLine,compactLine,primaryPrice,metricPrice,dividendPrice,detailLine,basisKrw:positionKrw,fx,priceKrw,totalKrw,distributionStats,netDividend};
  showRate();
  window.addEventListener('isa-us-quotes-refreshed',()=>render());
+ window.addEventListener('isa-tv-user-reference-changed',()=>render());
  render();
 }
 mount();
