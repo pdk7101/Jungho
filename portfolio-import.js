@@ -174,53 +174,8 @@ function importSnapshot(){
  }
  return report;
 }
-function renderSnapshot(){
- const d=load(KEY);if(!d||!d.date)return;
- const anchor=$('summary');if(!anchor)return;
- let host=$('portfolio-screenshot-snapshot');
- if(!host){host=document.createElement('section');host.id='portfolio-screenshot-snapshot';host.className='panel';anchor.insertAdjacentElement('afterend',host);}
- const report=load('isa-user-portfolio-snapshot-report-v1');
- const rows=(group,data)=>{
-  const order=group==='K'?KR:group==='D'?TD:US;
-  return '<div class="portfolio-shot-list">'+order.map(id=>{
-   const x=data[id],primary=group==='K'?'평단 '+money(x.avg)+' · 사진 현재가 '+money(x.current):
-     (Number(x.avg)>0?'토스 원화 평단 '+money(x.avg)+' · ':'')+
-     (Number.isFinite(x.value)?'사진 평가액 '+money(x.value):'사진 평가액 없음');
-   return '<div class="portfolio-shot-row"><span><b>'+escapeHtml(NAMES[id])+'</b>'+
-    '<small>'+comma(x.qty)+'주 · '+primary+'</small></span>'+
-    '<strong class="'+(x.pnl>=0?'good':'error')+'">'+(Number.isFinite(x.pnl)?signed(x.pnl):'손익 미입력')+'</strong></div>';
-  }).join('')+'</div>';
- };
- host.innerHTML='<h2>내 보유현황 · 사진 기록 '+escapeHtml(d.date)+'</h2>'+
- '<p class="sub">보내주신 증권사 화면의 기록입니다. 오늘 이후 시세·체결에 따라 달라질 수 있으며, 실제 실시간 계좌조회가 아닙니다.</p>'+
- (report?.kind==='success'?'<p class="sub" role="status">'+escapeHtml(report.message)+'</p>':'')+
- (KR.every(id=>d.kr&&d.kr[id])?
- '<details><summary>키움 ISA 보유 6종목 · '+KR.reduce((n,id)=>n+d.kr[id].qty,0)+'주 · 사진 손익 '+signed(KR.reduce((n,id)=>n+d.kr[id].pnl,0))+
- (d.krDate?' · 별도 기록 '+escapeHtml(d.krDate):'')+'</summary>'+rows('K',d.kr)+'</details>':
- '<p class="sub">키움 ISA 사진 기록은 이 브라우저에 없어 이전에 입력한 보유정보를 그대로 유지했습니다.</p>')+
- (US.every(id=>d.us&&d.us[id])?
- '<details><summary>토스 미국주식 5종목 · '+escapeHtml(d.usDate||d.usPositionDate||'기록일 미확인')+
- ' · 평가 '+money(US.reduce((n,id)=>n+(Number(d.us[id].value)||0),0))+
- ' · 사진 손익 '+signed(US.reduce((n,id)=>n+(Number(d.us[id].pnl)||0),0))+'</summary>'+
- rows('U',d.us)+
- '<p class="sub">스페이스X는 사진 보유현황에만 기록하고 미국 4종목 투자판단에 포함하지 않습니다.</p></details>':
- '<p class="sub">토스 미국주식 최신 사진 기록 없음 · 기존 보유정보 유지</p>')+
- (TD.every(id=>d.tossDomestic&&d.tossDomestic[id])?
- '<details><summary>토스 국내주식 9종목 · '+escapeHtml(d.tdDate||'기록일 미확인')+
- ' · 평가 '+money(TD.reduce((n,id)=>n+d.tossDomestic[id].value,0))+
- ' · 사진 손익 '+signed(TD.reduce((n,id)=>n+d.tossDomestic[id].pnl,0))+'</summary>'+
- rows('D',d.tossDomestic)+
- '<p class="sub">토스 국내주식은 키움 ISA 6종목과 별도입니다. 기존 국내 ETF 조건부 매수계획에 합산하지 않습니다.</p></details>':'')+
- (d.conyNote?
- '<details><summary>CONY 누적 분배금 메모 · '+escapeHtml(d.conyNoteDate||'날짜 미확인')+
- ' · '+money(d.conyNote.total)+'</summary>'+
- '<p>사진 누적 분배금 '+money(d.conyNote.total)+
- ' / 이번 기록 증가분 '+money(d.conyNote.increment)+
- ' / 이번 증가분을 제외한 이전 누적액 '+money(d.conyNote.total-d.conyNote.increment)+'</p>'+
- '<p class="sub">사진에는 세후 수령 여부가 명시되지 않아 기존 세후 분배금 원장과 별개로 보관했습니다. 세후 분배금 계산에 중복 합산하지 않습니다.</p></details>':'')+
- (d.tossTotal&&d.tossTotalDate&&d.tossTotalDate!==d.date?
- '<p class="sub">토스 이전 계좌 전체 평가 합계 '+money(d.tossTotal.amount)+' ('+escapeHtml(d.tossTotalDate)+')는 오늘 합계로 사용하지 않습니다.</p>':'');
-}
+// Previously displayed a full historic photo portfolio panel.
+// Keep the optional private import and the locally saved holdings; omit the duplicate panel.
 const report=importSnapshot();
 if(report.kind!=='none'){
  try{store('isa-user-portfolio-snapshot-report-v1',report);}catch(_){}
@@ -232,5 +187,5 @@ if(report.kind!=='none'){
   marker.textContent='보유현황 적용 실패: '+report.message;
   $('summary')?.insertAdjacentElement('afterend',marker);
  }
-}else renderSnapshot();
+}
 })();
