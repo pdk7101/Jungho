@@ -140,7 +140,8 @@ equal(verdict('sol').qty,1,'SOL follows confirmed one-no-buy plan under its own 
 app.setQuotes({robot:trade(9300),sol:trade(9400)});
 equal(app.pairPlan().known,false,'no verified aerospace price keeps conditional extras unknown');
 equal(app.pairPlan().reitQty,1,'REIT base one share remains when space price unavailable');
-equal(verdict('reit').qty,1,'REIT base one share still displayed as BUY');
+equal(verdict('reit').qty,1,'REIT basic one share remains an unconfirmed standing plan');
+equal(verdict('reit').type,'wait','REIT basic one share is not a verified same-day BUY if pair data are missing');
 app.setQuotes({robot:trade(9300),space:trade(9685),sol:trade(9400)});
 app.manual.robot=25000;
 equal(app.current(app.byId.robot,'robot'),9300,'verified quote outranks manually entered old price');
@@ -213,8 +214,47 @@ const planApp=new Function('window','localStorage','document','Date',appCode+'\n
  '\nreturn {renderPlan};')({ISA_livePriceFetch:{active:()=>false}},loc,
  {getElementById:id=>id==='plan'?planHost:null},FixedDate);
 planApp.renderPlan();
-truth(planHost.innerHTML.includes('KODEX 미국달러SOFR 1주 (월요일 정기매수 예정 · 예상가격 미확인)'),
- 'SOFR Monday scheduled 1 share stays visible with missing bar price, without guessed cost');
+truth(planHost.innerHTML.includes('KODEX 미국달러SOFR 1주 (월요일 정기적립 계획 · 실제 체결 별도 확인)'),
+ 'SOFR Monday 1 share remains a scheduled broker plan, not a verified BUY');
+truth(planHost.innerHTML.includes('조건별 추가 수량 판정 보류'),
+ 'unverified paired quotes cannot produce a conditional trade recommendation');
+truth(planHost.innerHTML.includes('리츠 1주 / SOL 0주')&&
+ planHost.innerHTML.includes('리츠 2주 / SOL 1주')&&
+ planHost.innerHTML.includes('리츠 3주 / SOL 1주')&&
+ planHost.innerHTML.includes('리츠 4주 / SOL 0주'),
+ 'all four agreed REIT/SOL fallback branches remain visible as unchanged rules');
+truth(planHost.innerHTML.includes('검토 비용:</b> 당일 확정 불가')&&
+ !planHost.innerHTML.includes('현재 매수 조건 충족 (실제 주문'),
+ 'missing price and paired state cannot show a fake confirmed purchase amount');
+
+// Saturday 03:33 Seoul; Friday close is a reference, not a verified weekend trade.
+const SatDate=class extends Date{
+ constructor(...args){super(...(args.length?args:['2026-11-13T18:33:00.000Z']));}
+ static now(){return Date.parse('2026-11-13T18:33:00.000Z');}
+};
+const satStorage=storage();
+const satHost={innerHTML:''};
+const satApp=new Function('window','localStorage','document','Date',appCode+'\n'+planSrc+
+ '\nreturn {FUNDS,byId,pairPlan,verdict,renderPlan};')(
+ {ISA_livePriceFetch:{active:()=>false}},satStorage,
+ {getElementById:id=>id==='plan'?satHost:null},SatDate
+);
+satApp.FUNDS.forEach(f=>{satApp.byId[f.id]=bars(f.id,3690,'20261113');});
+satApp.renderPlan();
+truth(satHost.innerHTML.includes('한국장 휴장(주말)')&&
+ satHost.innerHTML.includes('검증된 당일 체결가 0/6'),
+ 'Saturday with Friday-close data is a closed session with no verified trades');
+truth(satHost.innerHTML.includes('다음 거래일 기본 적립계획:</b> TIGER 리츠부동산인프라 1주')&&
+ satHost.innerHTML.includes('직전 확정 종가 3,690원 · 오늘 거래가격 아님'),
+ 'standing REIT base is preserved and Friday close labeled reference only');
+truth(satHost.innerHTML.includes('조건별 추가 수량 판정 보류')&&
+ satHost.innerHTML.includes('리츠 2·3·4주로 자동 증액하지 않습니다'),
+ 'unknown robot/space/SOL conditions do not force extra shares on weekend');
+truth(!satHost.innerHTML.includes('현재 매수 조건 충족')&&
+ satHost.innerHTML.includes('검토 비용:</b> 당일 확정 불가'),
+ 'unknown price prevents confirmed buy and budget claims');
+equal(satApp.verdict(satApp.FUNDS.find(f=>f.id==='reit')).type,'wait',
+ 'Saturday REIT card stays WAIT, while base standing plan remains one share');
 
 const head=source=>source.slice(0,source.indexOf('window.ISA_ORDER_PLAN='))
  .replace(/^\/\*[\s\S]*?\*\/\s*\(function\(\)\{\s*'use strict';/,'');
