@@ -7,7 +7,7 @@
  // Explicit opt-in only. A persistent access token can be read by scripts on this public origin.
  const REMEMBER_KEY='isa-us-private-worker-remembered-v1',REMEMBER_MAX_MS=30*86400000;
  const TRADE_TTL=45*60000,RESPONSE_TTL=5*60000;
- let endpoint='',password='',quotes={},fetchedAt='',busy=false,lastMessage='',diagnostics={},workerVersion='';
+ let endpoint='',password='',quotes={},fetchedAt='',busy=false,lastMessage='',diagnostics={},workerVersion='',lastRequestAt=0,lastError='';
  const $=id=>document.getElementById(id);
  function rememberedAccess(url){
   if(!url)return '';
@@ -81,6 +81,13 @@ function renderDiagnostics(){
  host.textContent='시세 서버 코드 '+(workerVersion||'버전 표기 없음(구버전 Worker 가능)')+
   ' / '+IDS.map(id=>id.toUpperCase()+': '+(diagnostics[id]||'미확인')).join(' / ');
 }
+ function connectionState(){
+  // Public UI diagnostics only. Never return the access token or a secret-bearing URL.
+  return {configured:Boolean(endpoint&&password),fetching:busy,
+   count:IDS.filter(id=>quote(id)).length,
+   error:lastError?'시세 서버 조회 실패':'',
+   lastChecked:fetchedAt||null};
+ }
  function signal(){
   window.dispatchEvent(new Event('isa-personal-us-quote-refreshed'));
  }
@@ -102,7 +109,7 @@ function renderDiagnostics(){
  }
  async function refresh(){
   if(!endpoint||!password||busy||document.hidden)return;
-  busy=true;
+  busy=true;lastRequestAt=Date.now();lastError='';
   status('현재가 조회 중');
   try{
    const r=await fetch(endpoint+'/quotes',{
@@ -126,7 +133,7 @@ function renderDiagnostics(){
       details[id]=quoteDiagnosis(v,now);
     }
    }
-   quotes=next;diagnostics=details;fetchedAt=payload.fetchedAt;
+   quotes=next;diagnostics=details;fetchedAt=payload.fetchedAt;lastError='';
    workerVersion=/^20261114-quote-transport-2$/.test(String(payload.workerVersion||''))?
     payload.workerVersion:'';
    status(IDS.filter(id=>quote(id)).length?
@@ -134,6 +141,7 @@ function renderDiagnostics(){
     '개인 시세 서버 응답 성공 · 유효한 최근 체결 0/4 (시세 지연·미제공 가능, 장 마감 단정 불가)');
   }catch(e){
    quotes={};fetchedAt='';diagnostics={};workerVersion='';
+   lastError='시세 서버 조회 실패';
    status('자동 조회 실패: '+String(e?.message||e));
   }finally{
    busy=false;signal();status();
@@ -162,7 +170,7 @@ function renderDiagnostics(){
   }
   const changed=url!==endpoint||access!==password;
   endpoint=url;password=access;
-  if(changed){quotes={};fetchedAt='';diagnostics={};workerVersion='';signal();}
+  if(changed){quotes={};fetchedAt='';diagnostics={};workerVersion='';lastError='';signal();}
   try{localStorage.setItem(URL_KEY,url);sessionStorage.setItem(VIEW_KEY,access);}catch(_){}
   saveRememberedAccess(url,access);
   $('us-live-secret').value=''; // Never leave secret readable in the input/DOM.
@@ -171,7 +179,7 @@ function renderDiagnostics(){
   refresh();
  }
  function disconnect(){
-  endpoint='';password='';quotes={};fetchedAt='';diagnostics={};workerVersion='';
+  endpoint='';password='';quotes={};fetchedAt='';diagnostics={};workerVersion='';lastError='';
   try{localStorage.removeItem(URL_KEY);sessionStorage.removeItem(VIEW_KEY);localStorage.removeItem(REMEMBER_KEY);}catch(_){}
   if($('us-live-remember'))$('us-live-remember').checked=false;
   if($('us-live-url'))$('us-live-url').value='';
@@ -179,7 +187,7 @@ function renderDiagnostics(){
   accessHint();
   status('개인 시세 연결 해제');signal();
  }
- window.ISA_PERSONAL_US={quote,refresh};
+ window.ISA_PERSONAL_US={quote,refresh,state:connectionState};
  const connectButton=$('us-live-connect'),stopButton=$('us-live-disconnect'),quickRefresh=$('us-live-refresh');
  if(connectButton)connectButton.addEventListener('click',connect);
  if(stopButton)stopButton.addEventListener('click',disconnect);
@@ -214,7 +222,14 @@ function renderDiagnostics(){
   if(!active&&Object.keys(quotes).length){quotes={};fetchedAt='';signal();}
   status();
  },60000);
- document.addEventListener('visibilitychange',function(){
-  if(!document.hidden)refresh();
- });
+ function refreshOnReturn(){
+  // Mobile in-app browsers may restore a tab without a visibilitychange event.
+  // Recheck on focus/pageshow while throttling duplicate lifecycle events.
+  if(document.hidden||!endpoint||!password||busy||Date.now()-lastRequestAt<15000)return;
+  refresh();
+ }
+ document.addEventListener('visibilitychange',refreshOnReturn);
+ window.addEventListener('focus',refreshOnReturn);
+ window.addEventListener('pageshow',refreshOnReturn);
+ window.addEventListener('online',refreshOnReturn);
 })();
