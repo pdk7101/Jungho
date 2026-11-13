@@ -7,7 +7,7 @@
  // Explicit opt-in only. A persistent access token can be read by scripts on this public origin.
  const REMEMBER_KEY='isa-us-private-worker-remembered-v1',REMEMBER_MAX_MS=30*86400000;
  const TRADE_TTL=45*60000,RESPONSE_TTL=5*60000;
- let endpoint='',password='',quotes={},fetchedAt='',busy=false,lastMessage='',diagnostics={};
+ let endpoint='',password='',quotes={},fetchedAt='',busy=false,lastMessage='',diagnostics={},workerVersion='';
  const $=id=>document.getElementById(id);
  function rememberedAccess(url){
   if(!url)return '';
@@ -61,6 +61,9 @@ function quoteDiagnosis(item,now){
  if(/^upstream_status_5[0-9]{2}$/.test(status))return 'Finnhub 서버 오류 ('+status.slice(-3)+')';
  if(status==='invalid_or_outdated_trade')return '공급원에서 유효한 가격 또는 체결시각을 받지 못함';
  if(status==='upstream_redirect_blocked')return 'Finnhub가 다른 주소로 이동을 요청하여 안전상 차단됨';
+ if(status==='upstream_timeout')return 'Finnhub 요청 시간 초과(8초)';
+ if(status==='upstream_type_error')return 'Cloudflare 외부 요청 TypeError · 실행환경/URL 입력 확인';
+ if(status==='upstream_aborted')return 'Finnhub 요청 취소';
  if(status==='upstream_unavailable')return 'Finnhub 네트워크 응답 확인 실패';
  if(status)return '공급원 조회 오류 (가격 미반영)';
  if(!item)return '종목 응답 누락';
@@ -75,7 +78,8 @@ function quoteDiagnosis(item,now){
 function renderDiagnostics(){
  const host=$('us-quote-debug-text');if(!host)return;
  if(!Object.keys(diagnostics).length){host.textContent='조회 결과가 아직 없습니다. 연결·조회 버튼을 누르면 종목별 사유가 표시됩니다.';return;}
- host.textContent=IDS.map(id=>id.toUpperCase()+': '+(diagnostics[id]||'미확인')).join(' / ');
+ host.textContent='시세 서버 코드 '+(workerVersion||'버전 표기 없음(구버전 Worker 가능)')+
+  ' / '+IDS.map(id=>id.toUpperCase()+': '+(diagnostics[id]||'미확인')).join(' / ');
 }
  function signal(){
   window.dispatchEvent(new Event('isa-personal-us-quote-refreshed'));
@@ -122,11 +126,13 @@ function renderDiagnostics(){
     }
    }
    quotes=next;diagnostics=details;fetchedAt=payload.fetchedAt;
+   workerVersion=/^20261114-quote-transport-2$/.test(String(payload.workerVersion||''))?
+    payload.workerVersion:'';
    status(IDS.filter(id=>quote(id)).length?
     '개인 시세 서버 조회 성공 · 최근 체결 확인':
     '개인 시세 서버 응답 성공 · 유효한 최근 체결 0/4 (시세 지연·미제공 가능, 장 마감 단정 불가)');
   }catch(e){
-   quotes={};fetchedAt='';diagnostics={};
+   quotes={};fetchedAt='';diagnostics={};workerVersion='';
    status('자동 조회 실패: '+String(e?.message||e));
   }finally{
    busy=false;signal();status();
@@ -155,7 +161,7 @@ function renderDiagnostics(){
   }
   const changed=url!==endpoint||access!==password;
   endpoint=url;password=access;
-  if(changed){quotes={};fetchedAt='';diagnostics={};signal();}
+  if(changed){quotes={};fetchedAt='';diagnostics={};workerVersion='';signal();}
   try{localStorage.setItem(URL_KEY,url);sessionStorage.setItem(VIEW_KEY,access);}catch(_){}
   saveRememberedAccess(url,access);
   $('us-live-secret').value=''; // Never leave secret readable in the input/DOM.
@@ -164,7 +170,7 @@ function renderDiagnostics(){
   refresh();
  }
  function disconnect(){
-  endpoint='';password='';quotes={};fetchedAt='';diagnostics={};
+  endpoint='';password='';quotes={};fetchedAt='';diagnostics={};workerVersion='';
   try{localStorage.removeItem(URL_KEY);sessionStorage.removeItem(VIEW_KEY);localStorage.removeItem(REMEMBER_KEY);}catch(_){}
   if($('us-live-remember'))$('us-live-remember').checked=false;
   if($('us-live-url'))$('us-live-url').value='';
