@@ -7,9 +7,7 @@ const FUNDS=[
  {id:'spym',ticker:'SPYM',name:'SPDR Portfolio S&P 500 ETF',type:'미국 S&P500 ETF',hint:'분배금 재투자 우선순위 3'},
  {id:'cony',ticker:'CONY',name:'YieldMax COIN Option Income Strategy ETF',type:'고위험 커버드콜 ETF',hint:'230~250주 목표 · 분배금/NAV/병합 별도 주의'}
 ];
-let data=null,selected='cony',positions={},manual={},loadTime=null;
-const TV_KEY='isa-tv-observed-usd-session-v1',TV_TTL_MS=30*60*1000;
-let tvObserved={};
+let data=null,selected='cony',loadTime=null;
 const $=id=>document.getElementById(id);
 const valid=n=>n!==null&&n!==undefined&&String(n).trim()!==''&&Number.isFinite(Number(n))&&Number(n)>0;
 const num=n=>Number(n);
@@ -19,78 +17,6 @@ const date=s=>/^\d{8}$/.test(String(s))?s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slic
 const min=(...args)=>Math.min(...args);
 const round=(n,p=2)=>Number(n.toFixed(p));
 const read=key=>{try{return JSON.parse(localStorage.getItem(key)||'null')}catch(e){return null}};
-function save(){
- try{
-  const all=read('isa-us-holdings-v1')||{};
-  for(const f of FUNDS){
-   const p=positions[f.id]||{};
-   all[f.id]={...(all[f.id]||{}),qty:p.qty,avg:p.avg,net:p.net};
-  }
-  localStorage.setItem('isa-us-holdings-v1',JSON.stringify(all));
- }catch(e){$('us-store-msg').textContent='이 기기의 저장소를 사용할 수 없습니다.';}
-}
-let saved=read('isa-us-holdings-v1');
-if(saved&&typeof saved==='object')FUNDS.forEach(f=>{
- const p=saved[f.id];if(!p)return;
- positions[f.id]={qty:valid(p.qty)?Number(p.qty):'',avg:valid(p.avg)?Number(p.avg):'',net:typeof p.net==='number'&&Number.isFinite(p.net)&&p.net>=0?p.net:''};
-});
-// TradingView widgets do not expose prices to the host. These prices are explicitly typed
-// and timestamped by the user, never programmatically extracted from the widget.
-function observedQuote(id){
- const q=tvObserved[id],now=Date.now(),at=Date.parse(q?.confirmedAt||'');
- if(!q||!valid(q.usd)||Number(q.usd)>100000||!Number.isFinite(at)||
-  now-at<0||now-at>=TV_TTL_MS)return null;
- return {usd:Number(q.usd),confirmedAt:q.confirmedAt,
-  ageMinutes:Math.floor((now-at)/60000),expiresAt:new Date(at+TV_TTL_MS).toISOString()};
-}
-function recoverTvQuotes(){
- try{
-  const saved=JSON.parse(sessionStorage.getItem(TV_KEY)||'null');
-  if(!saved||typeof saved!=='object')return;
-  for(const f of FUNDS){if(saved[f.id])tvObserved[f.id]=saved[f.id];}
- }catch(_){}
-}
-function persistTvQuotes(){
- try{sessionStorage.setItem(TV_KEY,JSON.stringify(tvObserved));}catch(_){}
-}
-recoverTvQuotes();
-function updateTvStatus(message){
- const status=$('tv-price-status');if(!status)return;
- const active=FUNDS.map(f=>({name:f.ticker,q:observedQuote(f.id)})).filter(x=>x.q);
- const summary=active.map(x=>x.name+' '+usd(x.q.usd)+' (확인 후 '+x.q.ageMinutes+
-  '분 · 남은 시간 약 '+Math.max(1,30-x.q.ageMinutes)+'분)').join(' · ');
- status.textContent=(message?message+' · ':'')+
-  (summary||'적용 중인 임시 가격 없음. 원화 평가는 기존 미국장 확정 종가 기준입니다.')+
-  ' · TradingView 가격을 자동 수집한 것은 아닙니다.';
-}
-function applyTvQuotes(){
- const fields=Array.from(document.querySelectorAll('input[data-tv-usd]'));
- const candidates=fields.filter(el=>el.value.trim()!=='');
- if(!candidates.length){updateTvStatus('달러 가격을 한 종목 이상 입력하세요');return;}
- const updates=[];
- for(const field of candidates){
-  const id=field.dataset.tvUsd,price=Number(field.value.trim());
-  if(!FUNDS.some(f=>f.id===id)||!Number.isFinite(price)||price<=0||price>100000){
-   updateTvStatus('달러 가격이 올바르지 않습니다. 입력값을 반영하지 않았습니다');return;
-  }
-  updates.push([id,price]);
- }
- const at=new Date().toISOString();
- for(const [id,price] of updates)tvObserved[id]={usd:price,confirmedAt:at};
- persistTvQuotes();
- fields.forEach(el=>{el.value='';});
- render();
- window.dispatchEvent(new Event('isa-tv-user-reference-changed'));
- updateTvStatus('사용자 확인 '+updates.length+'종목의 임시 가격을 원화 평가에 적용');
-}
-function clearTvQuotes(){
- tvObserved={};
- try{sessionStorage.removeItem(TV_KEY);}catch(_){}
- document.querySelectorAll('input[data-tv-usd]').forEach(el=>{el.value='';});
- render();
- window.dispatchEvent(new Event('isa-tv-user-reference-changed'));
- updateTvStatus('임시 가격 적용 해제');
-}
 function record(f){return data?.items?.find(x=>x.id===f.id);}
 function fresh(x){
  if(!x?.ok||!/^\d{8}$/.test(x.date)||!Array.isArray(x.bars)||x.bars.length<40)return false;
@@ -98,20 +24,11 @@ function fresh(x){
  return Number.isFinite(dt.getTime())&&Math.abs(Date.now()-dt.getTime())<8*86400000;
 }
 function market(f){const x=record(f);return x&&fresh(x)?x:null;}
-function price(f){const x=market(f),manual=observedQuote(f.id),live=window.ISA_PERSONAL_US?.quote?.(f.id);return manual?manual.usd:live?live.usd:x?Number(x.close):null;}
+function price(f){const x=market(f),live=window.ISA_PERSONAL_US?.quote?.(f.id);return live?live.usd:x?Number(x.close):null;}
 function zone(x,px){
  if(!x||!(px>0))return null;
  const b20=x.low20+(x.high20-x.low20)*.20,b30=x.low20+(x.high20-x.low20)*.30;
  return {b20:round(b20,3),b30:round(b30,3),level:px<=b20?2:px<=b30?1:0};
-}
-function basis(f,px){
- const p=positions[f.id];
- if(!p||!valid(p.qty)||!valid(p.avg)||!(px>0))return null;
- const qty=Number(p.qty),avg=Number(p.avg),value=qty*px,principal=qty*avg,unrealized=value-principal;
- const net=typeof p.net==='number'&&p.net>=0?p.net:null;
- return {qty,avg,principal,value,unrealized,net,
-  withNet:net!==null?unrealized+net:null,
-  afterOne:(principal+px)/(qty+1)};
 }
 function trend(x){
  const t=x.trend;if(!t)return '미확인';
@@ -170,7 +87,7 @@ function cards(){
  // Domestic-style layout: one compact full-width row per US symbol.
  // The rich indicators, dividend and risk details remain in the selection panel.
  host.innerHTML=FUNDS.map(f=>{
-  const x=market(f),px=price(f),decision=window.ISA_US_SIGNAL?.decision?.(f.id),
+  const x=market(f),px=price(f),
     wonQuote=window.ISA_US_KRW?.priceKrw?.(f.id,px);
   const brokerNote=window.ISA_ORDER_PLAN?.note?.(f.id);
   const brokerStatus=brokerNote?.value||'unknown';
@@ -181,15 +98,9 @@ function cards(){
    Math.round(wonQuote.amount).toLocaleString('ko-KR')+'원':'원화 미확인';
   const summary=window.ISA_US_KRW?.compactLine?.(f.id,px)||'보유수량·원화 평단 입력 필요';
   const quoteBasis=wonQuote?.kind==='finnhub-private'?
-   '개인 Finnhub 체결가격 '+new Date(wonQuote.stamp).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+
-   ' · USD×참고환율 · 전체 거래소 체결가와 다를 수 있음':
-   wonQuote?.kind==='tv-user-confirmed'?
-   '트레이딩뷰 화면 가격 사용자 직접 확인 '+
-    new Date(wonQuote.stamp).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+
-    ' · 30분 임시 평가 · 자동 시세 연동 아님':
-   wonQuote?.manual?'토스 직접 입력한 당일 원화 가격 · 자동 실시간 시세 아님':
-   x?'미국장 '+date(x.date)+' 확정 종가 × 참고 환율 · 실시간 호가 아님':
-   '미국장 확정 종가 미확인 · 실시간 호가 미연동';
+   'Finnhub 체결 '+new Date(wonQuote.stamp).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+' · 참고환율':
+   wonQuote?.manual?'토스 직접 입력 당일 가격':
+   x?'확정 종가 '+date(x.date)+' · 참고환율':'원화 참고가격 미확인';
   const selectedClass=selected===f.id?'us-selected':'';
   return '<button class="us-card us-list-row '+selectedClass+'" type="button" data-us="'+f.id+
    '" aria-label="'+text(f.ticker+' 원화 참고 표시가격 '+wonPrice+' '+quoteBasis+' '+decisionText+' '+summary)+
@@ -201,8 +112,7 @@ function cards(){
    '<span class="us-list-meta">'+text(quoteBasis)+'</span>'+
    (conversionLine(wonQuote)?'<span class="us-list-meta us-list-calculation">'+text(conversionLine(wonQuote))+'</span>':'')+
    '<span class="us-list-meta">'+text(summary)+'</span>'+
-   '<span class="us-list-meta">토스 주문상태 '+text(brokerNote?.date?'마지막 사용자 확인 '+brokerNote.date:'확인 기록 없음')+
-   ' · 증권사 실시간 연동 아님</span></button>';
+   '</button>';
  }).join('');
  host.querySelectorAll('[data-us]').forEach(btn=>btn.onclick=()=>{
   selected=btn.dataset.us;
@@ -210,53 +120,25 @@ function cards(){
   render();
  });
 }
-function renderPositionEditor(){
- const host=$('us-positions');if(!host)return;
- host.innerHTML=FUNDS.map(f=>{
- const p=positions[f.id]||{};
- const val=v=>typeof v==='number'&&Number.isFinite(v)?String(v):'';
- return '<div class="us-pos-row"><strong>'+f.ticker+'</strong>'+
- '<label>보유수량 (주)<input data-symbol="'+f.id+'" data-field="qty" type="number" min="0" step="0.000001" value="'+val(p.qty)+'" placeholder="미보유: 0"></label>'+
- '<label>평단 (USD)<input data-symbol="'+f.id+'" data-field="avg" type="number" min="0" step="0.0001" value="'+val(p.avg)+'" placeholder="미입력"></label>'+
- '<label>누적 세후 배당·분배금 (USD)<input data-symbol="'+f.id+'" data-field="net" type="number" min="0" step="0.01" value="'+val(p.net)+'" placeholder="직접 입력"></label>'+
- '</div>';
- }).join('');
- host.querySelectorAll('input[data-symbol]').forEach(input=>input.addEventListener('change',()=>{
- const id=input.dataset.symbol,field=input.dataset.field,n=input.value.trim()===''?null:Number(input.value);
- if(!positions[id])positions[id]={qty:'',avg:'',net:''};
- positions[id][field]=n!==null&&Number.isFinite(n)&&n>=0?n:'';
- if(field==='avg'&&n===0)positions[id][field]='';
- save();$('us-store-msg').textContent='이 기기에 저장했습니다. 토스에서 추가매수·재투자 후 평단과 수량을 갱신하세요.';render();
- }));
-}
 function details(){
- const f=FUNDS.find(f=>f.id===selected),x=market(f),px=valid(manual[f.id])?Number(manual[f.id]):x?Number(x.close):null,host=$('us-details');
+ const f=FUNDS.find(f=>f.id===selected),x=market(f),px=x?Number(x.close):null,host=$('us-details');
  if(!host)return;
  if(!x){host.innerHTML='<h3>'+f.ticker+' · '+text(f.name)+'</h3>'+(window.ISA_US_SIGNAL?.detailLine?.(f.id)||'')+'<p class="us-small">미국장 완료 일봉을 확인할 수 없습니다. 가격과 이동평균선을 추정하지 않습니다. <a href="https://finance.yahoo.com/quote/'+f.ticker+'/" target="_blank" rel="noopener">시세 제공처에서 확인</a></p>';return;}
- const z=zone(x,px),b=basis(f,px),div=distribution(x),t=x.trend,metric=n=>window.ISA_US_KRW?.metricPrice?.(n)||usd(n),divPrice=n=>window.ISA_US_KRW?.dividendPrice?.(n)||usd(n,4);
+ const z=zone(x,px),div=distribution(x),t=x.trend,metric=n=>window.ISA_US_KRW?.metricPrice?.(n)||usd(n),divPrice=n=>window.ISA_US_KRW?.dividendPrice?.(n)||usd(n,4);
  const split=x.splits||[];
  let section='<h3>'+f.ticker+' · '+text(f.name)+'</h3><p class="us-small">'+text(f.type)+' · '+text(f.hint)+'</p>'+
- '<p class="us-small">미국장 확정 일봉 '+date(x.date)+' · '+text(x.source)+' · 실시간 호가 아님 · 원화 환산 참고</p>'+
+ '<p class="us-small">기술분석: '+date(x.date)+' 확정 일봉 · 장중 시세와 별개</p>'+
  (window.ISA_US_SIGNAL?.detailLine?.(f.id)||'')+chart(x)+'<p class="us-legend">파랑 종가 · 초록 5일선 · 노랑 20일선 (원본 달러 차트)</p>'+
  '<div class="us-statgrid"><div>종가<strong>'+metric(x.close)+'</strong></div><div>5일선<strong>'+metric(t.ma5)+'</strong></div>'+
  '<div>20일선<strong>'+metric(t.ma20)+'</strong></div><div>20일 저가<strong>'+metric(x.low20)+'</strong></div>'+
  '<div>20일 고가<strong>'+metric(x.high20)+'</strong></div><div>하단 30% · 20%<strong>'+metric(z.b30)+' / '+metric(z.b20)+'</strong></div></div>'+
  '<p class="us-small">이평선 판단: <b>'+text(trend(x))+'</b>. 매수 조건은 개인 평단·비중·현금 여력을 함께 보세요.</p>'+ '<p class="us-small">원화 5·20일선과 박스권은 각각의 달러 지표에 동일 참고환율을 곱한 값입니다. 날짜별 실제 환율을 적용한 원화 이동평균은 아닙니다.</p>'+ (window.ISA_US_KRW?.detailLine?.(f.id,px)||'');
- if(b){
-  section+='<details class="us-ledger"><summary>달러(USD) 매입원가·평가손익 참고 · '+b.qty.toLocaleString('ko-KR')+'주</summary>'+
-  '<p>매수원가(평단×수량) '+usd(b.principal)+' / 평가금액 '+usd(b.value)+'</p>'+
-  '<p>평가손익 <strong class="'+(b.unrealized>=0?'us-positive':'us-negative')+'">'+(b.unrealized>=0?'+':'')+usd(b.unrealized)+'</strong></p>'+
-  (b.net!==null?'<p>누적 세후 분배금 '+usd(b.net)+' · <b>분배금 포함 총손익 '+(b.withNet>=0?'+':'')+usd(b.withNet)+'</b></p>':
-   '<p class="us-small">누적 세후 배당금 미입력 · 분배금 포함 손익 계산 보류</p>')+
-  '<p>현재 가격에 1주 추가 시 예상 평단 '+usd(b.afterOne,4)+(px<b.avg?' · 평단 인하 가능':' · 평단 인하 효과 없음')+'</p>'+
-  '<p class="us-small">별도 입력한 달러 기준 원가의 참고 내역입니다. 원화 손익은 위 원화 기준 계산을 우선하세요. 분배금 재투자 시 동일 지급금을 이중으로 반영하지 마세요.</p></details>';
- }
  if(div.available){
   section+='<p class="us-small"><b>최근 90일 세전 배당·분배금 합계(주당):</b> '+divPrice(div.total)+' · 월평균 환산 약 '+divPrice(div.total/3)+' (세전 참고)</p>'+
   '<p class="us-small">마지막 기록 '+date(div.last.date)+' · '+divPrice(div.last.perShare)+'/주 · 현재 참고환율 환산이며 지급 당시 환율·세후 실수령액과 다릅니다</p>';
  }else section+='<p class="us-small">배당·분배금 자동 확인: '+text(div.reason)+' · 정확한 실수령액은 증권사 내역을 입력하세요.</p>';
  if(f.id==='cony'){
-  const shares=valid(positions[f.id]?.qty)?Number(positions[f.id].qty):0;
+  const h=read('isa-us-holdings-v1')||{},shares=valid(h.cony?.qty)?Number(h.cony.qty):0;
   section+='<div class="us-cony"><strong>CONY 별도 관리</strong>'+
   '<p>보유 '+shares.toLocaleString('ko-KR')+'주 · 목표 230~250주'+(shares>0?' · 230주 목표까지 '+Math.max(0,230-shares).toLocaleString('ko-KR')+'주 부족':' · 실제 보유수량을 입력해 진행률 표시')+'</p>'+
   '<div class="us-progress"><span style="width:'+Math.min(100,shares/230*100)+'%"></span></div>'+
@@ -266,10 +148,6 @@ function details(){
  }
  if(f.id==='agnc')section+='<p class="us-small">AGNC는 ETF가 아니라 모기지 리츠 회사 주식입니다. 배당액뿐 아니라 순자산(BVPS), 금리 민감도 및 배당 지속가능성을 별도로 확인하세요.</p>';
  if(f.id==='spym')section+='<p class="us-small">SPYM은 State Street SPDR Portfolio S&P 500 ETF의 현재 티커입니다. 배당수익보다 지수 추적·총수익률 중심으로 점검합니다.</p>';
- section+='<label>가격 직접 비교 (USD, 화면 한정)<input id="us-manual" type="number" min="0" step="0.01" placeholder="확정 일봉 대체가 아닌 가정 가격" value="'+(valid(manual[f.id])?manual[f.id]:'')+'"></label>'+
- '<p class="us-small">직접 입력은 가정 가격입니다. 이동평균선은 확정 일봉 기준이며, 실제 주문가격이나 실시간 조회가격으로 오인하지 마세요.</p>';
- host.innerHTML=section;
- $('us-manual').onchange=function(){const v=Number(this.value);if(this.value.trim()!==''&&Number.isFinite(v)&&v>0)manual[f.id]=v;else delete manual[f.id];render();};
 }
 function render(){cards();details();}
 async function refresh(){
@@ -283,24 +161,16 @@ async function refresh(){
   data=d;loadTime=d.fetchedAt;
   const count=FUNDS.filter(f=>market(f)).length;
   const time=loadTime?new Date(loadTime).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'미확인';
-  el.textContent='미국장 완료 일봉 '+count+'/4 · 마지막 수집 '+time+' · 미국장 종가×환율 참고 · 실시간 체결가 미연동';
+  el.textContent='기술 분석용 확정 일봉 '+count+'/4 · 마지막 수집 '+time;
  }catch(e){data=null;if(el)el.textContent='미국장 자료 확인 실패: '+String(e.message||e);}
  render();
  window.dispatchEvent(new Event('isa-us-quotes-refreshed'));
 }
 window.ISA_US_APP={
  getData:()=>data,
- observedQuote:observedQuote,
  getPrice:id=>{const f=FUNDS.find(x=>x.id===id);return f?price(f):null;},
- getPosition:id=>positions[id]||{},
- applyFromLocal:function(){
-  const all=read('isa-us-holdings-v1')||{};
-  for(const f of FUNDS){
-   const p=all[f.id]||{};
-   positions[f.id]={qty:valid(p.qty)?Number(p.qty):'',avg:valid(p.avg)?Number(p.avg):'',net:typeof p.net==='number'&&Number.isFinite(p.net)&&p.net>=0?p.net:''};
-  }
-  renderPositionEditor();render();
- },
+ getPosition:id=>(read('isa-us-holdings-v1')||{})[id]||{},
+ applyFromLocal:()=>render(),
  rerender:()=>render()
 };
 window.addEventListener('isa-personal-us-quote-refreshed',()=>render());
@@ -310,22 +180,6 @@ function mount(){
  FUNDS.forEach(f=>{const o=document.createElement('option');o.value=f.id;o.textContent=f.ticker+' · '+f.name;sel.appendChild(o);});
  sel.value=selected;
  sel.onchange=function(){selected=this.value;render();};
- renderPositionEditor();
- const confirmTv=$('tv-price-confirm'),clearTv=$('tv-price-clear');
- if(confirmTv)confirmTv.onclick=applyTvQuotes;
- if(clearTv)clearTv.onclick=clearTvQuotes;
- updateTvStatus();
- // Expired user-confirmed prices cannot linger in evaluation displays.
- setInterval(function(){
-  const expired=FUNDS.some(f=>tvObserved[f.id]&&!observedQuote(f.id));
-  if(expired){
-   for(const f of FUNDS)if(tvObserved[f.id]&&!observedQuote(f.id))delete tvObserved[f.id];
-   persistTvQuotes();render();window.dispatchEvent(new Event('isa-tv-user-reference-changed'));
-  }
-  updateTvStatus();
- },60000);
- const details=$('us-holdings-details');
- if(details)details.addEventListener('toggle',()=>{if(details.open)renderPositionEditor();});
  const reload=$('reload');if(reload)reload.addEventListener('click',refresh);
  $('us-refresh').onclick=refresh;
  refresh();
