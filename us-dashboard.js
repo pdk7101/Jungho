@@ -82,46 +82,96 @@ function conversionLine(q){
  return usd+' USD × '+rate+'원/USD = 약 '+calc+'원 · '+fxTime+warning+
   ' · 토스 적용환율·체결시세와 차이 가능';
 }
+function wonAmount(n,decimals=0){
+ return Number(n).toLocaleString('ko-KR',{minimumFractionDigits:decimals,maximumFractionDigits:decimals})+'원';
+}
+function signedWon(n){
+ return (n>=0?'+':'-')+wonAmount(Math.abs(n));
+}
+function pct(n){
+ return (n>=0?'+':'')+n.toFixed(2)+'%';
+}
+function fmtQty(n){
+ return Number(n).toLocaleString('ko-KR',{maximumFractionDigits:6})+'주';
+}
+function priceSource(f,x,wonQuote){
+ const state=window.ISA_PERSONAL_US?.state?.();
+ if(wonQuote?.kind==='finnhub-private'){
+  const time=Date.parse(wonQuote.stamp||'');
+  return {type:'live',short:'Finnhub 장중 체결'+(Number.isFinite(time)?
+   ' · '+new Date(time).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',
+    month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'')};
+ }
+ if(wonQuote?.manual)return {type:'manual',short:'토스 원화 현재가 직접 입력 · 당일만 유효'};
+ const reason=state?.fetching?'장중 시세 확인 중':
+  !state?.configured?'장중 시세 미연결':
+  state?.error?'장중 시세 조회 실패':'장중 시세 미수신·만료';
+ return {type:'close',short:x?'직전 확정 종가 '+date(x.date)+' · '+reason:
+  '시세 확인 대기 · '+reason};
+}
+function movingAverageCard(x,wonQuote){
+ const ma20=Number(x?.trend?.ma20),ma5=Number(x?.trend?.ma5);
+ // Compare the displayed KRW price with USD daily-bar indicators translated
+ // using one reference FX rate. Never call it a true KRW historical MA.
+ const fxRate=Number(wonQuote?.fxRate||window.ISA_US_KRW?.fx?.()?.rate);
+ if(!x||!valid(ma20)||!valid(ma5)||!valid(fxRate)||!valid(wonQuote?.amount))
+  return '<div class="us-card-ma20"><div class="us-ma-heading">20일 이동평균선 · 확인 대기</div>'+
+   '<div class="us-ma-foot">확정 일봉·참고환율·현재가격을 모두 확인한 후 계산합니다.</div></div>';
+ const m20=ma20*fxRate,m5=ma5*fxRate,diff=wonQuote.amount-m20,relative=diff/m20*100;
+ return '<div class="us-card-ma20">'+
+  '<div class="us-ma-heading"><b>20일 이동평균선</b><strong>'+wonAmount(m20,2)+'</strong></div>'+
+  '<div class="us-ma-comparison">비교가격 '+wonAmount(wonQuote.amount)+' · 20일선 대비 '+
+  '<b class="'+(diff>=0?'us-positive':'us-negative')+'">'+signedWon(diff)+' ('+pct(relative)+')</b></div>'+
+  '<div class="us-ma-foot">5일선 '+wonAmount(m5,2)+' · 기준 '+date(x.date)+' 확정 일봉</div>'+
+  '<div class="us-ma-foot">달러 이동평균에 동일 참고환율을 곱한 값 · 실제 원화 이평선 아님</div>'+
+  '</div>';
+}
+function holdingCard(id,usdPx){
+ const h=read('isa-us-holdings-v1')?.[id]||{};
+ const qty=h.qty!==null&&h.qty!==undefined&&String(h.qty).trim()!==''&&
+   Number.isFinite(Number(h.qty))&&Number(h.qty)>=0?Number(h.qty):null;
+ const avg=valid(h.krwAvg)?Number(h.krwAvg):null;
+ const position=window.ISA_US_KRW?.basisKrw?.(id,usdPx);
+ const holdings='보유 '+(qty===null?'미입력':fmtQty(qty))+
+  ' · 평단 '+(avg===null?'미입력':wonAmount(avg,2));
+ if(qty===0)return '<div class="us-card-holding">'+holdings+' · 현재 미보유</div>';
+ if(!position)return '<div class="us-card-holding">'+holdings+
+  '<div class="us-card-pnl">평가손익 계산 대기 · 보유정보와 원화 참고가격 확인</div></div>';
+ return '<div class="us-card-holding">'+holdings+
+  '<div class="us-card-pnl '+(position.pnl>=0?'us-positive':'us-negative')+'">평가손익 '+
+   signedWon(position.pnl)+' ('+pct(position.rate)+')</div>'+
+  (position.inclusive!==null?'<div class="us-card-dividend">누적 세후 분배금 포함 '+
+   signedWon(position.inclusive)+' ('+pct(position.inclusiveRate)+')</div>':'')+
+  '</div>';
+}
 function cards(){
  const host=$('us-cards');if(!host)return;
- // Domestic-style layout: one compact full-width row per US symbol.
- // The rich indicators, dividend and risk details remain in the selection panel.
+ // Match the vertical Korean ETF cards: price, source, MA20 reference, holdings and P/L.
  host.innerHTML=FUNDS.map(f=>{
   const x=market(f),px=price(f),
-    wonQuote=window.ISA_US_KRW?.priceKrw?.(f.id,px);
-  const wonPrice=wonQuote&&Number.isFinite(wonQuote.amount)&&wonQuote.amount>0?
-   Math.round(wonQuote.amount).toLocaleString('ko-KR')+'원':'원화 미확인';
-  const summary=window.ISA_US_KRW?.compactLine?.(f.id,px)||'보유수량·원화 평단 입력 필요';
-  const state=window.ISA_PERSONAL_US?.state?.();
-  const nyParts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',
-    year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
-  const nyDate=Object.fromEntries(nyParts.map(v=>[v.type,v.value]));
-  const nyToday=nyDate.year+'-'+nyDate.month+'-'+nyDate.day;
-  // A completed EOD candle is not today's intraday trade. Keep both dates explicit.
-  const fallbackNote=state?.fetching?'장중 시세 조회 중':
-    !state?.configured?'장중 시세 연결 필요':
-    state?.error?'장중 시세 조회 실패':'최근 장중 체결 미수신·만료';
-  const quoteBasis=wonQuote?.kind==='finnhub-private'?
-   'Finnhub 장중 체결 '+new Date(wonQuote.stamp).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',
-     year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})+' · 참고환율':
-   wonQuote?.manual?'토스 당일 원화 가격 직접 입력 · 자동 시세 아님':
-   x?fallbackNote+' · 미국 현지 '+nyToday+' 기준 직전 확정 종가 '+date(x.date)+
-    '로 대체 표시 (실시간 가격 아님)':'장중 및 확정 종가 미확인';
+   q=window.ISA_US_KRW?.priceKrw?.(f.id,px);
+  const krwPrice=valid(q?.amount)?wonAmount(q.amount):'원화 가격 미확인';
+  const source=priceSource(f,x,q);
+  const fxText=valid(q?.usd)&&valid(q?.fxRate)?
+   Number(q.usd).toLocaleString('en-US',{maximumFractionDigits:6})+' USD × '+
+   Number(q.fxRate).toLocaleString('ko-KR',{maximumFractionDigits:2})+
+   '원 = 약 '+wonAmount(q.amount):'';
   const selectedClass=selected===f.id?'us-selected':'';
   return '<button class="us-card us-list-row '+selectedClass+'" type="button" data-us="'+f.id+
-   '" aria-label="'+text(f.ticker+' 원화 참고 표시가격 '+wonPrice+' '+quoteBasis+' '+summary)+
-   '" aria-pressed="'+(selected===f.id?'true':'false')+'">'+
+   '" aria-label="'+text(f.ticker+' '+krwPrice+' '+source.short)+'" aria-pressed="'+
+   (selected===f.id?'true':'false')+'">'+
    '<span class="us-list-top"><strong class="us-list-ticker">'+f.ticker+'</strong>'+
-   '<b class="us-list-price">'+text(wonPrice)+'</b>'+
-   '<span class="us-list-arrow" aria-hidden="true">›</span></span>'+
-   '<span class="us-list-meta">'+text(quoteBasis)+'</span>'+
-   (conversionLine(wonQuote)?'<span class="us-list-meta us-list-calculation">'+text(conversionLine(wonQuote))+'</span>':'')+
-   '<span class="us-list-meta">'+text(summary)+'</span>'+
+    '<b class="us-list-price">'+text(krwPrice)+'</b>'+
+    '<span class="us-list-arrow" aria-hidden="true">›</span></span>'+
+   '<span class="us-list-subtitle">'+text(f.type)+'</span>'+
+   '<span class="us-list-source '+source.type+'">'+text(source.short)+'</span>'+
+   (fxText?'<span class="us-list-fx">'+text(fxText)+' · 참고환율</span>':'')+
+   movingAverageCard(x,q)+holdingCard(f.id,px)+
+   '<span class="us-list-foot">종목을 누르면 차트·분배금·매수 판단 상세 확인</span>'+
    '</button>';
  }).join('');
  host.querySelectorAll('[data-us]').forEach(btn=>btn.onclick=()=>{
   selected=btn.dataset.us;
-  const select=$('us-selector');if(select)select.value=selected;
   render();
  });
 }
@@ -153,6 +203,10 @@ function details(){
  }
  if(f.id==='agnc')section+='<p class="us-small">AGNC는 ETF가 아니라 모기지 리츠 회사 주식입니다. 배당액뿐 아니라 순자산(BVPS), 금리 민감도 및 배당 지속가능성을 별도로 확인하세요.</p>';
  if(f.id==='spym')section+='<p class="us-small">SPYM은 State Street SPDR Portfolio S&P 500 ETF의 현재 티커입니다. 배당수익보다 지수 추적·총수익률 중심으로 점검합니다.</p>';
+ const chosenQuote=window.ISA_US_KRW?.priceKrw?.(f.id,price(f));
+ const calculation=conversionLine(chosenQuote);
+ if(calculation)section+='<p class="us-small">시세 환산 상세: '+text(calculation)+'</p>';
+ host.innerHTML=section;
 }
 function render(){cards();details();}
 async function refresh(){
