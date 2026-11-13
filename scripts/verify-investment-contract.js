@@ -322,23 +322,107 @@ truth(!html.includes('.uo-panel')&&!html.includes('.portfolio-shot-row'),
  'obsolete broker order and screenshot snapshot styles are removed from published page');
 truth(usKrwCode.includes("const LEDGER_KEY='isa-us-distributions-krw-v1'"),
  'verified after-tax payout ledger is retained in the personal US holdings view');
-truth(html.includes('data-auto-kr-id='),'Korean holding editor has automatically sourced read-only reference prices');
-truth(html.includes("querySelectorAll('input[data-pos]')"),
- 'read-only Korean prices never trigger cost-basis/quantity edits');
-truth(html.includes('확정 일봉 종가 · 당일 현재가 아님'),
- 'Korean previous close is identified as historical, not a live price');
-truth(usKrwCode.includes('data-auto-krw-id='),
- 'US holding editor displays an automatically calculated KRW price');
-truth(usKrwCode.includes('data-auto-krw-id="'+String.fromCharCode(39)),
- 'US editor uses distinct non-editable auto quote input');
-truth(usKrwCode.includes("querySelectorAll('input[data-krw-id]')"),
- 'US auto quote display is excluded from manual-holdings save handler');
+// Shared holding settings: one edit location for six Kiwoom and four Toss holdings.
+const capSection=html.slice(html.indexOf('<section class="panel" id="cap-settings">'),
+ html.indexOf('</section>',html.indexOf('<section class="panel" id="cap-settings">')));
+truth(capSection.includes('id="holdings-settings"')&&
+ capSection.includes('id="positions"')&&
+ capSection.includes('id="us-krw-editor"'),
+ 'both Korean and US portfolio editors appear inside original ETF price-cap settings');
+truth(html.split('id="positions"').length===2&&html.split('id="us-krw-editor"').length===2,
+ 'there is exactly one editor host for each domestic and US market');
+truth(!html.includes('id="posDetails"')&&
+ !usKrwCode.includes("'<div id=\"us-krw-editor\"></div>'"),
+ 'duplicate remote holdings editor is removed from page bottom and US summary');
+truth(html.includes("querySelectorAll('input[data-pos]')")&&
+ html.includes("var avgText=renderHoldingInCard(f.id,p);"),
+ 'all six Korean ETF cards read locally saved quantity/average cost and listen to editor changes');
+truth(html.includes('과거 일봉 종가 · '),
+ 'Korean previous close is identified as historical, not current live price');
+truth(!html.includes('data-auto-kr-id=')&&!usKrwCode.includes('data-auto-krw-id='),
+ 'central holding form has no redundant read-only current-price inputs');
+truth(usKrwCode.includes("querySelectorAll('input[data-krw-id]')")&&
+ usKrwCode.includes("if(k==='qty'||k==='krwAvg')p.krwSnapshotDate=day()"),
+ 'US fractional quantity and KRW cost edits save in locally stamped holding records');
+truth(usKrwCode.includes("if(!write('isa-us-holdings-v1',h))")&&
+ usKrwCode.includes("  render();\n }));")&&
+ usKrwCode.includes("window.ISA_US_APP?.rerender?.()"),
+ 'US editor save refreshes live KRW cards and portfolio summary');
 truth(usKrwCode.includes("window.addEventListener('isa-us-quotes-refreshed',()=>render())"),
- 'US auto quote display refreshes after published US market data changes');
+ 'US live quote updates keep refreshing the cards and KRW valuation');
 truth(usKrwCode.includes("if(k==='krwCurrent')p.krwDay="),
- 'US Toss user-confirmed manual price still expires daily');
+ 'optional Toss price correction still expires each day');
 truth(usKrwCode.includes("const LEDGER_KEY='isa-us-distributions-krw-v1'"),
- 'US historical distribution ledger remains untouched');
+ 'existing cumulative net KRW distribution ledger is retained');
+
+// Behaviour test: domestic editor change updates a saved position without altering cost basis.
+const domesticSrc=html.slice(html.indexOf('function renderPositions(){'),html.indexOf('function renderPlan(){'));
+truth(domesticSrc.startsWith('function renderPositions(){')&&domesticSrc.includes("positions[id]=h;persist();render();"),
+ 'domestic holdings editor source is separately executable and updates cards');
+const domesticSaved={reit:{qty:42,avg:3886}},domesticInputs=[];
+const domesticMessage={textContent:''},domesticHost={
+ innerHTML:'',
+ querySelectorAll:()=>domesticInputs
+};
+const domFn=new Function('el','FUNDS','positions','valid','qtyValid','safe','persist','render',
+ domesticSrc+'\nreturn renderPositions;')(
+ id=>id==='positions'?domesticHost:domesticMessage,
+ [{id:'reit',name:'TIGER 리츠부동산인프라',code:'329200'}],domesticSaved,
+ v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number(v)>0&&Number.isFinite(Number(v)),
+ v=>String(v).trim()!==''&&Number.isInteger(Number(v))&&Number(v)>=0,
+ v=>String(v),()=>{domesticMessage.saved=(domesticMessage.saved||0)+1;},
+ ()=>{domesticMessage.rerendered=(domesticMessage.rerendered||0)+1;}
+);
+const domesticQty={dataset:{pos:'reit',kind:'qty'},value:'43',
+ addEventListener:(_name,cb)=>domesticQty.change=cb};
+const domesticAvg={dataset:{pos:'reit',kind:'avg'},value:'3910',
+ addEventListener:(_name,cb)=>domesticAvg.change=cb};
+domesticInputs.push(domesticQty,domesticAvg);
+domFn();
+truth(domesticHost.innerHTML.includes('data-kind="qty"')&&
+ domesticHost.innerHTML.includes('data-kind="avg"'),
+ 'Korean settings contain dedicated quantity and KRW average purchase fields');
+domesticQty.change.call(domesticQty);
+equal(domesticSaved.reit.qty,43,'domestic change updates the stored share quantity');
+equal(domesticSaved.reit.avg,3886,'changing share quantity preserves previous average cost');
+domesticAvg.change.call(domesticAvg);
+equal(domesticSaved.reit.avg,3910,'changing KRW average cost updates the existing holdings record');
+equal(domesticMessage.rerendered,2,'each valid domestic edit refreshes ETF cards');
+domesticQty.value='1.25';domesticQty.change.call(domesticQty);
+equal(domesticSaved.reit.qty,43,'domestic non-integer share quantities are rejected safely');
+
+// Behaviour test: US editor updates local investment holdings without overwriting dividends.
+const usFormSrc=usKrwCode.slice(usKrwCode.indexOf('function renderForm(){'),
+ usKrwCode.indexOf('function importHoldings(){'));
+truth(usFormSrc.startsWith('function renderForm(){'),
+ 'US share and cost editor is separately executable for synthetic local holdings');
+let usSaved={schd:{qty:24.330226,krwAvg:47864,krwNet:12345}},usRenders=0;
+const usInputs=[],usHost={innerHTML:'',querySelectorAll:()=>usInputs};
+const usMsg={textContent:''},usAltMsg={textContent:''};
+const usInput={dataset:{krwId:'schd',k:'qty'},value:'25.330226',
+ addEventListener:(_name,cb)=>usInput.change=cb};
+const usAvg={dataset:{krwId:'schd',k:'krwAvg'},value:'48000',
+ addEventListener:(_name,cb)=>usAvg.change=cb};
+usInputs.push(usInput,usAvg);
+const usFn=new Function('$','ITEMS','holdings','day','finitePositive','write','render',
+ usFormSrc+'\nreturn renderForm;')(
+ id=>id==='us-krw-editor'?usHost:id==='us-holding-message'?usMsg:usAltMsg,
+ ['SCHD','AGNC','SPYM','CONY'],()=>usSaved,()=> '2026-11-14',
+ v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0,
+ (key,value)=>{if(key!=='isa-us-holdings-v1')throw Error('unexpected storage key');usSaved=value;return true;},
+ ()=>{usRenders++}
+);
+usFn();
+truth(usHost.innerHTML.includes('data-k="qty"')&&
+ usHost.innerHTML.includes('data-k="krwAvg"')&&
+ usHost.innerHTML.includes('step="0.000001"'),
+ 'US holdings editor supports fractional share input and KRW average price');
+usInput.change();
+equal(usSaved.schd.qty,25.330226,'US fractional share change updates local holdings');
+equal(usSaved.schd.krwNet,12345,'US edit preserves existing cumulative after-tax distributions');
+usAvg.change();
+equal(usSaved.schd.krwAvg,48000,'US average cost is stored in KRW');
+equal(usRenders,2,'US edits trigger card and portfolio re-render');
 
 // The mobile US portfolio has one private live price feed with safe EOD fallback.
 // Redundant TradingView widget and old USD editor must never reappear.
