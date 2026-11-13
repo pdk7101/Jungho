@@ -365,8 +365,73 @@ equal(priceFromClose('schd',39).amount,54600,'expired or missing TV input falls 
 const directToss=convert(()=>({schd:{krwCurrent:61000,krwDay:'2026-11-13'}}),validPositive,
  ()=> '2026-11-13',()=>({rate:1400,source:'test FX'}),{ISA_US_APP:chosen});
 equal(directToss('schd',39).amount,61000,'user-confirmed Toss KRW value keeps priority over TV observation');
-truth(usDashboardCode.includes("function price(f){const x=market(f),q=observedQuote(f.id)"),
- 'US valuation list reads user-confirmed price before completed close');
-truth(usDashboardCode.includes('valid(manual[f.id])?Number(manual[f.id]):price(f)'),
- 'detail-only hypothetical price is isolated from valuation list');
+truth(usDashboardCode.includes("manual?manual.usd:live?live.usd:x?Number(x.close):null"),
+ 'US valuation uses user-confirmed price first, recent private price second, daily close last');
+truth(usDashboardCode.includes("valid(manual[f.id])?Number(manual[f.id]):x?Number(x.close):null"),
+ 'daily-bar trend detail is never silently changed by intraday quote');
+// Optional private personal-US feed: API keys remain in Cloudflare Secrets, never in GitHub.
+const feedCode=txt('personal-us-live.js'),workerCode=txt('private-us-quotes-worker.js');
+truth(!!new vm.Script(feedCode,{filename:'personal-us-live.js'}),
+ 'mobile personal feed is valid browser-side JavaScript');
+truth(!!new vm.Script(workerCode.replace('export default {','const worker = {'),
+   {filename:'private-us-quotes-worker.js'}),
+ 'free Worker bridge is valid JavaScript');
+truth(html.includes('src="./personal-us-live.js" defer')&&
+ html.indexOf('src="./personal-us-live.js" defer')<
+ html.indexOf('src="./us-dashboard.js" defer'),
+ 'private source is available before US valuation dashboard');
+truth(html.includes('id="us-live-url"')&&html.includes('id="us-live-secret"')&&
+ html.includes('id="us-live-connect"')&&html.includes('id="us-live-badge"'),
+ 'mobile dashboard can configure private personal endpoint');
+truth(workerCode.includes("const ALLOWED_ORIGIN='https://pdk7101.github.io'")&&
+ workerCode.includes("request.headers.get('Authorization')")&&
+ workerCode.includes('env.FINNHUB_API_KEY')&&workerCode.includes('env.VIEW_TOKEN'),
+ 'Worker must require explicit authentication and private provider key');
+truth(workerCode.includes("request.method!=='GET'||url.pathname!=='/quotes'"),
+ 'Worker exposes read-only quote path, not orders/account access');
+truth(workerCode.includes('X-Finnhub-Token')&&
+ workerCode.includes("Cache-Control':'private, no-store"),
+ 'provider key sent only to Finnhub; personal response is not publicly cached');
+truth(feedCode.includes("setInterval(refresh,120000)")&&
+ feedCode.includes("sessionStorage.setItem(VIEW_KEY,access)"),
+ 'free bridge polls at most once every two minutes with session-only viewer token');
+truth(feedCode.includes('now-t>TRADE_TTL')&&feedCode.includes('now-f>RESPONSE_TTL'),
+ 'client rejects expired trade and stale API response');
+truth(usKrwCode.includes("kind:'finnhub-private'")&&
+ usKrwCode.includes("isa-personal-us-quote-refreshed"),
+ 'private US live price is used in KRW valuation and refreshes on new quote');
+truth(usDashboardCode.includes("kind==='finnhub-private'"),
+ 'private price appears with distinct source/date, not as an official Toss quote');
+
+const feedStart=feedCode.indexOf('function quote(id){'),feedEnd=feedCode.indexOf('function signal(){',feedStart);
+truth(feedStart>=0&&feedEnd>feedStart,'client intraday quote validation function accessible');
+const currentTrade=new Date(Date.now()-2*60000).toISOString();
+const feedContext=vm.createContext({
+ IDS:['schd','agnc','spym','cony'],
+ quotes:{schd:{usd:42,tradeAt:currentTrade}},
+ fetchedAt:new Date().toISOString(),
+ TRADE_TTL:45*60000,RESPONSE_TTL:5*60000,
+ Date,Number
+});
+vm.runInContext(feedCode.slice(feedStart,feedEnd)+'\nthis.getQuote=quote;',feedContext);
+equal(feedContext.getQuote('schd').usd,42,'recent private confirmed trade accepted');
+feedContext.quotes.schd.tradeAt=new Date(Date.now()-46*60000).toISOString();
+equal(feedContext.getQuote('schd'),null,'trade older than 45 min is not used as fresh');
+feedContext.quotes.schd.tradeAt=currentTrade;
+feedContext.fetchedAt=new Date(Date.now()-6*60000).toISOString();
+equal(feedContext.getQuote('schd'),null,'stale server response not used as fresh');
+
+const personal=convert(()=>({}),validPositive,()=> '2026-11-13',
+ ()=>({rate:1400,source:'test FX'}),
+ {ISA_US_APP:{observedQuote:()=>null},
+  ISA_PERSONAL_US:{quote:()=>({usd:42,tradeAt:'2026-11-13T10:00:00Z'})}});
+equal(personal('schd',39).amount,58800,'private quote 42 USD × 1400 KRW converts automatically');
+equal(personal('schd',39).kind,'finnhub-private','private price source kept distinct');
+const overridePersonal=convert(()=>({schd:{krwCurrent:61000,krwDay:'2026-11-13'}}),
+ validPositive,()=> '2026-11-13',()=>({rate:1400,source:'test FX'}),
+ {ISA_US_APP:{observedQuote:()=>null},
+  ISA_PERSONAL_US:{quote:()=>({usd:42,tradeAt:'2026-11-13T10:00:00Z'})}});
+equal(overridePersonal('schd',39).amount,61000,
+ 'manually confirmed Toss price takes priority over personal intraday quote');
+
 console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
