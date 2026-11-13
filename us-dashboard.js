@@ -145,6 +145,26 @@ function chart(x){
  '<polyline points="'+poly(ma5s)+'" fill="none" stroke="#24bf9a" stroke-width="2.1"/>'+
  '<polyline points="'+poly(ma20s)+'" fill="none" stroke="#eab308" stroke-width="2.1"/></svg>';
 }
+function conversionLine(q){
+ if(!q||!Number.isFinite(q.usd)||q.usd<=0||
+    !Number.isFinite(q.fxRate)||q.fxRate<=0||!Number.isFinite(q.amount))return '';
+ const usd=q.usd.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:6});
+ const rate=q.fxRate.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:6});
+ const calc=Math.round(q.amount).toLocaleString('ko-KR');
+ let fxTime='환율 기준 미확인',warning='';
+ if(q.fxManual){
+  fxTime='사용자가 설정한 환율';
+ }else{
+  const stamp=Date.parse(q.fxAt||''),age=Date.now()-stamp;
+  if(Number.isFinite(stamp)){
+   fxTime='환율 기준 '+new Date(stamp).toLocaleString('ko-KR',
+    {timeZone:'Asia/Seoul',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+   if(Number.isFinite(age)&&age>24*3600000)warning=' · 환율 기준 24시간 이상 경과';
+  }
+ }
+ return usd+' USD × '+rate+'원/USD = 약 '+calc+'원 · '+fxTime+warning+
+  ' · 토스 적용환율·체결시세와 차이 가능';
+}
 function cards(){
  const host=$('us-cards');if(!host)return;
  // Domestic-style layout: one compact full-width row per US symbol.
@@ -179,6 +199,7 @@ function cards(){
    '<span class="us-list-state state-'+status+'">'+text(actualText)+'</span>'+
    '<span class="us-list-arrow" aria-hidden="true">›</span></span>'+
    '<span class="us-list-meta">'+text(quoteBasis)+'</span>'+
+   (conversionLine(wonQuote)?'<span class="us-list-meta us-list-calculation">'+text(conversionLine(wonQuote))+'</span>':'')+
    '<span class="us-list-meta">'+text(summary)+'</span>'+
    '<span class="us-list-meta">토스 주문상태 '+text(brokerNote?.date?'마지막 사용자 확인 '+brokerNote.date:'확인 기록 없음')+
    ' · 증권사 실시간 연동 아님</span></button>';
