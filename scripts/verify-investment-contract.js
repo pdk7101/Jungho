@@ -65,6 +65,36 @@ truth(html.includes('function renderMa20InCard(id)'),
  'moving average is rendered directly inside each ETF card');
 truth(html.includes('avgText+renderMa20InCard(f.id)+tag'),
  'moving average appears after average-cost comparison and before buy status');
+truth(html.includes('var avgText=renderHoldingInCard(f.id,p);'),
+ 'all six Korean ETF cards show local share count and average cost above MA20');
+truth(html.includes('data-holding=')&&html.includes('function renderHoldingInCard(id,p){'),
+ 'Korean ETF holding block uses only local stored positions and not public hardcoded counts');
+const holdingStart=html.indexOf('function renderHoldingInCard(id,p){');
+const holdingEnd=html.indexOf('function renderMa20InCard(id){',holdingStart);
+truth(holdingStart>=0&&holdingEnd>holdingStart,
+ 'Korean ETF holding formatter can be independently tested');
+const syntheticHoldings={reit:{qty:42,avg:3886},robot:{qty:0,avg:''},space:{qty:5,avg:''}};
+const holdingFormatter=new Function('positions','qtyValid','valid','avgMoney','safe',
+ html.slice(holdingStart,holdingEnd)+'\nreturn renderHoldingInCard;')(
+ syntheticHoldings,
+ v=>Number.isInteger(Number(v))&&Number(v)>=0&&String(v).trim()!=='',
+ v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0,
+ v=>Number(v).toLocaleString('ko-KR',{maximumFractionDigits:2})+'원',
+ v=>String(v).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]))
+);
+const reitHolding=holdingFormatter('reit',3690);
+truth(reitHolding.includes('보유 42주 · 평단 3,886원')&&
+ reitHolding.includes('-5.04%'),
+ 'REIT card correctly displays 42 owned shares, 3,886 KRW average cost and price difference');
+truth(holdingFormatter('robot',8880).includes('보유 0주 (미보유) · 평단 해당 없음'),
+ 'zero-share Korean ETF is labeled unowned without misleading average cost');
+truth(holdingFormatter('space',9700).includes('보유 5주 · 평단 미입력'),
+ 'quantity remains visible when average purchase price is missing');
+truth(holdingFormatter('sol',9300).includes('보유수량 미입력 · 평단 미입력'),
+ 'missing local holdings never fabricate share count or cost');
+truth(app.FUNDS.every(f=>holdingFormatter(f.id,9300).includes('data-holding="'+f.id+'"')),
+ 'the new holding row handles all six Korean ETF symbols');
+
 truth(html.includes('20일선 대비'),
  'card shows price-to-MA20 distance in KRW and percent');
 equal(app.ma20Comparison('reit').ma20,3955,'20-day moving average is derived from confirmed bar data');
