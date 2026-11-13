@@ -371,6 +371,9 @@ truth(usDashboardCode.includes("valid(manual[f.id])?Number(manual[f.id]):x?Numbe
  'daily-bar trend detail is never silently changed by intraday quote');
 // Optional private personal-US feed: API keys remain in Cloudflare Secrets, never in GitHub.
 const feedCode=txt('personal-us-live.js'),workerCode=txt('private-us-quotes-worker.js');
+const stampCode=txt('scripts/stamp-assets.js');
+truth(stampCode.includes("'personal-us-live.js','us-dashboard.js'"),
+ 'personal quote connector asset MUST be cache-busted on each site deployment');
 const pagesWorkflow=txt('.github/workflows/pages.yml');
 truth(/cp index\.html[^\n]*\bpersonal-us-live\.js\b[^\n]*\bsite\//.test(pagesWorkflow),
  'GitHub Pages deploy MUST copy personal quote connector script before reporting success');
@@ -411,7 +414,12 @@ truth(feedCode.includes("url&&url===endpoint&&password.length>=20?password")&&
  'blank token input reuses only a previously saved token for exactly the same Worker URL');
 truth(feedCode.includes("$('us-live-secret').value=''; // Never leave secret readable")&&
  !feedCode.includes("localStorage.setItem(VIEW_KEY"),
- 'input is cleared for security and the token is never stored in durable localStorage');
+ 'input is cleared; non-opt-in session token is not written to durable localStorage');
+truth(html.includes('id="us-live-remember"')&&
+ feedCode.includes("if($('us-live-remember')?.checked)")&&
+ feedCode.includes('elapsed>REMEMBER_MAX_MS')&&
+ feedCode.includes('saved.url===url'),
+ 'on-device token persistence is opt-in, 30-day-limited, and scoped to its original Worker');
 truth(feedCode.includes('개인 시세 서버 응답 성공 · 유효한 최근 체결 0/4'),
  'authenticated quote response with outdated trades is distinguished from a connection failure');
 truth(feedCode.includes('now-t>TRADE_TTL')&&feedCode.includes('now-f>RESPONSE_TTL'),
@@ -453,4 +461,93 @@ const overridePersonal=convert(()=>({schd:{krwCurrent:61000,krwDay:'2026-11-13'}
 equal(overridePersonal('schd',39).amount,61000,
  'manually confirmed Toss price takes priority over personal intraday quote');
 
+// Behavioral browser mocks: double-click, reload, optional on-device store, scoped token
+// and disconnect. No real credentials, market feeds, or broker orders used.
+function fakeStorage(backing=new Map()){
+ return {
+  getItem:key=>backing.get(key)??null,
+  setItem:(key,value)=>backing.set(key,String(value)),
+  removeItem:key=>backing.delete(key),
+  backing
+ };
+}
+function runFeed(local,session){
+ const nodes={};
+ const el=id=>{
+  if(!nodes[id]){
+   const hooks={};
+   nodes[id]={
+    value:'',checked:false,placeholder:'',textContent:'',
+    addEventListener:(type,fn)=>{hooks[type]=fn;},
+    invoke:type=>{if(!hooks[type])throw Error(id+' lacks '+type);return hooks[type]();}
+   };
+  }
+  return nodes[id];
+ };
+ const dom={hidden:true,getElementById:el,addEventListener:()=>{}};
+ const ctx={
+  localStorage:local,sessionStorage:session,document:dom,
+  window:{dispatchEvent:()=>{}},Event:class{constructor(name){this.type=name;}},
+  setInterval:()=>0,URL,Date,Number,JSON
+ };
+ vm.runInNewContext(feedCode,ctx,{filename:'personal-us-live.js'});
+ return {el,ctx};
+}
+const url='https://shy-moon-ff5b.pdk7101.workers.dev';
+const sampleToken='SYNTHETIC_PRIVATE_TOKEN_32_TEST_ONLY';
+const localFake=fakeStorage(),sessionFake=fakeStorage();
+const appOne=runFeed(localFake,sessionFake);
+appOne.el('us-live-url').value=url;
+appOne.el('us-live-secret').value=sampleToken;
+appOne.el('us-live-connect').invoke('click');
+equal(appOne.el('us-live-secret').value,'','token input cleared after successful same-tab connect');
+truth(sessionFake.getItem('isa-us-private-worker-access-session-v1')===sampleToken,
+ 'VIEW_TOKEN remembered in sessionStorage for a same-tab click');
+truth(!localFake.getItem('isa-us-private-worker-remembered-v1'),
+ 'without consent, VIEW_TOKEN is not stored persistently');
+appOne.el('us-live-connect').invoke('click');
+truth(appOne.el('us-personal-status').textContent.includes('저장된 암호로 다시 조회합니다'),
+ 'repeated connect click reuses in-memory/session secret without asking again');
+
+const reloaded=runFeed(localFake,sessionFake);
+reloaded.el('us-live-connect').invoke('click');
+truth(reloaded.el('us-personal-status').textContent.includes('저장된 암호로 다시 조회합니다'),
+ 'reload in the same browser tab reuses session token');
+
+const freshTab=runFeed(localFake,fakeStorage());
+freshTab.el('us-live-connect').invoke('click');
+truth(freshTab.el('us-personal-status').textContent.includes('개인 접근 암호가 비어 있습니다'),
+ 'without opt-in, opening a fresh tab does not silently persist a secret');
+
+appOne.el('us-live-remember').checked=true;
+appOne.el('us-live-remember').invoke('change');
+truth(JSON.parse(localFake.getItem('isa-us-private-worker-remembered-v1')).access===sampleToken,
+ 'explicit remember selection stores token only on personal device');
+const persistedTab=runFeed(localFake,fakeStorage());
+equal(persistedTab.el('us-live-remember').checked,true,
+ 'opted-in personal device remembers the setting in a new tab');
+persistedTab.el('us-live-connect').invoke('click');
+truth(persistedTab.el('us-personal-status').textContent.includes('저장된 암호로 다시 조회합니다'),
+ 'opted-in personal device connects in a new tab without retyping');
+
+persistedTab.el('us-live-url').value='https://different-user.workers.dev';
+persistedTab.el('us-live-connect').invoke('click');
+truth(persistedTab.el('us-personal-status').textContent.includes('개인 접근 암호가 비어 있습니다'),
+ 'remembered VIEW_TOKEN is never reused for a different Worker address');
+
+persistedTab.el('us-live-disconnect').invoke('click');
+equal(localFake.getItem('isa-us-private-worker-remembered-v1'),null,
+ 'disconnect deletes persistent remembered access token');
+
+const expiredLocal=fakeStorage(new Map([
+ ['isa-us-private-worker-url-v1',url],
+ ['isa-us-private-worker-remembered-v1',
+  JSON.stringify({url,access:sampleToken,savedAt:Date.now()-31*86400000})]
+]));
+const expired=runFeed(expiredLocal,fakeStorage());
+expired.el('us-live-connect').invoke('click');
+truth(expired.el('us-personal-status').textContent.includes('개인 접근 암호가 비어 있습니다'),
+ '30-day-old persisted VIEW_TOKEN is rejected');
+equal(expiredLocal.getItem('isa-us-private-worker-remembered-v1'),null,
+ 'expired on-device secret is purged');
 console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
