@@ -276,6 +276,13 @@ details[open]>summary{margin-bottom:12px}
 #us-intraday .tv-us-note{font-size:.79rem;color:#bbcee3;line-height:1.6;margin-top:7px}
 #us-intraday .tv-us-links{display:flex;flex-wrap:wrap;gap:9px;margin-top:8px;font-size:.77rem}
 #us-intraday .tv-us-links a{color:#a7d3ff}
+#tv-price-apply{margin-top:12px;border-top:1px solid #4b607b;padding-top:10px}
+#tv-price-apply summary{font-weight:700;font-size:.88rem;cursor:pointer}
+#tv-price-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}
+#tv-price-inputs label{font-size:.81rem;color:#c9d8e8}
+#tv-price-inputs input{max-width:100%;box-sizing:border-box}
+#tv-price-controls{display:flex;flex-wrap:wrap;gap:9px}
+#tv-price-status{font-size:.8rem;line-height:1.6;color:#c2d1e2;margin:8px 0 0}
 </style><script src="./live-prices.js"></script>
 <script type="module" src="https://widgets.tradingview-widget.com/w/en/tv-ticker-tape.js"></script></head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
@@ -316,6 +323,21 @@ details[open]>summary{margin-bottom:12px}
     외부 장중 시세 위젯 로드 중입니다.
   </tv-ticker-tape>
   <p class="tv-us-note">TradingView 제공 별도 시세 화면입니다. 거래소 정책에 따라 지연(미국 주식 약 15분 등)되며 미국장 외에는 직전 거래가격이 표시될 수 있습니다. 아래 원화 종가환산 카드와 시점이 다릅니다. 위젯 수치는 현재 매수판단·평가손익에 자동 반영되지 않습니다.</p>
+  <details id="tv-price-apply">
+   <summary>위젯에서 본 가격을 원화 평가손익에 적용 (직접 확인)</summary>
+   <p class="tv-us-note">TradingView는 위젯 시세를 외부 계산식에 자동 제공하지 않습니다. 위젯에서 확인한 달러 가격을 아래에 입력한 뒤 '반영'을 누르면 원화 평가금액·평가손익을 갱신합니다. 입력 후 30분까지만 임시 적용하며, 기술적 매수 신호는 기존 확정 일봉 기준으로 안전하게 유지합니다.</p>
+   <div id="tv-price-inputs">
+    <label>SCHD · 달러(USD)<input data-tv-usd="schd" type="number" min="0.01" max="100000" step="0.0001" inputmode="decimal" placeholder="가격 입력"></label>
+    <label>AGNC · 달러(USD)<input data-tv-usd="agnc" type="number" min="0.01" max="100000" step="0.0001" inputmode="decimal" placeholder="가격 입력"></label>
+    <label>SPYM · 달러(USD)<input data-tv-usd="spym" type="number" min="0.01" max="100000" step="0.0001" inputmode="decimal" placeholder="가격 입력"></label>
+    <label>CONY · 달러(USD)<input data-tv-usd="cony" type="number" min="0.01" max="100000" step="0.0001" inputmode="decimal" placeholder="가격 입력"></label>
+   </div>
+   <div id="tv-price-controls">
+    <button type="button" class="us-header-button" id="tv-price-confirm">입력한 가격 평가에 반영</button>
+    <button type="button" class="us-header-button" id="tv-price-clear">임시 가격 전체 해제</button>
+   </div>
+   <p id="tv-price-status" role="status">미국 장중 가격을 아직 직접 반영하지 않았습니다.</p>
+  </details>
   <nav class="tv-us-links" aria-label="미국 주식 시세 제공처 원본 보기">
    <a href="https://www.tradingview.com/symbols/AMEX-SCHD/" target="_blank" rel="noopener noreferrer">SCHD</a>
    <a href="https://www.tradingview.com/symbols/NASDAQ-AGNC/" target="_blank" rel="noopener noreferrer">AGNC</a>
