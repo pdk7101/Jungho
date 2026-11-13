@@ -275,6 +275,8 @@ details[open]>summary{margin-bottom:12px}
 #personal-us-live .us-personal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0}
 #personal-us-live .us-personal-grid label{font-size:.82rem}
 #personal-us-live input{max-width:100%;box-sizing:border-box}
+#personal-us-live .us-remember-option{display:flex;align-items:flex-start;gap:7px;font-size:.81rem;margin:8px 0;color:#ced9e9}
+#personal-us-live .us-remember-option input{width:18px;min-width:18px;height:18px;margin:2px 0 0}
 #personal-us-live .live-note{font-size:.8rem;color:#bfcfe5;line-height:1.6;margin:8px 0}
 #us-personal-status{font-size:.8rem;font-weight:600;margin:7px 0;line-height:1.6}
 #us-intraday{margin:12px 0 14px;padding:12px 11px;border:1px solid #5078ae;border-radius:11px;background:#14243a}
@@ -327,7 +329,8 @@ details[open]>summary{margin-bottom:12px}
    <label>개인용 Cloudflare Worker 주소<input id="us-live-url" type="url" placeholder="https://나의-시세.workers.dev" autocomplete="off" spellcheck="false"></label>
    <label>개인용 접근 암호 (20자 이상)<input id="us-live-secret" type="password" placeholder="Worker VIEW_TOKEN과 동일하게" autocomplete="off" spellcheck="false"></label>
   </div>
-  <p class="live-note" id="us-live-secret-hint">접근 암호는 최초 연결 시 한 번만 입력하세요. 같은 탭에서 자동 조회하거나 다시 눌러도 재입력할 필요가 없습니다.</p>
+  <label class="us-remember-option"><input type="checkbox" id="us-live-remember">내 개인 휴대전화에 접근 암호 기억하기 (선택 · 최대 30일)</label>
+  <p class="live-note" id="us-live-secret-hint">기본값은 현재 탭에서만 암호를 보관합니다. 위 항목을 직접 선택하면 이 브라우저의 기기 저장소에 암호를 저장해 새 탭에서도 다시 입력하지 않을 수 있습니다. 공용 기기에서는 선택하지 마세요. 기기에 저장된 암호는 해당 웹사이트에서 실행되는 스크립트가 접근할 수 있습니다.</p>
   <div id="us-personal-status" role="status">연결되지 않음 · 기존 미국장 확정 종가를 사용합니다.</div>
   <div id="tv-price-controls">
    <button type="button" class="us-header-button" id="us-live-connect">개인 시세 연결·조회</button>
