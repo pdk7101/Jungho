@@ -550,4 +550,26 @@ truth(expired.el('us-personal-status').textContent.includes('개인 접근 암�
  '30-day-old persisted VIEW_TOKEN is rejected');
 equal(expiredLocal.getItem('isa-us-private-worker-remembered-v1'),null,
  'expired on-device secret is purged');
+// Diagnose unavailable Finnhub quotes without assuming the US market is closed.
+truth(html.includes('id="us-quote-debug"')&&html.includes('id="us-quote-debug-text"'),
+ 'personal mobile page shows per-symbol non-secret API response diagnostics');
+truth(feedCode.includes('diagnostics=details')&&
+ feedCode.includes('details[id]=quoteDiagnosis(v,now)'),
+ 'when zero quotes validate, the client preserves safe per-symbol failure reasons');
+const diagStart=feedCode.indexOf('function quoteDiagnosis(item,now){');
+const diagEnd=feedCode.indexOf('function renderDiagnostics(){',diagStart);
+truth(diagStart>=0&&diagEnd>diagStart,'non-secret quote diagnosis function available');
+const diagCtx=vm.createContext({TRADE_TTL:45*60000,Date,Number,Math});
+vm.runInContext(feedCode.slice(diagStart,diagEnd)+'\nthis.diagnose=quoteDiagnosis;',diagCtx);
+const diagNow=Date.now();
+truth(diagCtx.diagnose({error:'upstream_status_403'},diagNow).includes('403'),
+ 'Finnhub 403 is identified as provider access denial, not market closure');
+truth(diagCtx.diagnose({error:'upstream_status_429'},diagNow).includes('429'),
+ 'provider rate limit is identified without exposing any API key');
+truth(diagCtx.diagnose({error:'invalid_or_outdated_trade'},diagNow).includes('유효한 가격'),
+ 'missing or outdated trade is identified as data not usable for valuation');
+truth(diagCtx.diagnose({usd:42,tradeAt:new Date(diagNow-50*60000).toISOString()},diagNow).includes('45분 초과'),
+ 'old trade timestamp is distinguished from an API failure');
+truth(diagCtx.diagnose({usd:42,tradeAt:new Date(diagNow-3*60000).toISOString()},diagNow)==='최근 체결가격 사용 가능',
+ 'recent valid trade is clearly distinguished from provider errors');
 console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
