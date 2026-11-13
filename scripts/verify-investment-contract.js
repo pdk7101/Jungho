@@ -426,17 +426,17 @@ equal(usRenders,2,'US edits trigger card and portfolio re-render');
 
 // The mobile US portfolio has one private live price feed with safe EOD fallback.
 // Redundant TradingView widget and old USD editor must never reappear.
-truth(usDashboardCode.includes("nyToday+' 기준 직전 확정 종가 '+date(x.date)")&&
- usDashboardCode.includes("'로 대체 표시 (실시간 가격 아님)'")&&
- usDashboardCode.includes("기술 분석용 확정 일봉"),
- 'US cards label last completed US close as a non-live substitute using NY-local date');
-truth(usDashboardCode.includes("'장중 시세 연결 필요'")&&
+truth(usDashboardCode.includes("'직전 확정 종가 '+date(x.date)")&&
+ usDashboardCode.includes("기술 분석용 확정 일봉")&&
+ usDashboardCode.includes("''")===false,
+ 'US fallback is explicitly dated as completed previous-session close');
+truth(usDashboardCode.includes("'장중 시세 미연결'")&&
  usDashboardCode.includes("'장중 시세 조회 실패'")&&
- usDashboardCode.includes("'최근 장중 체결 미수신·만료'"),
- 'each fallback US card explains precisely why intraday quotes were not used');
-truth(usDashboardCode.includes("'Finnhub 장중 체결 '")&&
- usDashboardCode.includes("year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit'"),
- 'valid US live trades show complete Korean-local date and time');
+ usDashboardCode.includes("'장중 시세 미수신·만료'"),
+ 'US cards distinguish disconnected feed, failed request, and expired intraday trade');
+truth(usDashboardCode.includes("short:'Finnhub 장중 체결'")&&
+ usDashboardCode.includes("month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'"),
+ 'valid US intraday trade shows time in Korean local timezone');
 truth(!usDashboardCode.includes("'매수중 기록'")&&
  !usDashboardCode.includes("'일시중지 기록'")&&
  !usDashboardCode.includes("ISA_ORDER_PLAN?.note")&&
@@ -764,9 +764,14 @@ truth(!JSON.stringify(exceptionFeed).includes('synthetic unsafe internal detail'
  'upstream exception messages do not enter the client quote feed');
 // USD/KRW discrepancy check: never present Finnhub USD × dated reference FX as Toss KRW.
 truth(usDashboardCode.includes('function conversionLine(q){')&&
- usDashboardCode.includes('us-list-meta us-list-calculation')&&
- html.includes('#us-panel .us-list-meta.us-list-calculation{'),
- 'each US card shows the exact USD and dated FX conversion without mobile truncation');
+ usDashboardCode.includes("const calculation=conversionLine(chosenQuote)")&&
+ usDashboardCode.includes("host.innerHTML=section;")&&
+ html.includes('#us-panel .us-list-fx{'),
+ 'US card shows a concise USD-to-KRW reference, full conversion only in selected ticker detail');
+truth(usDashboardCode.includes('function movingAverageCard(x,wonQuote){')&&
+ usDashboardCode.includes('movingAverageCard(x,q)+holdingCard(f.id,px)')&&
+ html.includes('#us-panel .us-card-ma20{'),
+ 'each US card matches domestic ETF layout with a central MA20 panel and holdings below');
 truth(usKrwCode.includes("usd:Number(privateQuote.usd),fxRate:rate.rate,fxAt:rate.when")&&
  usKrwCode.includes("fxSource:rate.source,fxManual:rate.manual"),
  'personal Finnhub quote preserves calculation inputs and FX reference provenance');
@@ -789,4 +794,67 @@ const oldFx=convSandbox.conversionLineForTest({
 });
 truth(oldFx.includes('환율 기준 24시간 이상 경과'),
  'dated reference FX older than 24 hours is flagged rather than implied to be realtime');
+
+const usCardStart=usDashboardCode.indexOf('function wonAmount(n,decimals=0){');
+const usCardEnd=usDashboardCode.indexOf('function details(){',usCardStart);
+truth(usCardStart>=0&&usCardEnd>usCardStart,
+ 'complete US card renderer and MA20 helper can be tested without broker connections');
+const fakeCards={innerHTML:'',querySelectorAll:()=>[]};
+const nowRecent=new Date(Date.now()-2*60000).toISOString();
+const testUs={kind:'finnhub-private',usd:42,fxRate:1400,amount:58800,
+ stamp:nowRecent};
+const fakePosition={schd:{qty:24.330226,krwAvg:47864}};
+const testItem={id:'schd',ticker:'SCHD',type:'미국 배당 ETF'};
+const testBar={date:'20261112',close:40,trend:{ma20:40,ma5:41}};
+const fakeWin={
+ ISA_PERSONAL_US:{state:()=>({configured:true,fetching:false,error:''})},
+ ISA_US_KRW:{
+  fx:()=>({rate:1400}),
+  priceKrw:()=>testUs,
+  basisKrw:()=>({pnl:2800,rate:5,net:1000,inclusive:3800,inclusiveRate:6.78})
+ }
+};
+const cardCtx=vm.createContext({
+ FUNDS:[testItem],selected:'schd',window:fakeWin,document:{getElementById:()=>fakeCards},
+ read:()=>fakePosition,market:()=>testBar,price:()=>42,date:s=>s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6),
+ valid:v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0,
+ text:s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+ Intl,Number,Date,Math
+});
+vm.runInContext(usDashboardCode.slice(usCardStart,usCardEnd)+'\nthis.renderTestCards=cards;',cardCtx);
+cardCtx.renderTestCards();
+truth(fakeCards.innerHTML.includes('58,800원')&&
+ fakeCards.innerHTML.includes('20일 이동평균선')&&
+ fakeCards.innerHTML.includes('56,000.00원'),
+ 'US live card renders KRW current reference and converted MA20 like Korean ETF');
+truth(fakeCards.innerHTML.includes('2,800원 (+5.00%)')&&
+ fakeCards.innerHTML.includes('5일선 57,400.00원'),
+ 'US MA20 box renders price difference in KRW and percent plus MA5');
+truth(fakeCards.innerHTML.includes('보유 24.330226주 · 평단 47,864.00원')&&
+ fakeCards.innerHTML.includes('평가손익 +2,800원 (+5.00%)'),
+ 'US card shows local share count, KRW average price and evaluation return');
+truth(fakeCards.innerHTML.includes('누적 세후 분배금 포함 +3,800원 (+6.78%)'),
+ 'known cumulative after-tax distributions remain visible and are not double counted');
+truth(fakeCards.innerHTML.includes('Finnhub 장중 체결')&&
+ !fakeCards.innerHTML.includes('직전 확정 종가'),
+ 'valid intraday quote is distinctly labeled without suggesting a completed close');
+truth(fakeCards.innerHTML.includes('role="button" tabindex="0"')&&
+ fakeCards.innerHTML.includes('aria-pressed="true"'),
+ 'new structured US card can be operated from keyboard and announces selected state');
+const closeQuote={kind:'usd-close',amount:56000,usd:40,fxRate:1400};
+fakeWin.ISA_US_KRW.priceKrw=()=>closeQuote;
+fakeWin.ISA_PERSONAL_US.state=()=>({configured:true,fetching:false,error:''});
+cardCtx.renderTestCards();
+truth(fakeCards.innerHTML.includes('직전 확정 종가 2026-11-12 · 장중 시세 미수신·만료')&&
+ !fakeCards.innerHTML.includes('Finnhub 장중 체결'),
+ 'stale live quotes are never mislabeled as live and are replaced by dated daily close');
+fakeWin.ISA_US_KRW.priceKrw=()=>null;
+cardCtx.renderTestCards();
+truth(fakeCards.innerHTML.includes('원화 가격 미확인')&&
+ fakeCards.innerHTML.includes('20일 이동평균선 · 확인 대기'),
+ 'missing FX/price never creates fabricated US current price or moving average');
+truth(usDashboardCode.includes("const calculation=conversionLine(chosenQuote)")&&
+ usDashboardCode.includes("host.innerHTML=section;"),
+ 'selected US ticker details include complete FX provenance and render visible content');
+
 console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
