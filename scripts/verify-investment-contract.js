@@ -587,6 +587,7 @@ function mockFinnhub(responseStatus){
  const calls=[];
  const sandbox=vm.createContext({
   SYMBOLS:{schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY'},
+  WORKER_VERSION:'20261114-quote-transport-2',
   URL,Date,Number,Math,Promise,Object,AbortSignal,
   fetch:async(u,options)=>{
    // Match documented Cloudflare Worker input shape: URL strings or Request objects.
@@ -626,6 +627,7 @@ truth(diagCtx.diagnose({error:'upstream_timeout'},Date.now()).includes('시간 �
  'mobile diagnosis safely distinguishes Finnhub timeout');
 const typeCtx=vm.createContext({
  SYMBOLS:{schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY'},
+ WORKER_VERSION:'20261114-quote-transport-2',
  URL,Date,Number,Math,Promise,Object,AbortSignal,
  fetch:async()=>{throw new TypeError('synthetic unsafe internal detail');}
 });
