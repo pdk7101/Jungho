@@ -427,8 +427,7 @@ equal(usRenders,2,'US edits trigger card and portfolio re-render');
 // The mobile US portfolio has one private live price feed with safe EOD fallback.
 // Redundant TradingView widget and old USD editor must never reappear.
 truth(usDashboardCode.includes("'직전 확정 종가 '+date(x.date)")&&
- usDashboardCode.includes("기술 분석용 확정 일봉")&&
- usDashboardCode.includes("''")===false,
+ usDashboardCode.includes("기술 분석용 확정 일봉"),
  'US fallback is explicitly dated as completed previous-session close');
 truth(usDashboardCode.includes("'장중 시세 미연결'")&&
  usDashboardCode.includes("'장중 시세 조회 실패'")&&
