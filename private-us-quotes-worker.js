@@ -45,7 +45,10 @@ async function collect(env){
    const response=await fetch(u,{headers:{
     'X-Finnhub-Token':env.FINNHUB_API_KEY,
     'Accept':'application/json'
-   },redirect:'error',signal:AbortSignal.timeout(8000)});
+   },redirect:'manual',signal:AbortSignal.timeout(8000)});
+   // Cloudflare Workers does not support redirect:'error'; it throws TypeError before fetching.
+   // Manual handling blocks unexpected redirects without forwarding the API secret to another host.
+   if(response.status>=300&&response.status<400)return [id,{error:'upstream_redirect_blocked'}];
    if(!response.ok)return [id,{error:'upstream_status_'+response.status}];
    const body=await response.json(),usd=Number(body?.c),ts=Number(body?.t);
    const tradeAtMs=ts*1000;
