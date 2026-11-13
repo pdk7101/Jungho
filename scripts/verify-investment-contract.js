@@ -4,6 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import vm from 'node:vm';
 const txt=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const html=txt('index.html'), brokerCode=txt('unattended-orders.js');
 const liveCode=txt('live-prices.js'), portfolioCode=txt('portfolio-import.js');
@@ -317,4 +318,55 @@ truth(html.includes('위젯 수치는 현재 매수판단·평가손익에 자�
  'US widget price is clearly separated from order decisions and KRW valuation');
 truth(!usDashboardCode.includes('tv-ticker-tape')&&!usKrwCode.includes('tv-ticker-tape'),
  'US trading decision and cost basis never consume external widget DOM');
+// TradingView widget prices cannot be read programmatically. Verify explicit user confirmation.
+for(const path of ['us-dashboard.js','us-krw.js'])
+ truth(!!new vm.Script(txt(path),{filename:path}),path+' is valid JavaScript');
+truth(html.includes('id="tv-price-apply"')&&html.includes('id="tv-price-confirm"')&&
+ html.includes('id="tv-price-clear"'),'user-confirmed TV inputs and clear button exist');
+for(const symbol of ['schd','agnc','spym','cony'])
+ truth(html.includes('data-tv-usd="'+symbol+'"'),symbol+' can be individually price-confirmed');
+truth(usDashboardCode.includes("TV_TTL_MS=30*60*1000"),
+ 'user-observed quotes expire automatically after 30 minutes');
+truth(usDashboardCode.includes("sessionStorage.setItem(TV_KEY"),
+ 'confirmed price records stay within browser tab session');
+truth(usDashboardCode.includes("window.dispatchEvent(new Event('isa-tv-user-reference-changed'))"),
+ 'explicit confirmation triggers valuation refresh event');
+truth(usKrwCode.includes("if(rate&&tv&&finitePositive(tv.usd))"),
+ 'user-confirmed USD quote must have verified reference FX before KRW conversion');
+truth(usKrwCode.includes("kind:'tv-user-confirmed'"),
+ 'manual TradingView observation has explicit provenance separate from Toss price');
+truth(usKrwCode.includes("source:'미국장 USD 종가 × '"),
+ 'quote expires back to original completed US daily close price');
+
+const observedStart=usDashboardCode.indexOf('function observedQuote(id){');
+const observedEnd=usDashboardCode.indexOf('function recoverTvQuotes(){',observedStart);
+truth(observedStart>=0&&observedEnd>observedStart,'confirmed price getter can be inspected');
+const tctx=vm.createContext({tvObserved:{schd:{usd:42.5,confirmedAt:new Date().toISOString()}},
+ TV_TTL_MS:1800000,valid:v=>Number(v)>0&&Number.isFinite(Number(v)),Date,Number});
+vm.runInContext(usDashboardCode.slice(observedStart,observedEnd)+'\nthis.readQuote=observedQuote;',tctx);
+equal(tctx.readQuote('schd').usd,42.5,'fresh user-confirmed quote is available for valuation');
+tctx.tvObserved.schd.confirmedAt=new Date(Date.now()-31*60000).toISOString();
+equal(tctx.readQuote('schd'),null,'31-minute-old price cannot be used for valuation');
+
+const kStart=usKrwCode.indexOf('function priceKrw(id,priceUsd){');
+const kEnd=usKrwCode.indexOf('// Automated public reference quote',kStart);
+truth(kStart>=0&&kEnd>kStart,'KRW conversion function can be inspected');
+const convert=new Function('holdings','finitePositive','day','fx','window',
+ usKrwCode.slice(kStart,kEnd)+'\nreturn priceKrw;');
+const validPositive=v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0;
+const chosen={observedQuote:()=>({usd:42.5,confirmedAt:'2026-11-13T10:00:00Z'})};
+const priceFromTv=convert(()=>({}),validPositive,()=> '2026-11-13',
+ ()=>({rate:1400,source:'test FX'}),{ISA_US_APP:chosen});
+equal(priceFromTv('schd',39).amount,59500,'confirmed 42.50 USD × 1400 KRW is used for personal valuation');
+equal(priceFromTv('schd',39).kind,'tv-user-confirmed','user-entered TV quote is never labeled as API live');
+const priceFromClose=convert(()=>({}),validPositive,()=> '2026-11-13',
+ ()=>({rate:1400,source:'test FX'}),{ISA_US_APP:{observedQuote:()=>null}});
+equal(priceFromClose('schd',39).amount,54600,'expired or missing TV input falls back to 39 USD completed close');
+const directToss=convert(()=>({schd:{krwCurrent:61000,krwDay:'2026-11-13'}}),validPositive,
+ ()=> '2026-11-13',()=>({rate:1400,source:'test FX'}),{ISA_US_APP:chosen});
+equal(directToss('schd',39).amount,61000,'user-confirmed Toss KRW value keeps priority over TV observation');
+truth(usDashboardCode.includes("function price(f){const x=market(f),q=observedQuote(f.id)"),
+ 'US valuation list reads user-confirmed price before completed close');
+truth(usDashboardCode.includes('valid(manual[f.id])?Number(manual[f.id]):price(f)'),
+ 'detail-only hypothetical price is isolated from valuation list');
 console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
