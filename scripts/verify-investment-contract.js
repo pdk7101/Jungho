@@ -426,9 +426,17 @@ equal(usRenders,2,'US edits trigger card and portfolio re-render');
 
 // The mobile US portfolio has one private live price feed with safe EOD fallback.
 // Redundant TradingView widget and old USD editor must never reappear.
-truth(usDashboardCode.includes("x?'확정 종가 '+date(x.date)")&&
+truth(usDashboardCode.includes("nyToday+' 기준 직전 확정 종가 '+date(x.date)")&&
+ usDashboardCode.includes("'로 대체 표시 (실시간 가격 아님)'")&&
  usDashboardCode.includes("기술 분석용 확정 일봉"),
- 'US cards label completed daily close separately from private intraday quotes');
+ 'US cards label last completed US close as a non-live substitute using NY-local date');
+truth(usDashboardCode.includes("'장중 시세 연결 필요'")&&
+ usDashboardCode.includes("'장중 시세 조회 실패'")&&
+ usDashboardCode.includes("'최근 장중 체결 미수신·만료'"),
+ 'each fallback US card explains precisely why intraday quotes were not used');
+truth(usDashboardCode.includes("'Finnhub 장중 체결 '")&&
+ usDashboardCode.includes("year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit'"),
+ 'valid US live trades show complete Korean-local date and time');
 truth(!usDashboardCode.includes("'매수중 기록'")&&
  !usDashboardCode.includes("'일시중지 기록'")&&
  !usDashboardCode.includes("ISA_ORDER_PLAN?.note")&&
@@ -538,6 +546,14 @@ truth(feedCode.includes('now-t>TRADE_TTL')&&feedCode.includes('now-f>RESPONSE_TT
 truth(usKrwCode.includes("kind:'finnhub-private'")&&
  usKrwCode.includes("isa-personal-us-quote-refreshed"),
  'private US live price is used in KRW valuation and refreshes on new quote');
+truth(feedCode.includes("state:connectionState")&&
+ feedCode.includes("configured:Boolean(endpoint&&password)")&&
+ feedCode.includes("error:lastError?'시세 서버 조회 실패':''"),
+ 'card connection state is read-only, secret-free and never exposes VIEW_TOKEN');
+truth(feedCode.includes("window.addEventListener('pageshow',refreshOnReturn)")&&
+ feedCode.includes("window.addEventListener('focus',refreshOnReturn)")&&
+ feedCode.includes("Date.now()-lastRequestAt<15000"),
+ 'mobile return to a tab retries verified intraday quotes with throttling');
 truth(usDashboardCode.includes("kind==='finnhub-private'"),
  'private price appears with distinct source/date, not as an official Toss quote');
 
@@ -596,7 +612,7 @@ function runFeed(local,session){
  const dom={hidden:true,getElementById:el,addEventListener:()=>{}};
  const ctx={
   localStorage:local,sessionStorage:session,document:dom,
-  window:{dispatchEvent:()=>{}},Event:class{constructor(name){this.type=name;}},
+  window:{dispatchEvent:()=>{},addEventListener:()=>{}},Event:class{constructor(name){this.type=name;}},
   setInterval:()=>0,URL,Date,Number,JSON
  };
  vm.runInNewContext(feedCode,ctx,{filename:'personal-us-live.js'});
