@@ -607,7 +607,7 @@ function verdict(f){
  }
  if(id==='reit'){
  var pair=pairPlan(),n=pair.reitQty;
- if(!pair.known)return {type:'buy',title:'리츠 1주 유지 · 판단 대기',qty:1,info:'로봇·우주 상태 미확인 · 추가매수 결정 보류.'};
+ if(!pair.known)return {type:'wait',title:'리츠 기본 1주 계획 · 장중 판단 대기',qty:1,info:'기존 거래일 기본 적립 1주는 유지합니다. 로봇·우주 당일 확인가격 미수신으로 2·3·4주 증액은 미확정이며, 오늘 매수조건 충족 신호가 아닙니다.'};
  var reason=pair.reitQty===4?'SOL 일일 매수조건 미충족 → 리츠 4주.':
   pair.solNeeded&&pair.solStatus==='wait'?'SOL 자료 미확인 → 리츠 '+n+'주만 검토, 4주 증액 보류.':
   pair.stopped===2?'로봇·우주 매수 불가 → 리츠 3주 + SOL 1주.':
@@ -692,27 +692,80 @@ function renderPositions(){
  });
 }
 function renderPlan(){
- var vals=FUNDS.map(function(f){return {f:f,x:byId[f.id],v:verdict(f)};});
- var total=0,pieces=[],unavailable=false;
+ const pair=pairPlan();
+ const vals=FUNDS.map(function(f){return {f:f,x:byId[f.id],v:verdict(f)};});
+ const weekday=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',weekday:'short'}).format(new Date());
+ const weekend=weekday==='Sat'||weekday==='Sun';
+ const inSession=!!window.ISA_livePriceFetch?.active?.(new Date());
+ const marketText=weekend?'한국장 휴장(주말)':inSession?
+  '한국장 장중 시간대 · 실제 개장 여부 별도 확인':'한국장 장외 시간 · 실제 개장 여부 별도 확인';
+ const todayCount=FUNDS.filter(function(f){return !!freshQuote(f.id);}).length;
+ let confirmed=[],scheduled=[],total=0,reference=false,unknown=false;
  vals.forEach(function(item){
-  if(item.v.type==='buy'&&item.v.qty>0){
-   if(verified(item.f.id)){
-    var cost=current(item.x,item.f.id)*item.v.qty;
-    total+=cost;pieces.push(safe(item.f.name)+' '+item.v.qty+'주 ('+money(cost)+')');
-   }else{unavailable=true;if(item.f.id==='reit'||item.f.id==='sofr')pieces.push(safe(item.f.name)+' '+item.v.qty+'주 ('+(item.f.id==='sofr'?'월요일 정기매수 예정 · 예상가격 미확인':'기본 적립 유지 · 가격 확인 대기')+')');}
+  if(item.v.type!=='buy'||!Number.isInteger(item.v.qty)||item.v.qty<=0)return;
+  if(item.f.id==='reit'&&!pair.known)return;
+  if(item.f.id==='sofr'){
+   scheduled.push('KODEX 미국달러SOFR '+item.v.qty+'주 (월요일 정기적립 계획 · 실제 체결 별도 확인)');
+   return;
+  }
+  const q=freshQuote(item.f.id);
+  if(q){
+   const cost=Number(q.price)*item.v.qty;
+   total+=cost;
+   confirmed.push(safe(item.f.name)+' '+item.v.qty+'주 (당일 검증 시세 기준 '+money(cost)+')');
+  }else if(verified(item.f.id)){
+   // Explicitly retain an EOD-only *estimate*, never claim an intraday confirmation.
+   const cost=Number(item.x.close)*item.v.qty;
+   total+=cost;reference=true;
+   confirmed.push(safe(item.f.name)+' '+item.v.qty+'주 (직전 확정 종가 참고 '+money(cost)+' · 당일 체결가 미확인)');
+  }else{
+   unknown=true;
+   confirmed.push(safe(item.f.name)+' '+item.v.qty+'주 (당일 가격 미확인 · 예상 비용 산정 보류)');
   }
  });
- var reit=vals.find(function(x){return x.f.id==='reit';});
- var sol=vals.find(function(x){return x.f.id==='sol';});
- var clash=!!(reit.v.type==='buy'&&reit.v.qty===3&&sol.v.type==='buy'&&sol.v.qty===1);
- var reit4=!!(reit.v.type==='buy'&&reit.v.qty===4&&sol.v.qty===0);
- var budget=valid(settings.dailyBudget)?Number(settings.dailyBudget):null;
- var message='<p><b>현재 매수 조건 충족 (실제 주문·체결 아님):</b> '+(pieces.length?pieces.join(' · '):'조건을 충족한 수량 확인 없음')+'</p>';
- message+='<p><b>검토 수량 예상 비용:</b> '+(unavailable?'일부 가격 미확인 · ':'')+money(total)+' <small>(SOFR은 월요일에만 포함, 200TR 조건부 주문은 제외)</small></p>';
- if(budget!==null)message+='<p class="'+(total>budget?'error':'good')+'"><b>입력 예산:</b> '+money(budget)+' · '+(total>budget?'예상 비용이 예산을 초과합니다. 수량 조정 필요.':'현재 계산한 검토 비용은 예산 이내입니다.')+'</p>';
- else message+='<p class="sub">하루 예산이 미입력입니다. SOFR은 매주 월요일 1주이며, 미체결 감시주문도 별도로 확인하세요.</p>';
- if(clash)message+='<p class="sub"><b>대체매수 조합:</b> 로봇·우주 모두 매수 불가, SOL 조건 충족 → 리츠 3주 + SOL 1주.</p>';
- if(reit4)message+='<p class="sub"><b>신규 대체매수 조합:</b> SOL 일일 매수조건 미충족 → 리츠 4주 / SOL 0주. 예산·리츠 자체 위험 점검 필요.</p>';
+ let message='<p><b>현재 시세 확인:</b> '+marketText+' · 검증된 당일 체결가 '+todayCount+'/6</p>';
+ if(!pair.known){
+  const reit=byId.reit;
+  const lastClose=verified('reit')?' (직전 확정 종가 '+money(reit.close)+' · 오늘 거래가격 아님)':' (최근 가격 확인 대기)';
+  message+='<p><b>다음 거래일 기본 적립계획:</b> TIGER 리츠부동산인프라 1주'+lastClose+'</p>';
+  message+='<p class="sub"><b>조건별 추가 수량 판정 보류:</b> 로봇·우주 매수가능 여부 확인 전입니다. SOL도 미확정이며 리츠 2·3·4주로 자동 증액하지 않습니다. 기본 1주 계획을 당일 매수신호로 표시하지 않습니다.</p>';
+ }else{
+  message+='<p><b>로봇·우주 판단:</b> '+
+   (pair.robot==='buy'?'로봇 매수조건 충족':'로봇 매수조건 미충족')+' · '+
+   (pair.space==='buy'?'우주 매수조건 충족':'우주 매수조건 미충족')+'</p>';
+  message+='<p><b>조건별 검토 수량:</b> 리츠 '+pair.reitQty+'주 · SOL '+
+   (pair.solQty===null?'미확정':pair.solQty+'주')+
+   ' · 로봇·우주 각 카드의 매수조건 참조 (실제 주문 아님)</p>';
+  if(pair.solQty===null)message+='<p class="sub">SOL 당일 시세·기술조건 미확인: 리츠 4주로 임의 증액하지 않습니다.</p>';
+ }
+ message+='<p><b>현재 확인된 매수 검토:</b> '+
+   (confirmed.length?confirmed.join(' · '):'당일 조건에 따라 확정된 추가매수 신호 없음')+'</p>';
+ if(scheduled.length)message+='<p><b>정기 적립계획:</b> '+scheduled.join(' · ')+'</p>';
+ const fullPriceKnown=pair.known&&!unknown&&pair.solQty!==null&&!reference;
+ if(confirmed.length&&fullPriceKnown){
+  message+='<p><b>당일 시세 기준 검토 비용:</b> '+money(total)+
+    ' <small>(SOFR 월요일 정기적립·200TR 감시 주문 별도)</small></p>';
+ }else{
+  message+='<p><b>검토 비용:</b> 당일 확정 불가'+
+   (reference?' · 직전 확정 종가는 참고용이며 실제 거래가격과 다릅니다.':
+    ' · 검증된 가격과 조건이 확정된 뒤 산정합니다.')+'</p>';
+ }
+ const budget=valid(settings.dailyBudget)?Number(settings.dailyBudget):null;
+ if(budget!==null){
+  if(fullPriceKnown&&confirmed.length)
+   message+='<p class="'+(total>budget?'error':'good')+'"><b>입력 하루 예산:</b> '+
+     money(budget)+' · '+(total>budget?'참고 검토 비용 초과':'현재 확인된 검토 비용은 예산 범위 이내')+'</p>';
+  else
+   message+='<p class="sub"><b>입력 하루 예산:</b> '+money(budget)+
+     ' · 매수 수량·가격 미확정으로 예산 잔액은 계산하지 않습니다.</p>';
+ }else message+='<p class="sub">하루 예산 미입력. SOFR 매주 월요일 1주 · KODEX 200TR -5% 감시는 기존대로 별도 관리합니다.</p>';
+ message+='<details class="plan-rules"><summary>기존 조건별 적립 규칙 확인 (설정 변경 없음)</summary>'+
+  '<p>로봇·우주 모두 매수조건 충족 → 리츠 1주 / SOL 0주</p>'+
+  '<p>로봇·우주 한 종목 미충족 + SOL 매수조건 충족 → 리츠 2주 / SOL 1주</p>'+
+  '<p>로봇·우주 두 종목 미충족 + SOL 매수조건 충족 → 리츠 3주 / SOL 1주</p>'+
+  '<p>로봇·우주 중 매수조건 미충족 + SOL도 미충족 → 리츠 4주 / SOL 0주</p>'+
+  '<p>당일 가격·매수조건 미확인은 매수불가 판정이 아닙니다. 4주 자동 증액 금지. 실제 증권사 주식모으기 설정·주문은 변경하지 않습니다.</p>'+
+  '</details>';
  el('plan').innerHTML=message;
 }
 function render(){
