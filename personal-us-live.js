@@ -7,6 +7,14 @@
  const TRADE_TTL=45*60000,RESPONSE_TTL=5*60000;
  let endpoint='',password='',quotes={},fetchedAt='',busy=false,lastMessage='';
  const $=id=>document.getElementById(id);
+ function accessHint(){
+  const hint=$('us-live-secret-hint'),input=$('us-live-secret');
+  const active=safeUrl($('us-live-url')?.value)===endpoint&&password.length>=20;
+  if(hint)hint.textContent=active?
+   '이 탭에 접근 암호가 임시 보관되어 있습니다. 조회 버튼을 다시 눌러도 재입력할 필요가 없습니다. 브라우저 탭 종료 시 다시 입력이 필요할 수 있습니다.':
+   '첫 연결 때만 VIEW_TOKEN을 입력하세요. 연결 후에는 암호 입력칸이 비어 보여도 같은 탭에서 자동 조회와 재조회가 가능합니다.';
+  if(input)input.placeholder=active?'저장된 암호 사용 중 · 재입력 불필요':'Worker VIEW_TOKEN과 동일하게';
+ }
  function safeUrl(raw){
   try{
    const u=new URL(String(raw||'').trim());
@@ -61,7 +69,9 @@
     next[id]={usd:p,tradeAt:v.tradeAt};
    }
    quotes=next;fetchedAt=payload.fetchedAt;
-   status(IDS.filter(id=>quote(id)).length?'자동 시세 조회 성공':'체결 시각 오래됨/미국장 마감');
+   status(IDS.filter(id=>quote(id)).length?
+    '개인 시세 서버 조회 성공 · 최근 체결 확인':
+    '개인 시세 서버 응답 성공 · 유효한 최근 체결 0/4 (시세 지연·미제공 가능, 장 마감 단정 불가)');
   }catch(e){
    quotes={};fetchedAt='';
    status('자동 조회 실패: '+String(e?.message||e));
@@ -71,20 +81,31 @@
  }
  function connect(){
   const enteredUrl=$('us-live-url')?.value?.trim()||'';
-  const url=safeUrl(enteredUrl),access=$('us-live-secret')?.value?.trim()||'';
-  // Explain the exact local validation failure before any network request.
-  // Never log or display the access secret itself.
+  const url=safeUrl(enteredUrl),typed=$('us-live-secret')?.value?.trim()||'';
+  // Reuse the secret only for the SAME Worker origin. Never send it to a new address.
+  let cachedUrl=null,cachedAccess='';
+  try{
+   cachedUrl=safeUrl(localStorage.getItem(URL_KEY));
+   cachedAccess=sessionStorage.getItem(VIEW_KEY)||'';
+  }catch(_){}
+  const access=typed||
+   (url&&url===endpoint&&password.length>=20?password:'')||
+   (url&&url===cachedUrl&&cachedAccess.length>=20?cachedAccess:'');
+  // Never show the credential; explain only the local input validation error.
   if(!enteredUrl){status('Worker 주소가 비어 있습니다. Cloudflare workers.dev 전체 주소를 입력하세요');return;}
   if(!url){status('Worker 주소 형식 오류: https://워커이름.계정이름.workers.dev 형태의 전체 HTTPS 주소를 입력하세요');return;}
-  if(!access){status('개인 접근 암호가 비어 있습니다. Cloudflare에 등록한 VIEW_TOKEN을 입력하세요');return;}
+  if(!access){status('개인 접근 암호가 비어 있습니다. 처음 한 번만 Cloudflare VIEW_TOKEN을 입력하세요');return;}
   if(access.length<20){
    status('개인 접근 암호 길이 부족: 현재 '+access.length+'자 / 최소 20자. Cloudflare의 VIEW_TOKEN도 20자 이상으로 수정한 뒤 같은 암호를 입력하세요');
    return;
   }
-  endpoint=url;password=access;quotes={};fetchedAt='';
+  const changed=url!==endpoint||access!==password;
+  endpoint=url;password=access;
+  if(changed){quotes={};fetchedAt='';signal();}
   try{localStorage.setItem(URL_KEY,url);sessionStorage.setItem(VIEW_KEY,access);}catch(_){}
-  $('us-live-secret').value='';
-  status('개인 비공개 시세 서버 접속 중');
+  $('us-live-secret').value=''; // Never leave secret readable in the input/DOM.
+  accessHint();
+  status(typed?'개인 시세 서버 접속 중':'저장된 암호로 다시 조회합니다');
   refresh();
  }
  function disconnect(){
@@ -92,6 +113,7 @@
   try{localStorage.removeItem(URL_KEY);sessionStorage.removeItem(VIEW_KEY);}catch(_){}
   if($('us-live-url'))$('us-live-url').value='';
   if($('us-live-secret'))$('us-live-secret').value='';
+  accessHint();
   status('개인 시세 연결 해제');signal();
  }
  window.ISA_PERSONAL_US={quote,refresh};
@@ -103,6 +125,8 @@
   if($('us-live-url')&&u)$('us-live-url').value=u;
   if(u&&token&&token.length>=20){endpoint=u;password=token;}
  }catch(_){}
+ accessHint();
+ if($('us-live-url'))$('us-live-url').addEventListener('change',accessHint);
  status();
  if(endpoint&&password)refresh();
  // Free account: four vendor requests at most every 120 seconds while page is visible.
