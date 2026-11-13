@@ -157,7 +157,7 @@ function cards(){
    Number(q.fxRate).toLocaleString('ko-KR',{maximumFractionDigits:2})+
    '원 = 약 '+wonAmount(q.amount):'';
   const selectedClass=selected===f.id?'us-selected':'';
-  return '<button class="us-card us-list-row '+selectedClass+'" type="button" data-us="'+f.id+
+  return '<div role="button" tabindex="0" class="us-card us-list-row '+selectedClass+'" data-us="'+f.id+
    '" aria-label="'+text(f.ticker+' '+krwPrice+' '+source.short)+'" aria-pressed="'+
    (selected===f.id?'true':'false')+'">'+
    '<span class="us-list-top"><strong class="us-list-ticker">'+f.ticker+'</strong>'+
@@ -168,11 +168,14 @@ function cards(){
    (fxText?'<span class="us-list-fx">'+text(fxText)+' · 참고환율</span>':'')+
    movingAverageCard(x,q)+holdingCard(f.id,px)+
    '<span class="us-list-foot">종목을 누르면 차트·분배금·매수 판단 상세 확인</span>'+
-   '</button>';
+   '</div>';
  }).join('');
- host.querySelectorAll('[data-us]').forEach(btn=>btn.onclick=()=>{
-  selected=btn.dataset.us;
-  render();
+ host.querySelectorAll('[data-us]').forEach(btn=>{
+  const select=()=>{selected=btn.dataset.us;render();};
+  btn.addEventListener('click',select);
+  btn.addEventListener('keydown',e=>{
+   if(e.key==='Enter'||e.key===' '){e.preventDefault();select();}
+  });
  });
 }
 function details(){
