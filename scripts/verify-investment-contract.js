@@ -815,6 +815,7 @@ const fakeWin={
 };
 const cardCtx=vm.createContext({
  FUNDS:[testItem],selected:'schd',window:fakeWin,document:{getElementById:()=>fakeCards},
+ $:()=>fakeCards,
  read:()=>fakePosition,market:()=>testBar,price:()=>42,date:s=>s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6),
  valid:v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0,
  text:s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
