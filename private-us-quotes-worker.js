@@ -13,6 +13,7 @@
 const ALLOWED_ORIGIN='https://pdk7101.github.io';
 const SYMBOLS=Object.freeze({schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY'});
 const REFRESH_MS=120_000;
+const WORKER_VERSION='20261114-quote-transport-2';
 let cached=null,loadedAt=0,inFlight=null;
 
 function reply(body,status,origin){
@@ -42,7 +43,8 @@ async function collect(env){
   try{
    const u=new URL('https://finnhub.io/api/v1/quote');
    u.searchParams.set('symbol',symbol);
-   const response=await fetch(u,{headers:{
+   // The Workers fetch API expects a URL string or a Request. Avoid URL-object ambiguity.
+   const response=await fetch(u.toString(),{headers:{
     'X-Finnhub-Token':env.FINNHUB_API_KEY,
     'Accept':'application/json'
    },redirect:'manual',signal:AbortSignal.timeout(8000)});
@@ -58,9 +60,18 @@ async function collect(env){
    return [id,{usd,tradeAt:new Date(tradeAtMs).toISOString(),
     prevClose:Number.isFinite(Number(body?.pc))&&Number(body.pc)>0?Number(body.pc):null,
     symbol,source:'Finnhub US trade snapshot'}];
-  }catch(_){return [id,{error:'upstream_unavailable'}];}
+  }catch(e){
+   // Only fixed safe error categories reach the browser. Never expose the provider key,
+   // exception message, request headers, or a raw upstream body.
+   const name=String(e?.name||'');
+   const error=name==='TimeoutError'?'upstream_timeout':
+    name==='TypeError'?'upstream_type_error':
+    name==='AbortError'?'upstream_aborted':'upstream_unavailable';
+   return [id,{error}];
+  }
  }));
  return {source:'Finnhub personal use · exchange coverage and timestamps may vary',
+  workerVersion:WORKER_VERSION,
   fetchedAt:new Date().toISOString(),quotes:Object.fromEntries(entries)};
 }
 
