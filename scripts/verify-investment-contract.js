@@ -186,7 +186,7 @@ planApp.renderPlan();
 truth(planHost.innerHTML.includes('KODEX 미국달러SOFR 1주 (월요일 정기매수 예정 · 예상가격 미확인)'),
  'SOFR Monday scheduled 1 share stays visible with missing bar price, without guessed cost');
 
-const head=source=>source.slice(0,source.indexOf('function mount(){'))
+const head=source=>source.slice(0,source.indexOf('window.ISA_ORDER_PLAN='))
  .replace(/^\/\*[\s\S]*?\*\/\s*\(function\(\)\{\s*'use strict';/,'');
 win.ISA_KR_APP={pairPlan:app.pairPlan,effectiveCap:app.effectiveCap,decisions:()=>app.FUNDS.map(f=>{
  const d=app.verdict(f),x=app.byId[f.id];
@@ -279,6 +279,19 @@ equal(privateStore.read('isa-user-portfolio-snapshot-v1').conyNote.increment,100
 equal(location.hash,'','complete portfolio fragment removed from browser address');
 truth(!portfolioCode.includes('isa-us-distributions-krw-v1'),
  'import never writes to verified payout ledger');
+truth(!portfolioCode.includes('function renderSnapshot(){')&&
+ !portfolioCode.includes('portfolio-screenshot-snapshot')&&
+ portfolioCode.includes('const report=importSnapshot();'),
+ 'old screenshot portfolio panel is removed, but private holdings import is intact');
+truth(!brokerCode.includes('function mount(){')&&
+ !brokerCode.includes('function render(){')&&
+ !brokerCode.includes('매일 주식모으기 실제 주문 상태·예산 확인')&&
+ brokerCode.includes('window.ISA_ORDER_PLAN='),
+ 'broker actual-order/budget panel is removed without changing decision helper API');
+truth(!html.includes('.uo-panel')&&!html.includes('.portfolio-shot-row'),
+ 'obsolete broker order and screenshot snapshot styles are removed from published page');
+truth(usKrwCode.includes("const LEDGER_KEY='isa-us-distributions-krw-v1'"),
+ 'verified after-tax payout ledger is retained in the personal US holdings view');
 truth(html.includes('data-auto-kr-id='),'Korean holding editor has automatically sourced read-only reference prices');
 truth(html.includes("querySelectorAll('input[data-pos]')"),
  'read-only Korean prices never trigger cost-basis/quantity edits');
@@ -302,11 +315,11 @@ truth(usKrwCode.includes("const LEDGER_KEY='isa-us-distributions-krw-v1'"),
 truth(usDashboardCode.includes("x?'확정 종가 '+date(x.date)")&&
  usDashboardCode.includes("기술 분석용 확정 일봉"),
  'US cards label completed daily close separately from private intraday quotes');
-truth(usDashboardCode.includes("'매수중 기록'")&&usDashboardCode.includes("'일시중지 기록'"),
- 'historical broker order notes remain explicit user-confirmed records');
-truth(usDashboardCode.includes("토스 사용자 확인 기록 ")&&
- usDashboardCode.includes("실시간 증권사 주문상태 아님"),
- 'broker verification date is kept distinct from authenticated trading status');
+truth(!usDashboardCode.includes("'매수중 기록'")&&
+ !usDashboardCode.includes("'일시중지 기록'")&&
+ !usDashboardCode.includes("ISA_ORDER_PLAN?.note")&&
+ !html.includes('us-list-state'),
+ 'US price cards no longer show manually recorded broker order statuses');
 truth(usDashboardCode.includes("fetch('./us-quotes.json?refresh="),
  'completed US daily bars stay available for technical analysis');
 truth(!html.includes('tv-ticker-tape')&&!html.includes('id="us-intraday"')&&
