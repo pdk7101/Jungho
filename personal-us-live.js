@@ -103,6 +103,7 @@ function renderDiagnostics(){
  async function refresh(){
   if(!endpoint||!password||busy||document.hidden)return;
   busy=true;
+  status('현재가 조회 중');
   try{
    const r=await fetch(endpoint+'/quotes',{
     method:'GET',
@@ -179,9 +180,17 @@ function renderDiagnostics(){
   status('개인 시세 연결 해제');signal();
  }
  window.ISA_PERSONAL_US={quote,refresh};
- const connectButton=$('us-live-connect'),stopButton=$('us-live-disconnect');
+ const connectButton=$('us-live-connect'),stopButton=$('us-live-disconnect'),quickRefresh=$('us-live-refresh');
  if(connectButton)connectButton.addEventListener('click',connect);
  if(stopButton)stopButton.addEventListener('click',disconnect);
+ if(quickRefresh)quickRefresh.addEventListener('click',function(){
+  if(!endpoint||!password){
+   if($('personal-us-live'))$('personal-us-live').open=true;
+   status('시세 연결을 먼저 설정해 주세요');
+   return;
+  }
+  refresh();
+ });
  try{
   const u=safeUrl(localStorage.getItem(URL_KEY)),token=sessionStorage.getItem(VIEW_KEY);
   const remembered=u?rememberedAccess(u):'';
