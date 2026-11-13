@@ -62,3 +62,19 @@
 | 네트워크 오류 | Workers 주소가 올바른지, 브라우저 네트워크/추적 차단이 있는지 |
 
 **주의:** 공개 GitHub 리포지토리에는 API 키를 저장하지 않습니다. 휴대전화 접속 시 토스증권 API 키, Client Secret, 계좌번호를 입력할 이유도 없습니다.
+
+## 네 종목 모두 Finnhub 네트워크 응답 실패로 나타날 때
+
+- Cloudflare Workers 관리 화면에서 `worker.js`가 저장소의 최신
+  `private-us-quotes-worker.js`와 같은지 확인합니다.
+- Worker 코드에서는 Finnhub URL을 `fetch(u.toString(), ...)`으로 전달하며,
+  `redirect: 'manual'`을 사용합니다. Cloudflare Workers에는 `redirect: 'error'`가
+  지원되지 않습니다.
+- 수정 후 Cloudflare 편집기 오른쪽 위의 **배포(Deploy)**를 누르세요.
+  GitHub에 코드를 수정하는 것만으로는 Cloudflare Worker가 자동으로 바뀌지 않습니다.
+- 휴대전화 주식 프로그램에서 **미국 주식 4종목 시세 응답 진단**을 펼치면
+  `20261114-quote-transport-2`라는 Worker 버전과 시세별 오류 종류가 나타납니다.
+  버전이 없으면 구버전 Worker가 실행 중일 수 있습니다.
+- 개인정보, Finnhub API 키 또는 `VIEW_TOKEN`을 이 문서나 채팅에 적지 마세요.
+- 서버 접속이 성공해도 4종목의 유효한 최근 체결이 0개이면 안전을 위해
+  기존 미국장 확정 종가로 계산합니다. **서버 연결 성공과 장중 가격 수신 성공은 별개입니다.**
