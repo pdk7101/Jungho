@@ -89,11 +89,6 @@ function cards(){
  host.innerHTML=FUNDS.map(f=>{
   const x=market(f),px=price(f),
     wonQuote=window.ISA_US_KRW?.priceKrw?.(f.id,px);
-  const brokerNote=window.ISA_ORDER_PLAN?.note?.(f.id);
-  const brokerStatus=brokerNote?.value||'unknown';
-  const status=brokerStatus==='running'?'buy':brokerStatus==='paused'?'stop':'wait';
-  const actualText=brokerStatus==='running'?'매수중 기록':brokerStatus==='paused'?'일시중지 기록':'실제 상태 미확인';
-  const decisionText='토스 사용자 확인 기록 '+(brokerNote?.date||'미등록')+' · 실시간 증권사 주문상태 아님';
   const wonPrice=wonQuote&&Number.isFinite(wonQuote.amount)&&wonQuote.amount>0?
    Math.round(wonQuote.amount).toLocaleString('ko-KR')+'원':'원화 미확인';
   const summary=window.ISA_US_KRW?.compactLine?.(f.id,px)||'보유수량·원화 평단 입력 필요';
@@ -103,11 +98,10 @@ function cards(){
    x?'확정 종가 '+date(x.date)+' · 참고환율':'원화 참고가격 미확인';
   const selectedClass=selected===f.id?'us-selected':'';
   return '<button class="us-card us-list-row '+selectedClass+'" type="button" data-us="'+f.id+
-   '" aria-label="'+text(f.ticker+' 원화 참고 표시가격 '+wonPrice+' '+quoteBasis+' '+decisionText+' '+summary)+
+   '" aria-label="'+text(f.ticker+' 원화 참고 표시가격 '+wonPrice+' '+quoteBasis+' '+summary)+
    '" aria-pressed="'+(selected===f.id?'true':'false')+'">'+
    '<span class="us-list-top"><strong class="us-list-ticker">'+f.ticker+'</strong>'+
    '<b class="us-list-price">'+text(wonPrice)+'</b>'+
-   '<span class="us-list-state state-'+status+'">'+text(actualText)+'</span>'+
    '<span class="us-list-arrow" aria-hidden="true">›</span></span>'+
    '<span class="us-list-meta">'+text(quoteBasis)+'</span>'+
    (conversionLine(wonQuote)?'<span class="us-list-meta us-list-calculation">'+text(conversionLine(wonQuote))+'</span>':'')+
