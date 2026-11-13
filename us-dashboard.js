@@ -176,10 +176,6 @@ window.ISA_US_APP={
 window.addEventListener('isa-personal-us-quote-refreshed',()=>render());
 function mount(){
  const p=$('us-panel');if(!p)return;
- const sel=$('us-selector');
- FUNDS.forEach(f=>{const o=document.createElement('option');o.value=f.id;o.textContent=f.ticker+' · '+f.name;sel.appendChild(o);});
- sel.value=selected;
- sel.onchange=function(){selected=this.value;render();};
  const reload=$('reload');if(reload)reload.addEventListener('click',refresh);
  $('us-refresh').onclick=refresh;
  refresh();
