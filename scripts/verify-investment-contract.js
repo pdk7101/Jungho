@@ -530,7 +530,7 @@ persistedTab.el('us-live-connect').invoke('click');
 truth(persistedTab.el('us-personal-status').textContent.includes('저장된 암호로 다시 조회합니다'),
  'opted-in personal device connects in a new tab without retyping');
 
-persistedTab.el('us-live-url').value='https://different-user.workers.dev';
+persistedTab.el('us-live-url').value='https://different-user.other-account.workers.dev';
 persistedTab.el('us-live-connect').invoke('click');
 truth(persistedTab.el('us-personal-status').textContent.includes('개인 접근 암호가 비어 있습니다'),
  'remembered VIEW_TOKEN is never reused for a different Worker address');
