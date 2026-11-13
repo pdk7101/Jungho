@@ -30,13 +30,7 @@ function priceKrw(id,priceUsd){
  if(finitePositive(p.krwCurrent)&&p.krwDay===day()){
   return {amount:Number(p.krwCurrent),manual:true,source:'토스 현재가 직접 입력',stamp:p.krwDay};
  }
- const rate=fx(),tv=window.ISA_US_APP?.observedQuote?.(id);
- // This amount was typed and confirmed by the user, not scraped/read from TradingView.
- if(rate&&tv&&finitePositive(tv.usd))
-  return {amount:tv.usd*rate.rate,manual:true,kind:'tv-user-confirmed',
-   usd:Number(tv.usd),fxRate:rate.rate,fxAt:rate.when,fxSource:rate.source,fxManual:rate.manual,
-   source:'트레이딩뷰 화면 사용자 입력 USD × '+rate.source,stamp:tv.confirmedAt};
- const privateQuote=window.ISA_PERSONAL_US?.quote?.(id);
+ const rate=fx(),privateQuote=window.ISA_PERSONAL_US?.quote?.(id);
  if(rate&&privateQuote&&finitePositive(privateQuote.usd))
   return {amount:privateQuote.usd*rate.rate,manual:false,kind:'finnhub-private',
    usd:Number(privateQuote.usd),fxRate:rate.rate,fxAt:rate.when,fxSource:rate.source,fxManual:rate.manual,
@@ -126,9 +120,8 @@ function primaryPrice(id,priceUsd){
  const q=priceKrw(id,priceUsd);
  const dollar=finitePositive(priceUsd)?usd(priceUsd):'달러 시세 미확인';
  if(q)return '<span class="us-won-main">'+won(q.amount)+'</span>'+
-  '<small>'+(q.kind==='finnhub-private'?'Finnhub 비공개 최근 체결가격 × 환율':
-   q.kind==='tv-user-confirmed'?'TradingView 화면 가격 직접 입력 × 환율 (30분 유효)':
-   q.manual?'토스 당일 직접 입력':'환율 환산 참고 가격')+' · '+dollar+'</small>';
+  '<small>'+(q.kind==='finnhub-private'?'Finnhub 최근 체결 × 참고환율':
+   q.manual?'토스 당일 직접 입력':'확정 종가 × 참고환율')+' · '+dollar+'</small>';
  return '<span class="us-won-main">원화 미확인</span>'+
   '<small>환율 정보가 없어 환산 보류 · 달러 원본 '+dollar+'</small>';
 }
@@ -458,15 +451,14 @@ function mount(){
  const head=$('us-updated');
  const holder=document.createElement('div');
  holder.id='us-krw-panel';holder.className='us-krw-panel';
- holder.innerHTML='<h3>미국주식 원화 평단·손익</h3>'+
- '<p class="us-small">공개 미국장 확정 종가 × 참고환율을 원화 참고현재가로 자동 표시합니다. 토스 원화 현재가 직접 보정은 선택이며, 실제 주문가격과 다를 수 있습니다. 보유정보는 기기에만 저장합니다.</p>'+
+ holder.innerHTML='<h3>미국주식 원화 투자현황</h3>'+
  '<div id="us-krw-rate-status" class="us-small">환율 확인 중…</div>'+
  '<div id="us-krw-holdings-check" class="us-holdings-check"></div>'+
  '<div id="us-krw-total" class="us-total-summary"></div>'+
  '<p id="us-krw-applied" class="us-small" aria-live="polite"></p>'+
- '<label>선택: 직접 적용할 USD/KRW 환율 (원)<input id="us-krw-fx" type="number" min="700" max="3000" step="0.01" placeholder="비워두면 수집한 참고 환율 사용" value="'+(manualFx||'')+'"></label>'+
- '<details id="us-krw-details"><summary>토스 보유수량·원화 평단·자동 참고현재가</summary>'+
- '<p class="us-small">참고현재가는 공개 미국장 확정 종가×참고환율로 자동 표시됩니다. 직접 보정 현재가만 당일 유효하며 다음 날 만료합니다. 기존 붙여넣기는 티커 / 수량 / 원화 평단 / 확인한 토스 현재가 순입니다.</p>'+
+ '<details id="us-krw-details"><summary>보유수량·원화 평단·환율 수정</summary>'+
+ '<p class="us-small">보유정보는 이 휴대전화 브라우저에만 저장됩니다. 원화 현재가 직접 보정은 당일에만 유효합니다.</p>'+
+ '<label>직접 지정할 USD/KRW 환율 (선택)<input id="us-krw-fx" type="number" min="700" max="3000" step="0.01" placeholder="비우면 참고 환율 자동 사용" value="'+(manualFx||'')+'"></label>'+
  '<textarea id="us-krw-import" rows="5" placeholder="SCHD 10 50000 49000&#10;SPYM 5 120000 118000"></textarea>'+
  '<button type="button" id="us-krw-import-button" class="us-header-button">입력한 4종목 저장</button>'+
  '<div id="us-krw-editor"></div>'+
@@ -502,7 +494,6 @@ function mount(){
  window.ISA_US_KRW={cardLine,compactLine,primaryPrice,metricPrice,dividendPrice,detailLine,basisKrw:positionKrw,fx,priceKrw,totalKrw,distributionStats,netDividend};
  showRate();
  window.addEventListener('isa-us-quotes-refreshed',()=>render());
- window.addEventListener('isa-tv-user-reference-changed',()=>render());
  window.addEventListener('isa-personal-us-quote-refreshed',()=>render());
  render();
 }
