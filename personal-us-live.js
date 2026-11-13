@@ -70,8 +70,17 @@
   }
  }
  function connect(){
-  const url=safeUrl($('us-live-url')?.value),access=$('us-live-secret')?.value?.trim()||'';
-  if(!url||access.length<20){status('유효한 workers.dev HTTPS 주소와 20자 이상 접근 암호가 필요합니다');return;}
+  const enteredUrl=$('us-live-url')?.value?.trim()||'';
+  const url=safeUrl(enteredUrl),access=$('us-live-secret')?.value?.trim()||'';
+  // Explain the exact local validation failure before any network request.
+  // Never log or display the access secret itself.
+  if(!enteredUrl){status('Worker 주소가 비어 있습니다. Cloudflare workers.dev 전체 주소를 입력하세요');return;}
+  if(!url){status('Worker 주소 형식 오류: https://워커이름.계정이름.workers.dev 형태의 전체 HTTPS 주소를 입력하세요');return;}
+  if(!access){status('개인 접근 암호가 비어 있습니다. Cloudflare에 등록한 VIEW_TOKEN을 입력하세요');return;}
+  if(access.length<20){
+   status('개인 접근 암호 길이 부족: 현재 '+access.length+'자 / 최소 20자. Cloudflare의 VIEW_TOKEN도 20자 이상으로 수정한 뒤 같은 암호를 입력하세요');
+   return;
+  }
   endpoint=url;password=access;quotes={};fetchedAt='';
   try{localStorage.setItem(URL_KEY,url);sessionStorage.setItem(VIEW_KEY,access);}catch(_){}
   $('us-live-secret').value='';
