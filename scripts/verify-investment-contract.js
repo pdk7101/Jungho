@@ -589,7 +589,9 @@ function mockFinnhub(responseStatus){
   SYMBOLS:{schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY'},
   URL,Date,Number,Math,Promise,Object,AbortSignal,
   fetch:async(u,options)=>{
-   calls.push({url:u.toString(),redirect:options.redirect,
+   // Match documented Cloudflare Worker input shape: URL strings or Request objects.
+   if(typeof u!=='string')throw new TypeError('Cloudflare fetch expected a URL string');
+   calls.push({url:u,redirect:options.redirect,
     auth:options.headers['X-Finnhub-Token']});
    // Simulate Cloudflare's documented incompatibility: error redirects reject before request.
    if(options.redirect==='error')throw new TypeError('Unsupported redirect mode');
@@ -605,9 +607,32 @@ truth(Object.values(testFeed.quotes).every(q=>q.usd===42.5),
  'Worker collects all four finite Finnhub quote prices with Cloudflare-compatible fetch');
 truth(liveMock.calls.length===4&&liveMock.calls.every(c=>c.redirect==='manual'&&c.auth==='FAKE_TEST_ONLY'),
  'four upstream calls use manual redirect policy and server-side token header');
+truth(workerCode.includes("fetch(u.toString(),")&&
+ liveMock.calls.every(c=>c.url.startsWith('https://finnhub.io/api/v1/quote?symbol=')),
+ 'Finnhub fetch always passes a canonical URL string to Cloudflare');
+truth(testFeed.workerVersion==='20261114-quote-transport-2',
+ 'worker includes public non-secret version in authenticated quote reply');
+truth(feedCode.includes("버전 표기 없음(구버전 Worker 가능)")&&
+ feedCode.includes("workerVersion=/^20261114-quote-transport-2$/.test"),
+ 'mobile diagnosis can distinguish redeployed Cloudflare code from old runtime');
 const redirectMock=mockFinnhub(302),blocked=await redirectMock.collect({FINNHUB_API_KEY:'FAKE_TEST_ONLY'});
 truth(Object.values(blocked.quotes).every(q=>q.error==='upstream_redirect_blocked'),
  'Worker refuses upstream redirects rather than following them with a secret');
 truth(diagCtx.diagnose({error:'upstream_redirect_blocked'},Date.now()).includes('차단'),
  'mobile diagnostic identifies Worker redirect refusal separately from network failure');
+truth(diagCtx.diagnose({error:'upstream_type_error'},Date.now()).includes('TypeError'),
+ 'mobile diagnosis safely distinguishes Cloudflare runtime TypeError');
+truth(diagCtx.diagnose({error:'upstream_timeout'},Date.now()).includes('시간 초과'),
+ 'mobile diagnosis safely distinguishes Finnhub timeout');
+const typeCtx=vm.createContext({
+ SYMBOLS:{schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY'},
+ URL,Date,Number,Math,Promise,Object,AbortSignal,
+ fetch:async()=>{throw new TypeError('synthetic unsafe internal detail');}
+});
+vm.runInContext(workerCode.slice(collectFrom,collectTo)+'\nthis.collectForTest=collect;',typeCtx);
+const exceptionFeed=await typeCtx.collectForTest({FINNHUB_API_KEY:'FAKE_TEST_ONLY'});
+truth(Object.values(exceptionFeed.quotes).every(q=>q.error==='upstream_type_error'),
+ 'private worker safely reports request TypeError without leaking exception message');
+truth(!JSON.stringify(exceptionFeed).includes('synthetic unsafe internal detail'),
+ 'upstream exception messages do not enter the client quote feed');
 console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
