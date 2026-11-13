@@ -398,6 +398,10 @@ truth(workerCode.includes('X-Finnhub-Token')&&
 truth(feedCode.includes("setInterval(refresh,120000)")&&
  feedCode.includes("sessionStorage.setItem(VIEW_KEY,access)"),
  'free bridge polls at most once every two minutes with session-only viewer token');
+truth(feedCode.includes("Worker 주소 형식 오류:")&&
+ feedCode.includes("개인 접근 암호 길이 부족: 현재 ")&&
+ feedCode.includes("access.length<20"),
+ 'mobile connection separately identifies malformed Worker address and short VIEW_TOKEN without exposing its value');
 truth(feedCode.includes('now-t>TRADE_TTL')&&feedCode.includes('now-f>RESPONSE_TTL'),
  'client rejects expired trade and stale API response');
 truth(usKrwCode.includes("kind:'finnhub-private'")&&
