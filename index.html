@@ -319,6 +319,7 @@ details[open]>summary{margin-bottom:12px}
   <button class="us-header-button" id="us-refresh" type="button">↻ 미국장 자료 확인</button>
  </div>
  <p class="sub" id="us-updated">미국장 최신 게시 일봉 확인 중</p>
+ <p class="sub" id="us-live-badge">개인 장중시세 미설정 · 기존 미국장 확정 종가 참고</p>
  <details id="personal-us-live">
   <summary>미국 주식 자동 장중 시세 · 무료 개인 연결 설정</summary>
   <p class="live-note">Finnhub 무료 개인용 API + Cloudflare Workers 무료 서버를 사용하는 비공개 시세 연결입니다. PC를 켜둘 필요가 없으며 설정 완료 후 페이지가 열려 있는 동안 약 2분마다 자동 조회합니다. 다른 사람에게 시세를 배포하지 마세요. 토스 API 키는 사용하지 않습니다.</p>
@@ -939,4 +940,4 @@ var reload=document.getElementById('reload');
 if(reload)reload.addEventListener('click',update);
 update();
 })();
-</script><script src="./insights.js" defer></script><script src="./us-dashboard.js" defer></script><script src="./us-krw.js" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script></body></html>
+</script><script src="./insights.js" defer></script><script src="./personal-us-live.js" defer></script><script src="./us-dashboard.js" defer></script><script src="./us-krw.js" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script></body></html>
