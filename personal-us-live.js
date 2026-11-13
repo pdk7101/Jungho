@@ -60,6 +60,7 @@ function quoteDiagnosis(item,now){
  if(/^upstream_status_(400|404)$/.test(status))return 'Finnhub 종목/요청 확인 ('+status.slice(-3)+')';
  if(/^upstream_status_5[0-9]{2}$/.test(status))return 'Finnhub 서버 오류 ('+status.slice(-3)+')';
  if(status==='invalid_or_outdated_trade')return '공급원에서 유효한 가격 또는 체결시각을 받지 못함';
+ if(status==='upstream_redirect_blocked')return 'Finnhub가 다른 주소로 이동을 요청하여 안전상 차단됨';
  if(status==='upstream_unavailable')return 'Finnhub 네트워크 응답 확인 실패';
  if(status)return '공급원 조회 오류 (가격 미반영)';
  if(!item)return '종목 응답 누락';
