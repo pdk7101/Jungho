@@ -402,6 +402,18 @@ truth(feedCode.includes("Worker 주소 형식 오류:")&&
  feedCode.includes("개인 접근 암호 길이 부족: 현재 ")&&
  feedCode.includes("access.length<20"),
  'mobile connection separately identifies malformed Worker address and short VIEW_TOKEN without exposing its value');
+truth(html.includes('id="us-live-secret-hint"')&&
+ feedCode.includes('function accessHint(){')&&
+ feedCode.includes("accessHint();"),
+ 'the mobile UI explains same-tab secret reuse without displaying the credential');
+truth(feedCode.includes("url&&url===endpoint&&password.length>=20?password")&&
+ feedCode.includes("url&&url===cachedUrl&&cachedAccess.length>=20?cachedAccess"),
+ 'blank token input reuses only a previously saved token for exactly the same Worker URL');
+truth(feedCode.includes("$('us-live-secret').value=''; // Never leave secret readable")&&
+ !feedCode.includes("localStorage.setItem(VIEW_KEY"),
+ 'input is cleared for security and the token is never stored in durable localStorage');
+truth(feedCode.includes('개인 시세 서버 응답 성공 · 유효한 최근 체결 0/4'),
+ 'authenticated quote response with outdated trades is distinguished from a connection failure');
 truth(feedCode.includes('now-t>TRADE_TTL')&&feedCode.includes('now-f>RESPONSE_TTL'),
  'client rejects expired trade and stale API response');
 truth(usKrwCode.includes("kind:'finnhub-private'")&&
