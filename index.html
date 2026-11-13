@@ -274,31 +274,21 @@ details[open]>summary{margin-bottom:12px}
 .fund-ma20-gap{font-size:.85rem;color:#d7e7f9;margin-top:3px}
 .fund-ma20-detail{font-size:.77rem;color:#b3c9df;margin-top:3px}
 .fund-ma20-up{color:#ffb1b5}.fund-ma20-down{color:#8ad0f9}
-/* TradingView's public USD intraday widget is self-contained; its quotes do not become app prices. */
-#personal-us-live{margin:12px 0;border:1px solid #5782b5;border-radius:11px;padding:12px;background:#152a40}
-#personal-us-live summary{font-weight:800;cursor:pointer}
+/* One private quote feed; redundant TradingView widget and manual reference are removed. */
+#personal-us-live{margin:9px 0;padding:10px;border:1px solid #426485;border-radius:10px;background:#12243b}
+#personal-us-live summary{font-weight:650;font-size:.88rem;cursor:pointer}
 #personal-us-live .us-personal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0}
-#personal-us-live .us-personal-grid label{font-size:.82rem}
+#personal-us-live .us-personal-grid label{font-size:.81rem}
 #personal-us-live input{max-width:100%;box-sizing:border-box}
 #personal-us-live .us-remember-option{display:flex;align-items:flex-start;gap:7px;font-size:.81rem;margin:8px 0;color:#ced9e9}
 #personal-us-live .us-remember-option input{width:18px;min-width:18px;height:18px;margin:2px 0 0}
-#personal-us-live .live-note{font-size:.8rem;color:#bfcfe5;line-height:1.6;margin:8px 0}
-#us-personal-status{font-size:.8rem;font-weight:600;margin:7px 0;line-height:1.6}
-#us-intraday{margin:12px 0 14px;padding:12px 11px;border:1px solid #5078ae;border-radius:11px;background:#14243a}
-#us-intraday .tv-us-title{font-size:.93rem;font-weight:800;margin:0 0 7px}
-#us-intraday tv-ticker-tape{display:block;width:100%;min-height:82px}
-#us-intraday .tv-us-note{font-size:.79rem;color:#bbcee3;line-height:1.6;margin-top:7px}
-#us-intraday .tv-us-links{display:flex;flex-wrap:wrap;gap:9px;margin-top:8px;font-size:.77rem}
-#us-intraday .tv-us-links a{color:#a7d3ff}
-#tv-price-apply{margin-top:12px;border-top:1px solid #4b607b;padding-top:10px}
-#tv-price-apply summary{font-weight:700;font-size:.88rem;cursor:pointer}
-#tv-price-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}
-#tv-price-inputs label{font-size:.81rem;color:#c9d8e8}
-#tv-price-inputs input{max-width:100%;box-sizing:border-box}
-#tv-price-controls{display:flex;flex-wrap:wrap;gap:9px}
-#tv-price-status{font-size:.8rem;line-height:1.6;color:#c2d1e2;margin:8px 0 0}
+#personal-us-live .live-note{font-size:.78rem;color:#bfcfe5;line-height:1.55;margin:7px 0}
+#us-personal-status{font-size:.82rem;font-weight:600;margin:8px 0;line-height:1.5}
+.us-head-actions{display:flex;flex-wrap:wrap;gap:7px}
+.us-head-actions .us-header-button{white-space:nowrap}
+#us-live-badge{font-size:.84rem;font-weight:650;line-height:1.55}
 </style><script src="./live-prices.js"></script>
-<script type="module" src="https://widgets.tradingview-widget.com/w/en/tv-ticker-tape.js"></script></head><body><main>
+</head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel flex"><div><b>한국 ETF 장중 공개 시세 자동 갱신 · 약 60초 간격 (페이지 열린 동안)</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
 <div id="alert">공개 일봉 종가와 당일 비공식 조회 가격은 다릅니다. 마지막 체결 시각을 확인하지 못하면 최신 가격으로 표시하지 않습니다.</div>
@@ -322,74 +312,38 @@ details[open]>summary{margin-bottom:12px}
 <section id="funds" class="funds"></section>
 <section id="us-panel" class="panel">
  <div class="us-head">
-  <div><h2>미국장 4종목 · SCHD / AGNC / SPYM / CONY</h2><p class="sub">상단: 장중 지연시세(달러) · 아래: 확정 종가 환산(원화) · ISA와 별도 관리</p></div>
-  <button class="us-header-button" id="us-refresh" type="button">↻ 미국장 자료 확인</button>
- </div>
- <p class="sub" id="us-updated">미국장 최신 게시 일봉 확인 중</p>
- <p class="sub" id="us-live-badge">개인 장중시세 미설정 · 기존 미국장 확정 종가 참고</p>
- <details id="personal-us-live">
-  <summary>미국 주식 자동 장중 시세 · 무료 개인 연결 설정</summary>
-  <p class="live-note">Finnhub 무료 개인용 API + Cloudflare Workers 무료 서버를 사용하는 비공개 시세 연결입니다. PC를 켜둘 필요가 없으며 설정 완료 후 페이지가 열려 있는 동안 약 2분마다 자동 조회합니다. 다른 사람에게 시세를 배포하지 마세요. 토스 API 키는 사용하지 않습니다.</p>
-  <div class="us-personal-grid">
-   <label>개인용 Cloudflare Worker 주소<input id="us-live-url" type="url" placeholder="https://나의-시세.workers.dev" autocomplete="off" spellcheck="false"></label>
-   <label>개인용 접근 암호 (20자 이상)<input id="us-live-secret" type="password" placeholder="Worker VIEW_TOKEN과 동일하게" autocomplete="off" spellcheck="false"></label>
+  <div><h2>미국 주식 · SCHD / AGNC / SPYM / CONY</h2><p class="sub">원화 참고가격 · 보유손익 · 분배금</p></div>
+  <div class="us-head-actions">
+   <button class="us-header-button" id="us-live-refresh" type="button">↻ 현재가 조회</button>
+   <button class="us-header-button" id="us-refresh" type="button">↻ 일봉 확인</button>
   </div>
-  <label class="us-remember-option"><input type="checkbox" id="us-live-remember">내 개인 휴대전화에 접근 암호 기억하기 (선택 · 최대 30일)</label>
-  <p class="live-note" id="us-live-secret-hint">기본값은 현재 탭에서만 암호를 보관합니다. 위 항목을 직접 선택하면 이 브라우저의 기기 저장소에 암호를 저장해 새 탭에서도 다시 입력하지 않을 수 있습니다. 공용 기기에서는 선택하지 마세요. 기기에 저장된 암호는 해당 웹사이트에서 실행되는 스크립트가 접근할 수 있습니다.</p>
-  <div id="us-personal-status" role="status">연결되지 않음 · 기존 미국장 확정 종가를 사용합니다.</div>
-  <details id="us-quote-debug" class="live-note">
-   <summary>미국 주식 4종목 시세 응답 진단 (연결 오류 원인 확인)</summary>
-   <div id="us-quote-debug-text">조회 후 종목별로 공급원 오류·체결 시각을 표시합니다. API 키나 암호는 표시되지 않습니다.</div>
-  </details>
-  <div id="tv-price-controls">
-   <button type="button" class="us-header-button" id="us-live-connect">개인 시세 연결·조회</button>
+ </div>
+ <p class="sub" id="us-updated">미국장 확정 일봉 확인 중</p>
+ <p class="sub" id="us-live-badge">개인 미국 주식 시세 확인 중 · 원화 참고환율 사용</p>
+ <details id="personal-us-live">
+  <summary>시세 연결 관리 · 오류 확인</summary>
+  <p class="live-note">Finnhub 개인용 시세 연결 · 페이지가 열려 있는 동안 약 2분마다 조회합니다. 토스 API 키는 사용하지 않습니다.</p>
+  <div class="us-personal-grid">
+   <label>Cloudflare Worker 주소<input id="us-live-url" type="url" placeholder="https://나의-시세.workers.dev" autocomplete="off" spellcheck="false"></label>
+   <label>개인 접근 암호 (20자 이상)<input id="us-live-secret" type="password" placeholder="Worker VIEW_TOKEN" autocomplete="off" spellcheck="false"></label>
+  </div>
+  <label class="us-remember-option"><input type="checkbox" id="us-live-remember">이 개인 휴대전화에 암호 기억 (선택 · 최대 30일)</label>
+  <p class="live-note" id="us-live-secret-hint">현재 탭에서 암호를 재사용합니다. 기기 저장을 선택하면 새 탭에서도 연결할 수 있으나, 공용 기기에서는 선택하지 마세요.</p>
+  <div id="us-personal-status" role="status">시세 연결 확인 전</div>
+  <div class="us-head-actions">
+   <button type="button" class="us-header-button" id="us-live-connect">연결·재조회</button>
    <button type="button" class="us-header-button" id="us-live-disconnect">연결 해제</button>
   </div>
-  <p class="live-note">API 키와 접근 암호를 GitHub 코드·URL·채팅에 넣지 마세요. 접근 암호는 현재 브라우저 탭 세션에서만 사용합니다. 시세 응답에 확인된 마지막 체결 시각을 표시하고, 오래된 데이터는 자동 가격으로 사용하지 않습니다. 누적 분배금·주문은 변경하지 않습니다. <a href="https://github.com/pdk7101/Jungho/blob/main/US_QUOTES_SETUP.md" target="_blank" rel="noopener noreferrer">무료 시세 연결 설정방법</a></p>
- </details>
- <section id="us-intraday" aria-label="미국주식 장중 시세 - 거래소 지연 가능">
-  <div class="tv-us-title">미국장 장중 자동 갱신 시세 (USD · 거래소 지연 가능)</div>
-  <tv-ticker-tape
-    symbols="AMEX:SCHD,NASDAQ:AGNC,AMEX:SPYM,AMEX:CONY"
-    direction="horizontal"
-    hide-chart
-    locale="ko"
-    aria-label="TradingView 제공 미국 주식 4종목 장중 가격">
-    외부 장중 시세 위젯 로드 중입니다.
-  </tv-ticker-tape>
-  <p class="tv-us-note">TradingView 제공 별도 시세 화면입니다. 거래소 정책에 따라 지연(미국 주식 약 15분 등)되며 미국장 외에는 직전 거래가격이 표시될 수 있습니다. 아래 원화 종가환산 카드와 시점이 다릅니다. 위젯 수치는 현재 매수판단·평가손익에 자동 반영되지 않습니다.</p>
-  <details id="tv-price-apply">
-   <summary>위젯에서 본 가격을 원화 평가손익에 적용 (직접 확인)</summary>
-   <p class="tv-us-note">TradingView는 위젯 시세를 외부 계산식에 자동 제공하지 않습니다. 위젯에서 확인한 달러 가격을 아래에 입력한 뒤 '반영'을 누르면 원화 평가금액·평가손익을 갱신합니다. 입력 후 30분까지만 임시 적용하며, 기술적 매수 신호는 기존 확정 일봉 기준으로 안전하게 유지합니다.</p>
-   <div id="tv-price-inputs">
-    <label>SCHD · 달러(USD)<input data-tv-usd="schd" type="number" min="0.01" max="100000" step="0.0001" inputmode="decimal" placeholder="가격 입력"></label>
-    <label>AGNC · 달러(USD)<input data-tv-usd="agnc" type="number" min="0.01" max="100000" step="0.0001" inputmode="decimal" placeholder="가격 입력"></label>
-    <label>SPYM · 달러(USD)<input data-tv-usd="spym" type="number" min="0.01" max="100000" step="0.0001" inputmode="decimal" placeholder="가격 입력"></label>
-    <label>CONY · 달러(USD)<input data-tv-usd="cony" type="number" min="0.01" max="100000" step="0.0001" inputmode="decimal" placeholder="가격 입력"></label>
-   </div>
-   <div id="tv-price-controls">
-    <button type="button" class="us-header-button" id="tv-price-confirm">입력한 가격 평가에 반영</button>
-    <button type="button" class="us-header-button" id="tv-price-clear">임시 가격 전체 해제</button>
-   </div>
-   <p id="tv-price-status" role="status">미국 장중 가격을 아직 직접 반영하지 않았습니다.</p>
+  <details id="us-quote-debug" class="live-note">
+   <summary>종목별 시세 오류 진단</summary>
+   <div id="us-quote-debug-text">시세 조회 후 원인별 결과 표시</div>
   </details>
-  <nav class="tv-us-links" aria-label="미국 주식 시세 제공처 원본 보기">
-   <a href="https://www.tradingview.com/symbols/AMEX-SCHD/" target="_blank" rel="noopener noreferrer">SCHD</a>
-   <a href="https://www.tradingview.com/symbols/NASDAQ-AGNC/" target="_blank" rel="noopener noreferrer">AGNC</a>
-   <a href="https://www.tradingview.com/symbols/AMEX-SPYM/" target="_blank" rel="noopener noreferrer">SPYM</a>
-   <a href="https://www.tradingview.com/symbols/AMEX-CONY/" target="_blank" rel="noopener noreferrer">CONY</a>
-  </nav>
- </section>
+  <p class="live-note">오래된 시세는 평가에 사용하지 않습니다. 인증정보를 공개 코드나 채팅에 올리지 마세요. <a href="https://github.com/pdk7101/Jungho/blob/main/US_QUOTES_SETUP.md" target="_blank" rel="noopener noreferrer">설정 안내</a></p>
+ </details>
  <!-- US_BUILD_VERSION -->
  <div class="us-cards" id="us-cards"></div>
  <label>미국주식 자세히 보기<select id="us-selector"></select></label>
  <div class="us-detail" id="us-details"></div>
- <details id="us-holdings-details">
-  <summary>달러(USD) 원가·배당금 별도 입력 (선택) <span class="pill">기기 내 저장</span></summary>
-  <p class="sub">개인 보유수량·평단가는 달러로 입력합니다. 누적 세후 배당금은 실제 계좌에서 수령한 금액을 입력하세요. 미국주식 평단가에 원화 금액을 입력하지 마세요. 입력 정보는 기기의 브라우저에만 저장되며 GitHub에는 게시되지 않습니다.</p>
-  <div id="us-positions"></div><p class="sub" id="us-store-msg">미보유 종목은 수량 0으로 기록할 수 있습니다. 추가매수·분배금 재투자·주식병합 후에는 직접 갱신해야 합니다.</p>
- </details>
- <p class="sub">SCHD·SPYM은 ETF, AGNC는 모기지 리츠 개별주, CONY는 고위험 커버드콜 ETF입니다. 미국장 확정 일봉에 비공식 참고환율을 적용해 원화로 표시합니다. 직접 입력한 토스 원화 현재가가 있으면 입력 당일에만 우선 사용합니다. 공식 실시간 호가는 아니며 배당 이벤트는 제공처에 따라 미제공일 수 있습니다.</p>
 </section>
 <section class="panel" id="etf-flow-panel">
  <h2>ETF 규모 · 유동성 · NAV 보조지표</h2>
