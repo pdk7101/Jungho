@@ -270,6 +270,13 @@ details[open]>summary{margin-bottom:12px}
 .fund-ma20-detail{font-size:.77rem;color:#b3c9df;margin-top:3px}
 .fund-ma20-up{color:#ffb1b5}.fund-ma20-down{color:#8ad0f9}
 /* TradingView's public USD intraday widget is self-contained; its quotes do not become app prices. */
+#personal-us-live{margin:12px 0;border:1px solid #5782b5;border-radius:11px;padding:12px;background:#152a40}
+#personal-us-live summary{font-weight:800;cursor:pointer}
+#personal-us-live .us-personal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0}
+#personal-us-live .us-personal-grid label{font-size:.82rem}
+#personal-us-live input{max-width:100%;box-sizing:border-box}
+#personal-us-live .live-note{font-size:.8rem;color:#bfcfe5;line-height:1.6;margin:8px 0}
+#us-personal-status{font-size:.8rem;font-weight:600;margin:7px 0;line-height:1.6}
 #us-intraday{margin:12px 0 14px;padding:12px 11px;border:1px solid #5078ae;border-radius:11px;background:#14243a}
 #us-intraday .tv-us-title{font-size:.93rem;font-weight:800;margin:0 0 7px}
 #us-intraday tv-ticker-tape{display:block;width:100%;min-height:82px}
@@ -312,6 +319,20 @@ details[open]>summary{margin-bottom:12px}
   <button class="us-header-button" id="us-refresh" type="button">↻ 미국장 자료 확인</button>
  </div>
  <p class="sub" id="us-updated">미국장 최신 게시 일봉 확인 중</p>
+ <details id="personal-us-live">
+  <summary>미국 주식 자동 장중 시세 · 무료 개인 연결 설정</summary>
+  <p class="live-note">Finnhub 무료 개인용 API + Cloudflare Workers 무료 서버를 사용하는 비공개 시세 연결입니다. PC를 켜둘 필요가 없으며 설정 완료 후 페이지가 열려 있는 동안 약 2분마다 자동 조회합니다. 다른 사람에게 시세를 배포하지 마세요. 토스 API 키는 사용하지 않습니다.</p>
+  <div class="us-personal-grid">
+   <label>개인용 Cloudflare Worker 주소<input id="us-live-url" type="url" placeholder="https://나의-시세.workers.dev" autocomplete="off" spellcheck="false"></label>
+   <label>개인용 접근 암호 (20자 이상)<input id="us-live-secret" type="password" placeholder="Worker VIEW_TOKEN과 동일하게" autocomplete="off" spellcheck="false"></label>
+  </div>
+  <div id="us-personal-status" role="status">연결되지 않음 · 기존 미국장 확정 종가를 사용합니다.</div>
+  <div id="tv-price-controls">
+   <button type="button" class="us-header-button" id="us-live-connect">개인 시세 연결·조회</button>
+   <button type="button" class="us-header-button" id="us-live-disconnect">연결 해제</button>
+  </div>
+  <p class="live-note">API 키와 접근 암호를 GitHub 코드·URL·채팅에 넣지 마세요. 접근 암호는 현재 브라우저 탭 세션에서만 사용합니다. 시세 응답에 확인된 마지막 체결 시각을 표시하고, 오래된 데이터는 자동 가격으로 사용하지 않습니다. 누적 분배금·주문은 변경하지 않습니다. <a href="https://github.com/pdk7101/Jungho/blob/main/US_QUOTES_SETUP.md" target="_blank" rel="noopener noreferrer">무료 시세 연결 설정방법</a></p>
+ </details>
  <section id="us-intraday" aria-label="미국주식 장중 시세 - 거래소 지연 가능">
   <div class="tv-us-title">미국장 장중 자동 갱신 시세 (USD · 거래소 지연 가능)</div>
   <tv-ticker-tape
