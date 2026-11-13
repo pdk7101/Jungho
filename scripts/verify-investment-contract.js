@@ -304,4 +304,17 @@ truth(usDashboardCode.includes('마지막 사용자 확인 '),
  'US card identifies last manual confirmation date');
 truth(usDashboardCode.includes("fetch('./us-quotes.json?refresh="),
  'US source remains an explicitly non-live published JSON data file');
+// The public TradingView ticker is an independent, possibly delayed USD display.
+// Never read embedded widget text into holdings, valuations, orders or MA signals.
+truth(html.includes('src="https://widgets.tradingview-widget.com/w/en/tv-ticker-tape.js"'),
+ 'TradingView ticker tape is loaded using the official external module');
+truth(html.includes('symbols="AMEX:SCHD,NASDAQ:AGNC,AMEX:SPYM,AMEX:CONY"'),
+ 'all four requested US symbols appear in the same watchlist');
+truth(html.indexOf('id="us-intraday"')>html.indexOf('id="us-panel"')&&
+ html.indexOf('id="us-intraday"')<html.indexOf('id="us-cards"'),
+ 'delayed intraday quotes are above the existing close-based US cards');
+truth(html.includes('위젯 수치는 현재 매수판단·평가손익에 자동 반영되지 않습니다.'),
+ 'US widget price is clearly separated from order decisions and KRW valuation');
+truth(!usDashboardCode.includes('tv-ticker-tape')&&!usKrwCode.includes('tv-ticker-tape'),
+ 'US trading decision and cost basis never consume external widget DOM');
 console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
