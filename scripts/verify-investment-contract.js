@@ -371,6 +371,9 @@ truth(usDashboardCode.includes("valid(manual[f.id])?Number(manual[f.id]):x?Numbe
  'daily-bar trend detail is never silently changed by intraday quote');
 // Optional private personal-US feed: API keys remain in Cloudflare Secrets, never in GitHub.
 const feedCode=txt('personal-us-live.js'),workerCode=txt('private-us-quotes-worker.js');
+const pagesWorkflow=txt('.github/workflows/pages.yml');
+truth(/cp index\.html[^\n]*\bpersonal-us-live\.js\b[^\n]*\bsite\//.test(pagesWorkflow),
+ 'GitHub Pages deploy MUST copy personal quote connector script before reporting success');
 truth(!!new vm.Script(feedCode,{filename:'personal-us-live.js'}),
  'mobile personal feed is valid browser-side JavaScript');
 truth(!!new vm.Script(workerCode.replace('export default {','const worker = {'),
