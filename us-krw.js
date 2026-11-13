@@ -35,6 +35,10 @@ function priceKrw(id,priceUsd){
  if(rate&&tv&&finitePositive(tv.usd))
   return {amount:tv.usd*rate.rate,manual:true,kind:'tv-user-confirmed',
    source:'트레이딩뷰 화면 사용자 입력 USD × '+rate.source,stamp:tv.confirmedAt};
+ const privateQuote=window.ISA_PERSONAL_US?.quote?.(id);
+ if(rate&&privateQuote&&finitePositive(privateQuote.usd))
+  return {amount:privateQuote.usd*rate.rate,manual:false,kind:'finnhub-private',
+   source:'Finnhub 개인 체결가 USD × '+rate.source,stamp:privateQuote.tradeAt};
  if(rate&&finitePositive(priceUsd))return {amount:Number(priceUsd)*rate.rate,manual:false,
   source:'미국장 USD 종가 × '+rate.source,stamp:rate.when};
  return null;
@@ -119,7 +123,8 @@ function primaryPrice(id,priceUsd){
  const q=priceKrw(id,priceUsd);
  const dollar=finitePositive(priceUsd)?usd(priceUsd):'달러 시세 미확인';
  if(q)return '<span class="us-won-main">'+won(q.amount)+'</span>'+
-  '<small>'+(q.kind==='tv-user-confirmed'?'TradingView 화면 가격 직접 입력 × 환율 (30분 유효)':
+  '<small>'+(q.kind==='finnhub-private'?'Finnhub 비공개 최근 체결가격 × 환율':
+   q.kind==='tv-user-confirmed'?'TradingView 화면 가격 직접 입력 × 환율 (30분 유효)':
    q.manual?'토스 당일 직접 입력':'환율 환산 참고 가격')+' · '+dollar+'</small>';
  return '<span class="us-won-main">원화 미확인</span>'+
   '<small>환율 정보가 없어 환산 보류 · 달러 원본 '+dollar+'</small>';
@@ -495,6 +500,7 @@ function mount(){
  showRate();
  window.addEventListener('isa-us-quotes-refreshed',()=>render());
  window.addEventListener('isa-tv-user-reference-changed',()=>render());
+ window.addEventListener('isa-personal-us-quote-refreshed',()=>render());
  render();
 }
 mount();
