@@ -297,78 +297,62 @@ truth(usKrwCode.includes("if(k==='krwCurrent')p.krwDay="),
 truth(usKrwCode.includes("const LEDGER_KEY='isa-us-distributions-krw-v1'"),
  'US historical distribution ledger remains untouched');
 
-truth(usDashboardCode.includes("date(x.date)+' 확정 종가 × 참고 환율 · 실시간 호가 아님'"),
- 'US cards clearly label per-symbol date of completed close');
+// The mobile US portfolio has one private live price feed with safe EOD fallback.
+// Redundant TradingView widget and old USD editor must never reappear.
+truth(usDashboardCode.includes("x?'확정 종가 '+date(x.date)")&&
+ usDashboardCode.includes("기술 분석용 확정 일봉"),
+ 'US cards label completed daily close separately from private intraday quotes');
 truth(usDashboardCode.includes("'매수중 기록'")&&usDashboardCode.includes("'일시중지 기록'"),
- 'US historic broker notes cannot appear as authenticated live broker states');
-truth(usDashboardCode.includes('마지막 사용자 확인 '),
- 'US card identifies last manual confirmation date');
+ 'historical broker order notes remain explicit user-confirmed records');
+truth(usDashboardCode.includes("마지막 사용자 확인 ")&&
+ usDashboardCode.includes("실시간 증권사 주문상태 아님"),
+ 'broker verification date is kept distinct from authenticated trading status');
 truth(usDashboardCode.includes("fetch('./us-quotes.json?refresh="),
- 'US source remains an explicitly non-live published JSON data file');
-// The public TradingView ticker is an independent, possibly delayed USD display.
-// Never read embedded widget text into holdings, valuations, orders or MA signals.
-truth(html.includes('src="https://widgets.tradingview-widget.com/w/en/tv-ticker-tape.js"'),
- 'TradingView ticker tape is loaded using the official external module');
-truth(html.includes('symbols="AMEX:SCHD,NASDAQ:AGNC,AMEX:SPYM,AMEX:CONY"'),
- 'all four requested US symbols appear in the same watchlist');
-truth(html.indexOf('id="us-intraday"')>html.indexOf('id="us-panel"')&&
- html.indexOf('id="us-intraday"')<html.indexOf('id="us-cards"'),
- 'delayed intraday quotes are above the existing close-based US cards');
-truth(html.includes('위젯 수치는 현재 매수판단·평가손익에 자동 반영되지 않습니다.'),
- 'US widget price is clearly separated from order decisions and KRW valuation');
-truth(!usDashboardCode.includes('tv-ticker-tape')&&!usKrwCode.includes('tv-ticker-tape'),
- 'US trading decision and cost basis never consume external widget DOM');
-// TradingView widget prices cannot be read programmatically. Verify explicit user confirmation.
+ 'completed US daily bars stay available for technical analysis');
+truth(!html.includes('tv-ticker-tape')&&!html.includes('id="us-intraday"')&&
+ !html.includes('id="tv-price-apply"')&&!html.includes('data-tv-usd='),
+ 'obsolete public ticker tape and its manual quote form are removed');
+truth(!html.includes('id="us-holdings-details"')&&
+ !html.includes('id="us-positions"')&&
+ !usDashboardCode.includes("renderPositionEditor"),
+ 'duplicate USD-only position editor removed while KRW holdings ledger stays');
+truth(html.includes('id="us-live-badge"')&&
+ html.includes('id="us-live-refresh"')&&
+ html.includes('id="us-cards"')&&
+ html.includes('id="us-krw-details"')===false,
+ 'USD source status, quick refresh and KRW card hosts remain');
+truth(usDashboardCode.includes("const x=market(f),live=window.ISA_PERSONAL_US?.quote?.(f.id)")&&
+ usDashboardCode.includes("return live?live.usd:x?Number(x.close):null"),
+ 'US price is private authenticated intraday when valid, else completed daily close');
+truth(usDashboardCode.includes("const h=read('isa-us-holdings-v1')||{},shares="),
+ 'CONY share target reads actual saved KRW holdings, not stale USD inputs');
+truth(!usDashboardCode.includes("observedQuote")&&
+ !usKrwCode.includes("observedQuote")&&
+ !usKrwCode.includes("kind:'tv-user-confirmed'"),
+ 'retired TradingView manual quote cannot override live evaluation anymore');
 for(const path of ['us-dashboard.js','us-krw.js'])
  truth(!!new vm.Script(txt(path),{filename:path}),path+' is valid JavaScript');
-truth(html.includes('id="tv-price-apply"')&&html.includes('id="tv-price-confirm"')&&
- html.includes('id="tv-price-clear"'),'user-confirmed TV inputs and clear button exist');
-for(const symbol of ['schd','agnc','spym','cony'])
- truth(html.includes('data-tv-usd="'+symbol+'"'),symbol+' can be individually price-confirmed');
-truth(usDashboardCode.includes("TV_TTL_MS=30*60*1000"),
- 'user-observed quotes expire automatically after 30 minutes');
-truth(usDashboardCode.includes("sessionStorage.setItem(TV_KEY"),
- 'confirmed price records stay within browser tab session');
-truth(usDashboardCode.includes("window.dispatchEvent(new Event('isa-tv-user-reference-changed'))"),
- 'explicit confirmation triggers valuation refresh event');
-truth(usKrwCode.includes("if(rate&&tv&&finitePositive(tv.usd))"),
- 'user-confirmed USD quote must have verified reference FX before KRW conversion');
-truth(usKrwCode.includes("kind:'tv-user-confirmed'"),
- 'manual TradingView observation has explicit provenance separate from Toss price');
-truth(usKrwCode.includes("source:'미국장 USD 종가 × '"),
- 'quote expires back to original completed US daily close price');
-
-const observedStart=usDashboardCode.indexOf('function observedQuote(id){');
-const observedEnd=usDashboardCode.indexOf('function recoverTvQuotes(){',observedStart);
-truth(observedStart>=0&&observedEnd>observedStart,'confirmed price getter can be inspected');
-const tctx=vm.createContext({tvObserved:{schd:{usd:42.5,confirmedAt:new Date().toISOString()}},
- TV_TTL_MS:1800000,valid:v=>Number(v)>0&&Number.isFinite(Number(v)),Date,Number});
-vm.runInContext(usDashboardCode.slice(observedStart,observedEnd)+'\nthis.readQuote=observedQuote;',tctx);
-equal(tctx.readQuote('schd').usd,42.5,'fresh user-confirmed quote is available for valuation');
-tctx.tvObserved.schd.confirmedAt=new Date(Date.now()-31*60000).toISOString();
-equal(tctx.readQuote('schd'),null,'31-minute-old price cannot be used for valuation');
-
+truth(usKrwCode.includes("kind:'finnhub-private'")&&
+ usKrwCode.includes("source:'미국장 USD 종가 × '"),
+ 'live USD quote and completed USD close have separate provenance');
+truth(usKrwCode.includes("const LEDGER_KEY='isa-us-distributions-krw-v1'"),
+ 'existing cumulative net KRW dividend ledger is never deleted');
 const kStart=usKrwCode.indexOf('function priceKrw(id,priceUsd){');
 const kEnd=usKrwCode.indexOf('// Automated public reference quote',kStart);
-truth(kStart>=0&&kEnd>kStart,'KRW conversion function can be inspected');
+truth(kStart>=0&&kEnd>kStart,'KRW price conversion function available');
 const convert=new Function('holdings','finitePositive','day','fx','window',
  usKrwCode.slice(kStart,kEnd)+'\nreturn priceKrw;');
 const validPositive=v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0;
-const chosen={observedQuote:()=>({usd:42.5,confirmedAt:'2026-11-13T10:00:00Z'})};
-const priceFromTv=convert(()=>({}),validPositive,()=> '2026-11-13',
- ()=>({rate:1400,source:'test FX'}),{ISA_US_APP:chosen});
-equal(priceFromTv('schd',39).amount,59500,'confirmed 42.50 USD × 1400 KRW is used for personal valuation');
-equal(priceFromTv('schd',39).kind,'tv-user-confirmed','user-entered TV quote is never labeled as API live');
 const priceFromClose=convert(()=>({}),validPositive,()=> '2026-11-13',
- ()=>({rate:1400,source:'test FX'}),{ISA_US_APP:{observedQuote:()=>null}});
-equal(priceFromClose('schd',39).amount,54600,'expired or missing TV input falls back to 39 USD completed close');
+ ()=>({rate:1400,source:'test FX'}),{ISA_PERSONAL_US:{quote:()=>null}});
+equal(priceFromClose('schd',39).amount,54600,'unavailable live USD quote falls back to 39 USD daily close');
 const directToss=convert(()=>({schd:{krwCurrent:61000,krwDay:'2026-11-13'}}),validPositive,
- ()=> '2026-11-13',()=>({rate:1400,source:'test FX'}),{ISA_US_APP:chosen});
-equal(directToss('schd',39).amount,61000,'user-confirmed Toss KRW value keeps priority over TV observation');
-truth(usDashboardCode.includes("manual?manual.usd:live?live.usd:x?Number(x.close):null"),
- 'US valuation uses user-confirmed price first, recent private price second, daily close last');
-truth(usDashboardCode.includes("valid(manual[f.id])?Number(manual[f.id]):x?Number(x.close):null"),
- 'daily-bar trend detail is never silently changed by intraday quote');
+ ()=> '2026-11-13',()=>({rate:1400,source:'test FX'}),
+ {ISA_PERSONAL_US:{quote:()=>({usd:42,tradeAt:'2026-11-13T10:00:00Z'})}});
+equal(directToss('schd',39).amount,61000,'verified same-day Toss KRW manual override is preserved');
+truth(usDashboardCode.includes("const f=FUNDS.find(f=>f.id===selected),x=market(f),px=x?Number(x.close):null"),
+ 'trend detail consumes completed EOD bars rather than streaming live trades');
+
 // Optional private personal-US feed: API keys remain in Cloudflare Secrets, never in GitHub.
 const feedCode=txt('personal-us-live.js'),workerCode=txt('private-us-quotes-worker.js');
 const stampCode=txt('scripts/stamp-assets.js');
@@ -450,14 +434,12 @@ equal(feedContext.getQuote('schd'),null,'stale server response not used as fresh
 
 const personal=convert(()=>({}),validPositive,()=> '2026-11-13',
  ()=>({rate:1400,source:'test FX'}),
- {ISA_US_APP:{observedQuote:()=>null},
-  ISA_PERSONAL_US:{quote:()=>({usd:42,tradeAt:'2026-11-13T10:00:00Z'})}});
+ {ISA_PERSONAL_US:{quote:()=>({usd:42,tradeAt:'2026-11-13T10:00:00Z'})}});
 equal(personal('schd',39).amount,58800,'private quote 42 USD × 1400 KRW converts automatically');
 equal(personal('schd',39).kind,'finnhub-private','private price source kept distinct');
 const overridePersonal=convert(()=>({schd:{krwCurrent:61000,krwDay:'2026-11-13'}}),
  validPositive,()=> '2026-11-13',()=>({rate:1400,source:'test FX'}),
- {ISA_US_APP:{observedQuote:()=>null},
-  ISA_PERSONAL_US:{quote:()=>({usd:42,tradeAt:'2026-11-13T10:00:00Z'})}});
+ {ISA_PERSONAL_US:{quote:()=>({usd:42,tradeAt:'2026-11-13T10:00:00Z'})}});
 equal(overridePersonal('schd',39).amount,61000,
  'manually confirmed Toss price takes priority over personal intraday quote');
 
