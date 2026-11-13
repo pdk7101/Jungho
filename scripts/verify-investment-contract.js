@@ -465,7 +465,7 @@ truth(usKrwCode.includes("kind:'finnhub-private'")&&
 truth(usKrwCode.includes("const LEDGER_KEY='isa-us-distributions-krw-v1'"),
  'existing cumulative net KRW dividend ledger is never deleted');
 const kStart=usKrwCode.indexOf('function priceKrw(id,priceUsd){');
-const kEnd=usKrwCode.indexOf('// Automated public reference quote',kStart);
+const kEnd=usKrwCode.indexOf('/* Private, user-entered Korean-won dividend/distribution ledger.',kStart);
 truth(kStart>=0&&kEnd>kStart,'KRW price conversion function available');
 const convert=new Function('holdings','finitePositive','day','fx','window',
  usKrwCode.slice(kStart,kEnd)+'\nreturn priceKrw;');
