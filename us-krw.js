@@ -34,12 +34,15 @@ function priceKrw(id,priceUsd){
  // This amount was typed and confirmed by the user, not scraped/read from TradingView.
  if(rate&&tv&&finitePositive(tv.usd))
   return {amount:tv.usd*rate.rate,manual:true,kind:'tv-user-confirmed',
+   usd:Number(tv.usd),fxRate:rate.rate,fxAt:rate.when,fxSource:rate.source,fxManual:rate.manual,
    source:'트레이딩뷰 화면 사용자 입력 USD × '+rate.source,stamp:tv.confirmedAt};
  const privateQuote=window.ISA_PERSONAL_US?.quote?.(id);
  if(rate&&privateQuote&&finitePositive(privateQuote.usd))
   return {amount:privateQuote.usd*rate.rate,manual:false,kind:'finnhub-private',
+   usd:Number(privateQuote.usd),fxRate:rate.rate,fxAt:rate.when,fxSource:rate.source,fxManual:rate.manual,
    source:'Finnhub 개인 체결가 USD × '+rate.source,stamp:privateQuote.tradeAt};
- if(rate&&finitePositive(priceUsd))return {amount:Number(priceUsd)*rate.rate,manual:false,
+ if(rate&&finitePositive(priceUsd))return {amount:Number(priceUsd)*rate.rate,manual:false,kind:'usd-close',
+  usd:Number(priceUsd),fxRate:rate.rate,fxAt:rate.when,fxSource:rate.source,fxManual:rate.manual,
   source:'미국장 USD 종가 × '+rate.source,stamp:rate.when};
  return null;
 }
