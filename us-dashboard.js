@@ -98,7 +98,7 @@ function fresh(x){
  return Number.isFinite(dt.getTime())&&Math.abs(Date.now()-dt.getTime())<8*86400000;
 }
 function market(f){const x=record(f);return x&&fresh(x)?x:null;}
-function price(f){const x=market(f),q=observedQuote(f.id);return q?q.usd:x?Number(x.close):null;}
+function price(f){const x=market(f),manual=observedQuote(f.id),live=window.ISA_PERSONAL_US?.quote?.(f.id);return manual?manual.usd:live?live.usd:x?Number(x.close):null;}
 function zone(x,px){
  if(!x||!(px>0))return null;
  const b20=x.low20+(x.high20-x.low20)*.20,b30=x.low20+(x.high20-x.low20)*.30;
@@ -160,7 +160,10 @@ function cards(){
   const wonPrice=wonQuote&&Number.isFinite(wonQuote.amount)&&wonQuote.amount>0?
    Math.round(wonQuote.amount).toLocaleString('ko-KR')+'원':'원화 미확인';
   const summary=window.ISA_US_KRW?.compactLine?.(f.id,px)||'보유수량·원화 평단 입력 필요';
-  const quoteBasis=wonQuote?.kind==='tv-user-confirmed'?
+  const quoteBasis=wonQuote?.kind==='finnhub-private'?
+   '개인 Finnhub 체결가격 '+new Date(wonQuote.stamp).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+
+   ' · USD×참고환율 · 전체 거래소 체결가와 다를 수 있음':
+   wonQuote?.kind==='tv-user-confirmed'?
    '트레이딩뷰 화면 가격 사용자 직접 확인 '+
     new Date(wonQuote.stamp).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+
     ' · 30분 임시 평가 · 자동 시세 연동 아님':
@@ -206,7 +209,7 @@ function renderPositionEditor(){
  }));
 }
 function details(){
- const f=FUNDS.find(f=>f.id===selected),x=market(f),px=valid(manual[f.id])?Number(manual[f.id]):price(f),host=$('us-details');
+ const f=FUNDS.find(f=>f.id===selected),x=market(f),px=valid(manual[f.id])?Number(manual[f.id]):x?Number(x.close):null,host=$('us-details');
  if(!host)return;
  if(!x){host.innerHTML='<h3>'+f.ticker+' · '+text(f.name)+'</h3>'+(window.ISA_US_SIGNAL?.detailLine?.(f.id)||'')+'<p class="us-small">미국장 완료 일봉을 확인할 수 없습니다. 가격과 이동평균선을 추정하지 않습니다. <a href="https://finance.yahoo.com/quote/'+f.ticker+'/" target="_blank" rel="noopener">시세 제공처에서 확인</a></p>';return;}
  const z=zone(x,px),b=basis(f,px),div=distribution(x),t=x.trend,metric=n=>window.ISA_US_KRW?.metricPrice?.(n)||usd(n),divPrice=n=>window.ISA_US_KRW?.dividendPrice?.(n)||usd(n,4);
@@ -279,6 +282,7 @@ window.ISA_US_APP={
  },
  rerender:()=>render()
 };
+window.addEventListener('isa-personal-us-quote-refreshed',()=>render());
 function mount(){
  const p=$('us-panel');if(!p)return;
  const sel=$('us-selector');
