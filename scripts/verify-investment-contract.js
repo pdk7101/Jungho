@@ -639,7 +639,7 @@ truth(!JSON.stringify(exceptionFeed).includes('synthetic unsafe internal detail'
  'upstream exception messages do not enter the client quote feed');
 // USD/KRW discrepancy check: never present Finnhub USD × dated reference FX as Toss KRW.
 truth(usDashboardCode.includes('function conversionLine(q){')&&
- usDashboardCode.includes("'us-list-meta us-list-calculation'")&&
+ usDashboardCode.includes('us-list-meta us-list-calculation')&&
  html.includes('#us-panel .us-list-meta.us-list-calculation{'),
  'each US card shows the exact USD and dated FX conversion without mobile truncation');
 truth(usKrwCode.includes("usd:Number(privateQuote.usd),fxRate:rate.rate,fxAt:rate.when")&&
