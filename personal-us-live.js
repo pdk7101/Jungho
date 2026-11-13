@@ -4,15 +4,38 @@
  const IDS=['schd','agnc','spym','cony'];
  const URL_KEY='isa-us-private-worker-url-v1';
  const VIEW_KEY='isa-us-private-worker-access-session-v1';
+ // Explicit opt-in only. A persistent access token can be read by scripts on this public origin.
+ const REMEMBER_KEY='isa-us-private-worker-remembered-v1',REMEMBER_MAX_MS=30*86400000;
  const TRADE_TTL=45*60000,RESPONSE_TTL=5*60000;
  let endpoint='',password='',quotes={},fetchedAt='',busy=false,lastMessage='';
  const $=id=>document.getElementById(id);
+ function rememberedAccess(url){
+  if(!url)return '';
+  try{
+   const saved=JSON.parse(localStorage.getItem(REMEMBER_KEY)||'null');
+   const savedAt=Number(saved?.savedAt),elapsed=Date.now()-savedAt;
+   if(!saved||!Number.isFinite(savedAt)||elapsed<0||elapsed>REMEMBER_MAX_MS){
+    if(saved)localStorage.removeItem(REMEMBER_KEY);
+    return '';
+   }
+   return saved.url===url&&typeof saved.access==='string'&&saved.access.length>=20?saved.access:'';
+  }catch(_){return '';}
+ }
+ function saveRememberedAccess(url,access){
+  try{
+   if($('us-live-remember')?.checked)
+    localStorage.setItem(REMEMBER_KEY,JSON.stringify({url,access,savedAt:Date.now()}));
+   else localStorage.removeItem(REMEMBER_KEY);
+  }catch(_){}
+ }
  function accessHint(){
   const hint=$('us-live-secret-hint'),input=$('us-live-secret');
   const active=safeUrl($('us-live-url')?.value)===endpoint&&password.length>=20;
+  const remembered=active&&Boolean(rememberedAccess(endpoint));
   if(hint)hint.textContent=active?
-   '이 탭에 접근 암호가 임시 보관되어 있습니다. 조회 버튼을 다시 눌러도 재입력할 필요가 없습니다. 브라우저 탭 종료 시 다시 입력이 필요할 수 있습니다.':
-   '첫 연결 때만 VIEW_TOKEN을 입력하세요. 연결 후에는 암호 입력칸이 비어 보여도 같은 탭에서 자동 조회와 재조회가 가능합니다.';
+   (remembered?'이 개인 휴대전화에 암호를 기억 중입니다. 새 탭에서도 자동 연결을 시도하며, 연결 해제를 누르면 저장된 암호까지 삭제합니다.':
+   '현재 탭에 암호가 임시 보관되어 있습니다. 다시 조회할 때 입력하지 마세요. 새 탭에서도 유지하려면 위 기기 저장 옵션을 직접 선택하세요.'):
+   '첫 연결에서만 암호 입력이 필요합니다. 공용 휴대전화에서는 기기에 암호 기억하기를 선택하지 마세요.';
   if(input)input.placeholder=active?'저장된 암호 사용 중 · 재입력 불필요':'Worker VIEW_TOKEN과 동일하게';
  }
  function safeUrl(raw){
@@ -90,7 +113,8 @@
   }catch(_){}
   const access=typed||
    (url&&url===endpoint&&password.length>=20?password:'')||
-   (url&&url===cachedUrl&&cachedAccess.length>=20?cachedAccess:'');
+   (url&&url===cachedUrl&&cachedAccess.length>=20?cachedAccess:'')||
+   rememberedAccess(url);
   // Never show the credential; explain only the local input validation error.
   if(!enteredUrl){status('Worker 주소가 비어 있습니다. Cloudflare workers.dev 전체 주소를 입력하세요');return;}
   if(!url){status('Worker 주소 형식 오류: https://워커이름.계정이름.workers.dev 형태의 전체 HTTPS 주소를 입력하세요');return;}
@@ -103,6 +127,7 @@
   endpoint=url;password=access;
   if(changed){quotes={};fetchedAt='';signal();}
   try{localStorage.setItem(URL_KEY,url);sessionStorage.setItem(VIEW_KEY,access);}catch(_){}
+  saveRememberedAccess(url,access);
   $('us-live-secret').value=''; // Never leave secret readable in the input/DOM.
   accessHint();
   status(typed?'개인 시세 서버 접속 중':'저장된 암호로 다시 조회합니다');
@@ -110,7 +135,8 @@
  }
  function disconnect(){
   endpoint='';password='';quotes={};fetchedAt='';
-  try{localStorage.removeItem(URL_KEY);sessionStorage.removeItem(VIEW_KEY);}catch(_){}
+  try{localStorage.removeItem(URL_KEY);sessionStorage.removeItem(VIEW_KEY);localStorage.removeItem(REMEMBER_KEY);}catch(_){}
+  if($('us-live-remember'))$('us-live-remember').checked=false;
   if($('us-live-url'))$('us-live-url').value='';
   if($('us-live-secret'))$('us-live-secret').value='';
   accessHint();
@@ -122,11 +148,18 @@
  if(stopButton)stopButton.addEventListener('click',disconnect);
  try{
   const u=safeUrl(localStorage.getItem(URL_KEY)),token=sessionStorage.getItem(VIEW_KEY);
+  const remembered=u?rememberedAccess(u):'';
   if($('us-live-url')&&u)$('us-live-url').value=u;
-  if(u&&token&&token.length>=20){endpoint=u;password=token;}
+  if($('us-live-remember'))$('us-live-remember').checked=Boolean(remembered);
+  if(u&&(token?.length>=20||remembered)){endpoint=u;password=token?.length>=20?token:remembered;}
  }catch(_){}
  accessHint();
  if($('us-live-url'))$('us-live-url').addEventListener('change',accessHint);
+ if($('us-live-remember'))$('us-live-remember').addEventListener('change',function(){
+  if(endpoint&&password.length>=20)saveRememberedAccess(endpoint,password);
+  else if(!this.checked)try{localStorage.removeItem(REMEMBER_KEY);}catch(_){}
+  accessHint();
+ });
  status();
  if(endpoint&&password)refresh();
  // Free account: four vendor requests at most every 120 seconds while page is visible.
