@@ -41,35 +41,6 @@ function priceKrw(id,priceUsd){
  return null;
 }
 
-// Automated public reference quote for the editor; never stored as a Toss override.
-function automaticReferenceKrw(id){
- const data=window.ISA_US_APP?.getData?.();
- const x=data?.items?.find(item=>item&&item.id===id);
- if(!x?.ok||!finitePositive(x.close)||!/[0-9]{8}/.test(String(x.date||''))||String(x.date).length!==8)return null;
- const dateString=String(x.date);
- const d=new Date(dateString.slice(0,4)+'-'+dateString.slice(4,6)+'-'+dateString.slice(6,8)+'T12:00:00Z');
- const age=Date.now()-d.getTime();
- if(!Number.isFinite(age)||age < -86400000||age > 8*86400000)return null;
- const referenceFx=fx();
- if(!referenceFx)return null;
- const amount=Number(x.close)*referenceFx.rate;
- if(!finitePositive(amount))return null;
- return {amount,asOf:dateString.slice(0,4)+'-'+dateString.slice(4,6)+'-'+dateString.slice(6,8),
-  source:usd(x.close)+' (USD 확정 종가) × '+referenceFx.source+' '+won(referenceFx.rate,2)};
-}
-function refreshAutoQuoteFields(){
- const area=$('us-krw-editor');if(!area)return;
- for(const ticker of ITEMS){
-  const id=ticker.toLowerCase(),q=automaticReferenceKrw(id);
-  const input=area.querySelector('input[data-auto-krw-id="'+id+'"]');
-  const status=area.querySelector('[data-auto-krw-label="'+id+'"]');
-  if(input)input.value=q?String(Math.round(q.amount*100)/100):'';
-  if(status)status.textContent=q?
-    '기준 '+q.asOf+' · '+q.source+' · 토스 앱의 실제 현재가와 다를 수 있음':
-    '공개 USD 종가 또는 환율 미확인 · 미국장 자료 조회 시 자동 표시';
- }
-}
-
 /* Private, user-entered Korean-won dividend/distribution ledger.
  * The public price feed never claims to know actual after-tax Korean receipts. */
 const LEDGER_KEY='isa-us-distributions-krw-v1';
@@ -326,26 +297,39 @@ function renderForm(){
   const id=ticker.toLowerCase(),p=h[id]||{};
   const fmt=x=>x!==null&&x!==undefined&&String(x).trim()!==''&&Number.isFinite(Number(x))?String(x):'';
   return '<div class="us-krw-form-row"><strong>'+ticker+'</strong>'+
-   '<label>보유수량 (주)<input data-krw-id="'+id+'" data-k="qty" type="number" min="0" step="0.000001" value="'+fmt(p.qty)+'"></label>'+
-   '<label>토스 원화 평단 (원)<input data-krw-id="'+id+'" data-k="krwAvg" type="number" min="0" step="0.01" value="'+fmt(p.krwAvg)+'"></label>'+
-   '<label>자동 원화 참고현재가 (원 · 확정 일봉)<input type="number" data-auto-krw-id="'+id+'" readonly aria-readonly="true" placeholder="미국장 조회 후 표시" value=""></label>'+
-   '<small class="us-small" data-auto-krw-label="'+id+'">공개 확정 종가와 환율 조회 중</small>'+
-   '<label>토스 원화 현재가 직접 보정 (원 · 오늘만, 선택)<input data-krw-id="'+id+'" data-k="krwCurrent" type="number" min="0" step="0.01" placeholder="자동 참고가 사용 시 공란" value="'+(p.krwDay===day()?fmt(p.krwCurrent):'')+'"></label>'+
-   '<label>누적 세후 배당·분배금 (원)<input data-krw-id="'+id+'" data-k="krwNet" type="number" min="0" step="0.01" value="'+fmt(p.krwNet)+'"></label>'+
-   '</div>';
+   '<label>보유수량 (주 · 소수점 가능)<input data-krw-id="'+id+'" data-k="qty" type="number" min="0" step="0.000001" placeholder="보유수량" value="'+fmt(p.qty)+'"></label>'+
+   '<label>원화 평단가 (원)<input data-krw-id="'+id+'" data-k="krwAvg" type="number" min="0" step="0.01" placeholder="토스 평균매수가" value="'+fmt(p.krwAvg)+'"></label>'+
+   '<details class="us-krw-optional"><summary>선택: 당일 현재가 보정 · 누적 세후 분배금</summary>'+
+   '<div class="us-krw-optional-fields">'+
+   '<label>토스 원화 현재가 직접 보정 (원 · 오늘만)<input data-krw-id="'+id+'" data-k="krwCurrent" type="number" min="0" step="0.01" placeholder="기본은 자동 시세" value="'+(p.krwDay===day()?fmt(p.krwCurrent):'')+'"></label>'+
+   '<label>누적 세후 배당·분배금 (원)<input data-krw-id="'+id+'" data-k="krwNet" type="number" min="0" step="0.01" placeholder="실수령 누적액" value="'+fmt(p.krwNet)+'"></label>'+
+   '</div></details></div>';
  }).join('');
- refreshAutoQuoteFields();
  area.querySelectorAll('input[data-krw-id]').forEach(input=>input.addEventListener('change',()=>{
   const id=input.dataset.krwId,k=input.dataset.k;
-  const h=holdings(),p={...(h[id]||{})},value=input.value.trim()===''?null:Number(input.value);
-  if(value!==null&&Number.isFinite(value)&&value>=0&&(k!=='krwAvg'||value>0)&&(k!=='krwCurrent'||value>0))p[k]=value;
-  else delete p[k];
+  const h=holdings(),p={...(h[id]||{})},raw=input.value.trim(),value=raw===''?null:Number(raw);
+  const invalid=value!==null&&(!Number.isFinite(value)||value<0||
+   (k==='krwAvg'&&value===0)||(k==='krwCurrent'&&value===0)||
+   (k==='qty'&&Math.abs(value-Math.round(value*1000000)/1000000)>1e-10));
+  const topMsg=$('us-holding-message'),subMsg=$('us-krw-message');
+  if(invalid){
+   input.value=p[k]===null||p[k]===undefined?'':String(p[k]);
+   if(topMsg)topMsg.textContent='보유수량(0 이상 · 소수점 6자리까지) 또는 원화 평단가(0보다 큼)를 확인해 주세요.';
+   return;
+  }
+  if(value===null)delete p[k];
+  else p[k]=value;
   if(k==='krwCurrent')p.krwDay=finitePositive(p.krwCurrent)?day():'';
   if(k==='qty'||k==='krwAvg')p.krwSnapshotDate=day();
   h[id]=p;
-  write('isa-us-holdings-v1',h);
-  $('us-krw-message').textContent='해당 기기에 보유정보를 저장했습니다. 추가매수·재투자 후 다시 갱신하세요.';
-  window.ISA_US_APP?.applyFromLocal?.();
+  if(!write('isa-us-holdings-v1',h)){
+   if(topMsg)topMsg.textContent='브라우저 저장에 실패했습니다. 저장공간과 브라우저 설정을 확인해 주세요.';
+   return;
+  }
+  const message=id.toUpperCase()+' 원화 보유정보 저장 완료 · 미국 주식 카드와 평가손익에 반영했습니다.';
+  if(topMsg)topMsg.textContent=message;
+  if(subMsg)subMsg.textContent=message;
+  render();
  }));
 }
 function importHoldings(){
@@ -363,7 +347,7 @@ function importHoldings(){
  }
  if(!good){msg.textContent='형식 확인: SCHD 10 50000 49000 (티커 수량 평단원 현재가원)';return;}
  write('isa-us-holdings-v1',h);
- field.value='';renderForm();window.ISA_US_APP?.applyFromLocal?.();
+ field.value='';renderForm();render();
  msg.textContent=good+'종목을 이 기기에 저장했습니다.'+(bad?' 형식 불일치 '+bad+'줄 제외.':'')+' 분배금은 별도 입력하세요.';
 }
 
@@ -424,7 +408,7 @@ function applyPersonalLink(){
     '. 기존 정보가 없었던 기기에 저장했습니다. 최신 추가매수 내역이 있다면 직접 갱신하세요.';
   if(info)info.textContent=msg;
   if(notice)notice.textContent=msg;
-  if($('us-krw-details'))$('us-krw-details').open=true;
+  if($('holdings-settings'))$('holdings-settings').open=true;
  }catch(e){
   const msg='보유정보 자동 적용 실패: '+String(e.message||e)+'. 입력 항목에서 직접 등록할 수 있습니다.';
   if(info)info.textContent=msg;
@@ -438,7 +422,6 @@ function showRate(){
  area.textContent=r?'적용 환율: 1 USD = '+won(r.rate,2)+' · '+r.source+' ('+r.when+')':'환율 확인 실패 · 환율 직접 입력 또는 토스 현재가를 사용하세요.';
 }
 function render(){
- refreshAutoQuoteFields();
  showRate();
  showHoldingsCheck();
  showTotal();
@@ -456,12 +439,11 @@ function mount(){
  '<div id="us-krw-holdings-check" class="us-holdings-check"></div>'+
  '<div id="us-krw-total" class="us-total-summary"></div>'+
  '<p id="us-krw-applied" class="us-small" aria-live="polite"></p>'+
- '<details id="us-krw-details"><summary>보유수량·원화 평단·환율 수정</summary>'+
- '<p class="us-small">보유정보는 이 휴대전화 브라우저에만 저장됩니다. 원화 현재가 직접 보정은 당일에만 유효합니다.</p>'+
+ '<details id="us-krw-details"><summary>선택: 참고 환율·보유정보 일괄 가져오기</summary>'+
+ '<p class="us-small">보유수량과 원화 평단가는 위쪽 국내 ETF 매수상한 영역의 통합 입력란에서 수정합니다. 이곳에는 환율과 기존 일괄 입력만 남겨둡니다.</p>'+
  '<label>직접 지정할 USD/KRW 환율 (선택)<input id="us-krw-fx" type="number" min="700" max="3000" step="0.01" placeholder="비우면 참고 환율 자동 사용" value="'+(manualFx||'')+'"></label>'+
  '<textarea id="us-krw-import" rows="5" placeholder="SCHD 10 50000 49000&#10;SPYM 5 120000 118000"></textarea>'+
  '<button type="button" id="us-krw-import-button" class="us-header-button">입력한 4종목 저장</button>'+
- '<div id="us-krw-editor"></div>'+
  '<p class="us-small" id="us-krw-message">누적 세후 분배금은 실수령액을 따로 입력해 주세요.</p></details>'+
  '<details id="us-distribution-details"><summary>세후 배당·분배금 원화 지급내역 상세 등록</summary>'+
  '<p class="us-small">실제 토스 입금내역의 날짜와 원화 금액을 입력하세요. 세전 지급금·세금·재투자액은 선택사항입니다. 과거 지급내역이 누락되어 있다면 별도의 누적 실수령액을 우선 사용하며 두 값을 합산하지 않습니다.</p>'+
@@ -488,7 +470,7 @@ function mount(){
  $('us-distribution-date').value=day();
  $('us-distribution-ticker').value=ledgerSelected;
  $('us-distribution-ticker').addEventListener('change',function(){ledgerSelected=this.value;renderLedger();});
- const d=$('us-krw-details');d.addEventListener('toggle',()=>{if(d.open)renderForm();});
+ const d=$('holdings-settings');if(d)d.addEventListener('toggle',()=>{if(d.open)renderForm();});
  renderForm();
  applyPersonalLink();
  window.ISA_US_KRW={cardLine,compactLine,primaryPrice,metricPrice,dividendPrice,detailLine,basisKrw:positionKrw,fx,priceKrw,totalKrw,distributionStats,netDividend};
