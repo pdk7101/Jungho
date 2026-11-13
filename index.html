@@ -49,6 +49,8 @@ details[open]>summary{margin-bottom:12px}
 .fieldset-note{font-size:.78rem;color:#b7c5da;line-height:1.55}
 #summary{line-height:1.6}
 .card-detail{font-size:.77rem;color:#abbdd7;margin-top:5px}
+.fund-holding{font-size:.83rem;font-weight:650;line-height:1.5;overflow-wrap:anywhere;margin-top:8px}
+.fund-holding.avg-down{color:#78b0ff}.fund-holding.avg-up{color:#f4b6ba}
 @media(max-width:560px){.pos-row{grid-template-columns:1fr 1fr}.pos-name{grid-column:1/-1}}
 
 
@@ -417,6 +419,21 @@ function ma20Comparison(id){
   source:q?'당일 공개 체결가'+(q.method==='published'?' (지연 게시 가능)':''):
    '확정 일봉 종가 (당일 현재가 아님)'};
 }
+function renderHoldingInCard(id,p){
+ // Read the same on-device holdings used by Korean ETF cost-basis calculations.
+ // Never embed personal share counts/average prices in the published site source.
+ var h=positions[id];
+ if(!h||!qtyValid(h.qty))
+  return '<div class="card-detail fund-holding" data-holding="'+safe(id)+'">보유수량 미입력 · 평단 미입력</div>';
+ var qty=Number(h.qty),avg=valid(h.avg)?Number(h.avg):null;
+ if(qty===0)
+  return '<div class="card-detail fund-holding" data-holding="'+safe(id)+'">보유 0주 (미보유) · 평단 해당 없음</div>';
+ var line='보유 '+qty.toLocaleString('ko-KR')+'주 · 평단 '+(avg!==null?avgMoney(avg):'미입력');
+ var detail=avg!==null&&valid(p)?
+  ' · 평단 대비 '+(p>=avg?'+':'')+((p/avg-1)*100).toFixed(2)+'%':'';
+ var cls=detail?(p<avg?' avg-down':' avg-up'):'';
+ return '<div class="card-detail fund-holding'+cls+'" data-holding="'+safe(id)+'">'+line+detail+'</div>';
+}
 function renderMa20InCard(id){
  var z=ma20Comparison(id);
  if(!z.ready)return '<div class="fund-ma20"><div class="fund-ma20-main"><b>20일 이동평균선</b> · 자료 확인 대기</div>'+
@@ -670,7 +687,7 @@ function render(){
  list.innerHTML=FUNDS.map(function(f){
   var x=byId[f.id],v=verdict(f),live=freshQuote(f.id),p=hasBars(x)?current(x,f.id):(live?live.price:null),h=p?holding(f.id,p):null,b=hasBars(x)?band(x,p):null;
   var tag=b?'<span class="band-tag '+(b.name==='하단 20%'?'band20':'')+'">'+b.name+'</span>':'';
-  var avgText=h?'<div class="card-detail '+(h.canLower?'avg-down':'avg-up')+'">평단 '+avgMoney(h.avg)+' 대비 '+(h.discount>=0?'+':'')+h.discount.toFixed(2)+'%</div>':'<div class="card-detail">평단가 미입력 / 미보유</div>';
+  var avgText=renderHoldingInCard(f.id,p);
   return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+safe(f.plan)+'</small><strong>'+(p?money(p):'미확인')+'</strong><small>'+(live?'오늘 공개 체결가 ('+(live.method==='published'?'GitHub 게시 · 지연 가능':'네이버 직접 조회')+') · 체결 '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+' · '+Math.max(0,Math.floor((Date.now()-new Date(live.tradeAt).getTime())/60000))+'분 경과':'과거 일봉 종가 · '+(hasBars(x)?day(x.date):'확인 불가'))+'</small>'+
   (['robot','space','sol'].includes(f.id)?'<small>매수 적용상한 '+(valid(effectiveCap(f.id).value)?money(effectiveCap(f.id).value):'확인 대기')+' · '+safe(effectiveCap(f.id).reason)+'</small>':'')+avgText+renderMa20InCard(f.id)+tag+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+actionLabel(v.type)+'</div></div>';
  }).join('');
