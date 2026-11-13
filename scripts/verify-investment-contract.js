@@ -572,4 +572,42 @@ truth(diagCtx.diagnose({usd:42,tradeAt:new Date(diagNow-50*60000).toISOString()}
  'old trade timestamp is distinguished from an API failure');
 truth(diagCtx.diagnose({usd:42,tradeAt:new Date(diagNow-3*60000).toISOString()},diagNow)==='최근 체결가격 사용 가능',
  'recent valid trade is clearly distinguished from provider errors');
+// Regression: Workers runtime rejects redirect:'error' before any Finnhub network request.
+// The Worker must use the supported manual mode and reject actual redirects explicitly.
+truth(workerCode.includes("redirect:'manual'")&&!workerCode.includes("},redirect:'error'"),
+ 'Cloudflare Worker does not use unsupported redirect:error for Finnhub subrequests');
+truth(workerCode.includes("if(response.status>=300&&response.status<400)")&&
+ workerCode.includes("upstream_redirect_blocked"),
+ 'unexpected Finnhub redirects are rejected without leaking a key to another URL');
+const collectFrom=workerCode.indexOf('async function collect(env){');
+const collectTo=workerCode.indexOf('export default {',collectFrom);
+truth(collectFrom>=0&&collectTo>collectFrom,
+ 'Finnhub subrequest worker function can be executed against mock Cloudflare fetch');
+function mockFinnhub(responseStatus){
+ const calls=[];
+ const sandbox=vm.createContext({
+  SYMBOLS:{schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY'},
+  URL,Date,Number,Math,Promise,Object,AbortSignal,
+  fetch:async(u,options)=>{
+   calls.push({url:u.toString(),redirect:options.redirect,
+    auth:options.headers['X-Finnhub-Token']});
+   // Simulate Cloudflare's documented incompatibility: error redirects reject before request.
+   if(options.redirect==='error')throw new TypeError('Unsupported redirect mode');
+   return {status:responseStatus,ok:responseStatus===200,
+    json:async()=>({c:42.5,t:Math.floor(Date.now()/1000),pc:40})};
+  }
+ });
+ vm.runInContext(workerCode.slice(collectFrom,collectTo)+'\nthis.collectForTest=collect;',sandbox);
+ return {collect:sandbox.collectForTest,calls};
+}
+const liveMock=mockFinnhub(200),testFeed=await liveMock.collect({FINNHUB_API_KEY:'FAKE_TEST_ONLY'});
+truth(Object.values(testFeed.quotes).every(q=>q.usd===42.5),
+ 'Worker collects all four finite Finnhub quote prices with Cloudflare-compatible fetch');
+truth(liveMock.calls.length===4&&liveMock.calls.every(c=>c.redirect==='manual'&&c.auth==='FAKE_TEST_ONLY'),
+ 'four upstream calls use manual redirect policy and server-side token header');
+const redirectMock=mockFinnhub(302),blocked=await redirectMock.collect({FINNHUB_API_KEY:'FAKE_TEST_ONLY'});
+truth(Object.values(blocked.quotes).every(q=>q.error==='upstream_redirect_blocked'),
+ 'Worker refuses upstream redirects rather than following them with a secret');
+truth(diagCtx.diagnose({error:'upstream_redirect_blocked'},Date.now()).includes('차단'),
+ 'mobile diagnostic identifies Worker redirect refusal separately from network failure');
 console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
