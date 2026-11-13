@@ -637,4 +637,31 @@ truth(Object.values(exceptionFeed.quotes).every(q=>q.error==='upstream_type_erro
  'private worker safely reports request TypeError without leaking exception message');
 truth(!JSON.stringify(exceptionFeed).includes('synthetic unsafe internal detail'),
  'upstream exception messages do not enter the client quote feed');
+// USD/KRW discrepancy check: never present Finnhub USD × dated reference FX as Toss KRW.
+truth(usDashboardCode.includes('function conversionLine(q){')&&
+ usDashboardCode.includes("'us-list-meta us-list-calculation'")&&
+ html.includes('#us-panel .us-list-meta.us-list-calculation{'),
+ 'each US card shows the exact USD and dated FX conversion without mobile truncation');
+truth(usKrwCode.includes("usd:Number(privateQuote.usd),fxRate:rate.rate,fxAt:rate.when")&&
+ usKrwCode.includes("fxSource:rate.source,fxManual:rate.manual"),
+ 'personal Finnhub quote preserves calculation inputs and FX reference provenance');
+const convStart=usDashboardCode.indexOf('function conversionLine(q){');
+const convEnd=usDashboardCode.indexOf('function cards(){',convStart);
+truth(convStart>=0&&convEnd>convStart,'unit-testable USD/KRW conversion explanation is available');
+const convSandbox=vm.createContext({Number,Date});
+vm.runInContext(usDashboardCode.slice(convStart,convEnd)+'\nthis.conversionLineForTest=conversionLine;',convSandbox);
+const conv=convSandbox.conversionLineForTest({
+ usd:35.92,fxRate:1336.26,amount:35.92*1336.26,fxManual:true,fxAt:'수동 입력'
+});
+truth(conv.includes('35.92 USD × 1,336.26원/USD')&&
+ conv.includes('약 47,998원')&&conv.includes('토스 적용환율'),
+ 'shown USD price × FX yields numerically correct rounded KRW and distinguishes Toss source');
+truth(convSandbox.conversionLineForTest({amount:48000})==='',
+ 'manual Toss KRW override is never mislabeled as a Finnhub USD×FX conversion');
+const oldFx=convSandbox.conversionLineForTest({
+ usd:8.21,fxRate:1336.26,amount:8.21*1336.26,
+ fxManual:false,fxAt:new Date(Date.now()-3*86400000).toISOString()
+});
+truth(oldFx.includes('환율 기준 24시간 이상 경과'),
+ 'dated reference FX older than 24 hours is flagged rather than implied to be realtime');
 console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
