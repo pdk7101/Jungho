@@ -304,7 +304,7 @@ truth(usDashboardCode.includes("x?'확정 종가 '+date(x.date)")&&
  'US cards label completed daily close separately from private intraday quotes');
 truth(usDashboardCode.includes("'매수중 기록'")&&usDashboardCode.includes("'일시중지 기록'"),
  'historical broker order notes remain explicit user-confirmed records');
-truth(usDashboardCode.includes("마지막 사용자 확인 ")&&
+truth(usDashboardCode.includes("토스 사용자 확인 기록 ")&&
  usDashboardCode.includes("실시간 증권사 주문상태 아님"),
  'broker verification date is kept distinct from authenticated trading status');
 truth(usDashboardCode.includes("fetch('./us-quotes.json?refresh="),
