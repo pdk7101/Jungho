@@ -43,6 +43,11 @@ truth(portfolioCode.includes("const KR=['reit','sol','robot','space','sofr','tr'
 equal([app.defaults.robotCap,app.defaults.spaceCap,app.defaults.solCap,app.defaults.trBase],
  [9500,9700,10000,31150],'Korean direct price caps and KODEX watch base');
 equal(app.defaults.capMode,'ma','moving-average-only is the default buy cap mode');
+truth(app.FUNDS.find(f=>f.id==='reit').plan.includes('1·2·3·4주'),
+ 'REIT card description accurately covers SOL-rejected 4-share fallback');
+truth(html.includes('국내 ETF 매수계획 · 거래일 조건 점검')&&
+ html.includes('기본 적립 계획과 미확정 조건을 구분합니다'),
+ 'daily buy plan panel differentiates standing schedule and verified live-entry signals');
 for(const mode of ['ma','manual','both'])truth(html.includes('value="'+mode+'"'),mode+' appears in mode selector');
 truth(html.indexOf('id="cap-settings"')<html.indexOf('id="summary"'),
  'manual limit controls appear above Korean stock recommendations');
