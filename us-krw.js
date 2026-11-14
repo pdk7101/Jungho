@@ -428,6 +428,7 @@ function render(){
  renderLedger();
  window.ISA_US_SIGNAL?.refreshSummary?.();
  window.ISA_US_APP?.rerender?.();
+ window.dispatchEvent(new Event('isa-us-valuation-refreshed'));
 }
 function mount(){
  const root=$('us-panel');if(!root)return;
