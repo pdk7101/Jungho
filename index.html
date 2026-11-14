@@ -44,6 +44,11 @@ details[open]>summary{margin-bottom:12px}
 .holdings-settings{border-top:1px solid #405874;padding-top:12px;margin-top:16px}
 .holdings-settings>summary{color:#b7d8ff;font-size:.95rem;font-weight:800}
 .holdings-settings>h3{font-size:.9rem;margin:15px 0 7px}
+.holdings-correction{border:1px solid #45627d;padding:12px;border-radius:10px;margin-top:16px}
+.holdings-correction h3{font-size:.9rem;margin:0 0 6px}
+.holdings-correction .grid{margin:9px 0;gap:9px}
+.holdings-correction .grid input{width:100%;box-sizing:border-box}
+.holdings-correction .grid label{font-size:.82rem}
 .holdings-settings .us-krw-form-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 .holdings-settings .us-krw-form-row>strong{grid-column:1/-1}
 .holdings-settings .us-krw-form-row .us-krw-optional{grid-column:1/-1}
@@ -316,6 +321,17 @@ details[open]>summary{margin-bottom:12px}
   <h3>미국 주식 · 토스 4종목</h3>
   <div id="us-krw-editor"></div>
   <p id="us-holding-message" class="fieldset-note" role="status">미국 수량과 원화 평단을 변경하면 시세 카드와 원화 손익이 갱신됩니다. 세후 분배금 기록은 별도 보존됩니다.</p>
+  <div class="holdings-correction">
+   <h3>보유정보 정정 · CONY / 마이티</h3>
+   <p class="fieldset-note">정정한 수치를 입력해 저장하세요. 비어 있는 항목은 기존 기록을 유지합니다. 다른 종목과 CONY 분배금은 변경하지 않습니다.</p>
+   <div class="grid">
+    <label>CONY 보유수량 (소수점 최대 6자리)<input id="correct-cony-qty" type="number" step="0.000001" min="0" placeholder="보유수량"></label>
+    <label>마이티 신약포커스바이오액티브 보유수량<input id="correct-mighty-qty" type="number" step="1" min="0" placeholder="주식수"></label>
+    <label>마이티 1주 원화 평단가<input id="correct-mighty-avg" type="number" step="0.01" min="0" placeholder="원화 평균매수가"></label>
+   </div>
+   <button type="button" id="correct-two-holdings" class="us-header-button">두 종목 보유정보 저장</button>
+   <p class="fieldset-note" id="correct-two-status" role="status">이 기기에만 저장하며 증권사의 실제 보유정보나 주문은 변경하지 않습니다.</p>
+  </div>
  </details>
 </section>
 <div class="legend"><span class="state-buy"><b>●</b> 매수 · 조건 충족(주문 아님)</span><span class="state-stop"><b>●</b> 중지 · 상한 초과</span><span class="state-wait"><b>●</b> 대기 · 미충족·확인 필요</span></div>
@@ -669,6 +685,52 @@ function chart(bars){
  var plot=function(values){return values.map(function(v,i){return (12+i*276/(values.length-1)).toFixed(1)+','+(83-68*(v-lo)/diff).toFixed(1);}).join(' ');};
  return '<svg viewBox="0 0 300 100" aria-label="20거래일 종가 파랑, 5일선 초록, 20일선 노랑"><line x1="12" y1="83" x2="288" y2="83" stroke="#52627a"/><polyline points="'+plot(all)+'" fill="none" stroke="#60a5fa" stroke-width="2.8"/><polyline points="'+plot(ma5s)+'" fill="none" stroke="#24bf9a" stroke-width="2.3"/><polyline points="'+plot(ma20s)+'" fill="none" stroke="#eab308" stroke-width="2.3"/></svg>';
 }
+function initHoldingCorrections(){
+ var el=id=>document.getElementById(id),button=el('correct-two-holdings');if(!button)return;
+ var USKEY='isa-us-holdings-v1',TDKEY='isa-private-toss-domestic-holdings-v1',
+  SNAP='isa-private-toss-domestic-snapshot-v1';
+ function read(key){try{var v=JSON.parse(localStorage.getItem(key)||'null');
+  return v&&typeof v==='object'&&!Array.isArray(v)?v:{};}catch(_){return {};}}
+ function day(){var v=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',
+  year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(p=>[p.type,p.value]));
+  return v.year+'-'+v.month+'-'+v.day;}
+ var cq=el('correct-cony-qty'),mq=el('correct-mighty-qty'),ma=el('correct-mighty-avg'),msg=el('correct-two-status');
+ var us=read(USKEY),td=read(TDKEY),m=td.biotech||{},prior=read(SNAP).rows?.biotech||{};
+ var estimated=Number(prior.qty)>0?(Number(prior.value)-Number(prior.pnl))/Number(prior.qty):null;
+ if(us.cony?.qty!==undefined)cq.value=us.cony.qty;
+ if(m.qty!==undefined)mq.value=m.qty;else if(prior.qty!==undefined)mq.value=prior.qty;
+ if(Number(m.avg)>0)ma.value=m.avg;
+ else if(Number.isFinite(estimated)&&estimated>0)ma.value=Math.round(estimated*100)/100;
+ button.onclick=function(){
+  var a=cq.value.trim(),b=mq.value.trim(),c=ma.value.trim();
+  if(!a&&!b&&!c){msg.textContent='수정할 수량 또는 평단을 입력해 주세요.';return;}
+  var q=a===''?null:Number(a),qty=b===''?null:Number(b),avg=c===''?null:Number(c);
+  if((q!==null&&(!Number.isFinite(q)||q<=0||q>1e7||Math.abs(q-Math.round(q*1e6)/1e6)>1e-10))||
+   (qty!==null&&(!Number.isSafeInteger(qty)||qty<0||qty>1e7))||
+   (avg!==null&&(!Number.isFinite(avg)||avg<=0||avg>1e9))){
+   msg.textContent='CONY 수량은 소수점 최대 6자리, 마이티 수량은 정수, 평단가는 0보다 큰 원화 금액이어야 합니다.';return;
+  }
+  var oldU=localStorage.getItem(USKEY),oldD=localStorage.getItem(TDKEY);
+  try{
+   var nextU=read(USKEY),nextD=read(TDKEY),stamp=day();
+   if(q!==null)nextU.cony={...(nextU.cony||{}),qty:q,krwSnapshotDate:stamp};
+   if(qty!==null||avg!==null)nextD.biotech={...(nextD.biotech||{}),
+    ...(qty!==null?{qty}:{}),...(avg!==null?{avg}:{}),updatedAt:stamp};
+   if(q!==null)localStorage.setItem(USKEY,JSON.stringify(nextU));
+   if(qty!==null||avg!==null)localStorage.setItem(TDKEY,JSON.stringify(nextD));
+   var field=document.querySelector('input[data-krw-id="cony"][data-k="qty"]');
+   if(field&&q!==null)field.value=q;
+   window.ISA_US_APP?.rerender?.();
+   if(q!==null)window.dispatchEvent(new Event('isa-us-quotes-refreshed'));
+   msg.textContent='기기에 저장했습니다. CONY 카드는 새 수량으로 갱신되고 마이티 평단은 토스 국내 기록에 별도로 저장됩니다.';
+  }catch(_){
+   try{if(oldU===null)localStorage.removeItem(USKEY);else localStorage.setItem(USKEY,oldU);
+    if(oldD===null)localStorage.removeItem(TDKEY);else localStorage.setItem(TDKEY,oldD);}catch(__){}
+   msg.textContent='저장 실패 · 기존 데이터 유지를 시도했습니다. 브라우저 저장공간을 확인하세요.';
+  }
+ };
+}
+
 function renderPositions(){
  var place=el('positions');if(!place)return;
  place.innerHTML=FUNDS.map(function(f){
@@ -877,6 +939,7 @@ FUNDS.forEach(function(f){var o=document.createElement('option');o.value=f.id;o.
 el('selection').value=selected;el('selection').onchange=function(){selected=this.value;render();};
 Object.keys(defaults).forEach(function(k){el(k).value=settings[k];el(k).onchange=function(){var v=this.value.trim();settings[k]=k==='capMode'?(['ma','manual','both'].includes(v)?v:defaults.capMode):k==='dailyBudget'?(valid(v)?Number(v):''):(valid(v)?Number(v):defaults[k]);persist();render();};});
 renderPositions();
+initHoldingCorrections();
 el('reload').onclick=refresh;
 // While this page is visible, refresh public KR quotes approximately once a minute.
 // Browsers may throttle timers in background; never claim push while the app is closed.
