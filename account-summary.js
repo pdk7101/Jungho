@@ -118,6 +118,8 @@ function applyPrivateDividendPhoto(){
    throw Error('기기 저장 오류');}
   const msg=$('account-dividend-message');
   if(msg)msg.textContent=date+' 사진의 누적 분배금 적용 완료 · 기존 더 큰 금액과 개별 지급일은 유지했습니다.';
+  if($('account-div-toss-domestic'))$('account-div-toss-domestic').value=d.tossDomestic?.amount??'';
+  if($('account-div-kiwoom'))$('account-div-kiwoom').value=d.kiwoom?.amount??'';
   window.ISA_US_APP?.rerender?.();
  }catch(e){const msg=$('account-dividend-message');if(msg)msg.textContent='사진 분배금 적용 실패: '+String(e.message||e);}
  finally{try{window.history.replaceState(window.history.state,'',window.location.pathname+window.location.search);}catch(_){}}
