@@ -168,6 +168,7 @@ const graphApp=new Function('window','localStorage','document','Date',appCode+
 );
 function graphFixture(id,low){
  const source=bars(id,low?80:120);
+ source.low20=80;source.high20=130; // Keep the synthetic box range consistent with test prices.
  source.bars=Array.from({length:40},(_,i)=>({
   date:'20261102',open:100,high:120,low:80,
   close:i>=38?(low?80:120):100,volume:i===39?(low?180:135):100
