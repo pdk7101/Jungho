@@ -879,13 +879,6 @@ function renderPlan(){
    message+='<p class="sub"><b>입력 하루 예산:</b> '+money(budget)+
      ' · 매수 수량·가격 미확정으로 예산 잔액은 계산하지 않습니다.</p>';
  }else message+='<p class="sub">하루 예산 미입력. SOFR 매주 월요일 1주 · KODEX 200TR -5% 감시는 기존대로 별도 관리합니다.</p>';
- message+='<details class="plan-rules"><summary>기존 조건별 적립 규칙 확인 (설정 변경 없음)</summary>'+
-  '<p>로봇·우주 모두 매수조건 충족 → 리츠 1주 / SOL 0주</p>'+
-  '<p>로봇·우주 한 종목 미충족 + SOL 매수조건 충족 → 리츠 2주 / SOL 1주</p>'+
-  '<p>로봇·우주 두 종목 미충족 + SOL 매수조건 충족 → 리츠 3주 / SOL 1주</p>'+
-  '<p>로봇·우주 중 매수조건 미충족 + SOL도 미충족 → 리츠 4주 / SOL 0주</p>'+
-  '<p>당일 가격·매수조건 미확인은 매수불가 판정이 아닙니다. 4주 자동 증액 금지. 실제 증권사 주식모으기 설정·주문은 변경하지 않습니다.</p>'+
-  '</details>';
  el('plan').innerHTML=message;
 }
 function render(){
