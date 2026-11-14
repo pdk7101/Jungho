@@ -749,7 +749,7 @@ function chart(bars){
  var ma5s=last.map(function(x,i){return bars.slice(i+16,i+21).reduce(function(s,b){return s+Number(b.close);},0)/5;});
  var lo=Math.min.apply(null,all.concat(ma5s,ma20s)),hi=Math.max.apply(null,all.concat(ma5s,ma20s)),diff=Math.max(1,hi-lo);
  var plot=function(values){return values.map(function(v,i){return (12+i*276/(values.length-1)).toFixed(1)+','+(83-68*(v-lo)/diff).toFixed(1);}).join(' ');};
- return '<svg viewBox="0 0 300 100" aria-label="20거래일 종가 파랑, 5일선 초록, 20일선 노랑"><line x1="12" y1="83" x2="288" y2="83" stroke="#52627a"/><polyline points="'+plot(all)+'" fill="none" stroke="#60a5fa" stroke-width="2.8"/><polyline points="'+plot(ma5s)+'" fill="none" stroke="#24bf9a" stroke-width="2.3"/><polyline points="'+plot(ma20s)+'" fill="none" stroke="#eab308" stroke-width="2.3"/></svg>';
+ return '<svg viewBox="0 0 300 100" aria-label="20거래일 종가 빨강, 5일선 초록, 20일선 노랑"><line x1="12" y1="83" x2="288" y2="83" stroke="#52627a"/><polyline points="'+plot(all)+'" fill="none" stroke="#f87171" stroke-width="2.8"/><polyline points="'+plot(ma5s)+'" fill="none" stroke="#24bf9a" stroke-width="2.3"/><polyline points="'+plot(ma20s)+'" fill="none" stroke="#eab308" stroke-width="2.3"/></svg>';
 }
 function renderTossDomesticPositions(){
  // The existing browser-only Toss Korea override is separate from Kiwoom ISA.
@@ -920,7 +920,7 @@ function render(){
  d.innerHTML='<div class="divider"></div><div class="flex"><strong>'+money(p)+'</strong><span class="status state-'+v.type+'">'+actionLabel(v.type)+'</span></div>'+
  '<p class="sub">'+(freshQuote(f.id)?'현재 표시 가격은 비공식 당일 조회가 · 5·20일선 및 박스권은 '+day(x.date)+' 확정 일봉 기준':'게시 일봉 종가 '+day(x.date))+' · 20거래일 '+day(x.rangeStart)+'~'+day(x.rangeEnd)+'</p>'+
  chart(x.bars)+
- '<div class="leg20"><span><i class="legend-dot" style="background:#60a5fa"></i>종가</span><span><i class="legend-dot" style="background:#24bf9a"></i>5일선</span><span><i class="legend-dot" style="background:#eab308"></i>20일선</span></div>'+
+ '<div class="leg20"><span><i class="legend-dot" style="background:#f87171"></i>종가</span><span><i class="legend-dot" style="background:#24bf9a"></i>5일선</span><span><i class="legend-dot" style="background:#eab308"></i>20일선</span></div>'+
  '<div class="metrics"><div><small>20거래일 저가</small><strong>'+money(low)+'</strong></div><div><small>20거래일 고가</small><strong>'+money(high)+'</strong></div><div><small>하단 30% 기준</small><strong>'+money(b.b30)+'</strong></div><div><small>하단 20% 기준</small><strong>'+money(b.b20)+'</strong></div><div><small>5일 이동평균</small><strong>'+avgMoney(t.ma5)+'</strong></div><div><small>20일 이동평균</small><strong>'+avgMoney(t.ma20)+'</strong></div></div>'+
  '<p class="context">현재 '+safe(b.name)+' · 종가와 20일선 차이 '+(ratio>=0?'+':'')+ratio.toFixed(2)+'% · 거래량(이전 20일 평균 대비) '+vol+'</p>'+
  '<p class="context"><b>이동평균 해석:</b> '+safe(trend(x))+' · 5일선 '+(t.ma5Rising?'상승·횡보':'하락')+' / 20일선 '+(t.maRising?'상승·횡보':'하락')+'</p>'+
