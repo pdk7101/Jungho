@@ -864,7 +864,7 @@ function accountTotals(){
 }
 window.ISA_KR_APP={
  accountTotals:accountTotals,
- renderCards:render,
+ renderCards:function(){return render();},
  pairPlan:pairPlan,
  solDailyEntry:solDailyEntry,
  effectiveCap:effectiveCap,
