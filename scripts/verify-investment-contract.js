@@ -400,59 +400,69 @@ truth(usKrwCode.includes("if(k==='krwCurrent')p.krwDay="),
 truth(usKrwCode.includes("const LEDGER_KEY='isa-us-distributions-krw-v1'"),
  'existing cumulative net KRW distribution ledger is retained');
 
-// One-time on-device corrections must never embed real personal holdings in public HTML.
-truth(html.includes('id="correct-cony-qty"')&&
- html.includes('id="correct-mighty-qty"')&&html.includes('id="correct-mighty-avg"')&&
- html.includes('id="correct-two-holdings"'),
- 'user can correct CONY fractional quantity and Mighty domestic basis on one local-only form');
-truth(!html.includes('91.820669')&&!html.includes('8,975'),
- 'real corrected quantities and average prices are not published as GitHub code defaults');
-const corrStart=html.indexOf('function initHoldingCorrections(){');
-const corrEnd=html.indexOf('function renderPositions(){',corrStart);
-truth(corrStart>=0&&corrEnd>corrStart,'correction save handler can be tested with mock browser');
-const correctionCode=html.slice(corrStart,corrEnd);
-const correctionData=storage({
- 'isa-us-holdings-v1':{cony:{qty:12.5,krwAvg:43000,krwNet:9500},
-  schd:{qty:7,krwAvg:55000}},
+// Keep one established editor per market; never invent a second CONY quantity field.
+truth(!html.includes('id="correct-cony-qty"')&&!html.includes('id="correct-two-holdings"')&&
+ !html.includes('function initHoldingCorrections(){'),
+ 'duplicate CONY correction section and its extra save flow have been removed');
+truth(html.includes('id="toss-domestic-positions"')&&
+ html.indexOf('id="positions"')<html.indexOf('id="toss-domestic-positions"')&&
+ html.indexOf('id="toss-domestic-positions"')<html.indexOf('id="us-krw-editor"'),
+ 'Mighty is under Korean equity holdings following Kiwoom, before existing US stocks');
+truth(html.split('id="us-krw-editor"').length===2&&
+ usKrwCode.includes('ITEMS=[\'SCHD\',\'AGNC\',\'SPYM\',\'CONY\']'),
+ 'existing CONY holding quantity and cost editor remains the only US entry route');
+truth(!html.includes('91.820669')&&!html.includes('8975'),
+ 'personal corrected holding values are not embedded in the public repository');
+truth(html.includes('function renderTossDomesticPositions(){')&&
+ html.includes("isa-private-toss-domestic-holdings-v1")&&
+ html.includes("isa-private-toss-domestic-snapshot-v1"),
+ 'Mighty reuses previously created local Toss domestic records and their prior screenshot');
+const mightyStart=html.indexOf('function renderTossDomesticPositions(){');
+const mightyEnd=html.indexOf('function renderPositions(){',mightyStart);
+truth(mightyStart>=0&&mightyEnd>mightyStart,
+ 'Toss domestic inline holdings editor can be tested independently');
+const mightySrc=html.slice(mightyStart,mightyEnd);
+const mightyLocal=storage({
+ 'isa-us-holdings-v1':{cony:{qty:12.5,krwAvg:43000,krwNet:9500}},
  'isa-private-toss-domestic-holdings-v1':{biotech:{qty:3,avg:8400},sensor:{qty:8,avg:7000}},
  'isa-private-toss-domestic-snapshot-v1':{date:'2026-11-09',rows:{biotech:{qty:3,value:19000,pnl:-6000}}}
 });
-const cFields={
- 'correct-two-holdings':{onclick:null},
- 'correct-cony-qty':{value:''},
- 'correct-mighty-qty':{value:''},
- 'correct-mighty-avg':{value:''},
- 'correct-two-status':{textContent:''}
-};
-let renderCount=0,dispatchCount=0;
-const cWin={ISA_US_APP:{rerender:()=>{renderCount++;}},dispatchEvent:()=>{dispatchCount++;}};
-const cDoc={getElementById:id=>cFields[id]||null,querySelector:()=>({value:''})};
-const correction=vm.createContext({document:cDoc,window:cWin,localStorage:correctionData,
- Event:class{constructor(type){this.type=type;}},Date,Intl,Number,Object,JSON,Math});
-vm.runInContext(correctionCode+'\ninitHoldingCorrections();',correction);
-equal(cFields['correct-cony-qty'].value,12.5,'correction form loads existing CONY quantity');
-equal(cFields['correct-mighty-avg'].value,8400,'correction form loads existing Mighty basis');
-cFields['correct-cony-qty'].value='13.125';
-cFields['correct-mighty-qty'].value='4';
-cFields['correct-mighty-avg'].value='8600';
-cFields['correct-two-holdings'].onclick();
-const fixedUs=correctionData.read('isa-us-holdings-v1'),
- fixedTD=correctionData.read('isa-private-toss-domestic-holdings-v1');
-equal(fixedUs.cony.qty,13.125,'CONY fractional share quantity correction is saved on device');
-equal(fixedUs.cony.krwAvg,43000,'CONY existing KRW average purchase price remains unchanged');
-equal(fixedUs.cony.krwNet,9500,'CONY existing cumulative net distributions remain unchanged');
-equal(fixedUs.schd.qty,7,'other US holdings are not overwritten');
-equal(fixedTD.biotech.qty,4,'Mighty share quantity correction is saved separately from Kiwoom');
-equal(fixedTD.biotech.avg,8600,'Mighty KRW average price correction is saved');
-equal(fixedTD.sensor.avg,7000,'other Toss domestic holdings are not overwritten');
-equal(correctionData.read('isa-private-toss-domestic-snapshot-v1').rows.biotech.qty,3,
- 'historical Toss screenshot data are retained unchanged');
-truth(renderCount===1&&dispatchCount===1,'CONY card and valuation are refreshed after correction');
-cFields['correct-cony-qty'].value='12.1234567';
-cFields['correct-two-holdings'].onclick();
-equal(correctionData.read('isa-us-holdings-v1').cony.qty,13.125,
- 'invalid CONY fractional quantity cannot overwrite confirmed on-device position');
-
+const mightyInputs=[],mightyHost={innerHTML:'',querySelectorAll:()=>mightyInputs};
+const mightyMsg={textContent:''};
+const mightyQuantity={dataset:{kind:'qty'},value:'4',
+ addEventListener:(_name,cb)=>mightyQuantity.change=cb};
+const mightyAverage={dataset:{kind:'avg'},value:'8600',
+ addEventListener:(_name,cb)=>mightyAverage.change=cb};
+mightyInputs.push(mightyQuantity,mightyAverage);
+const runMighty=new Function('el','localStorage','qtyValid','valid','Intl','Date',
+ mightySrc+'\nreturn renderTossDomesticPositions;')(
+ id=>id==='toss-domestic-positions'?mightyHost:mightyMsg,
+ mightyLocal,
+ v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isSafeInteger(Number(v))&&Number(v)>=0,
+ v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0,
+ Intl,Date
+);
+runMighty();
+truth(mightyHost.innerHTML.includes('마이티 신약포커스바이오액티브')&&
+ mightyHost.innerHTML.includes('data-kind="qty"')&&mightyHost.innerHTML.includes('data-kind="avg"'),
+ 'Mighty Korean equity row offers share count and average KRW cost');
+truth(mightyHost.innerHTML.includes('value="3"')&&mightyHost.innerHTML.includes('value="8400"'),
+ 'the same pre-existing private Toss domestic overrides are displayed without migrating');
+mightyQuantity.change();
+mightyAverage.change();
+const afterMighty=mightyLocal.read('isa-private-toss-domestic-holdings-v1');
+equal(afterMighty.biotech.qty,4,'Mighty quantity is saved to existing local Toss domestic records');
+equal(afterMighty.biotech.avg,8600,'Mighty corrected average KRW price is saved locally');
+equal(afterMighty.sensor.avg,7000,'other Toss domestic records are untouched');
+equal(mightyLocal.read('isa-us-holdings-v1').cony.krwNet,9500,
+ 'Mighty domestic change never touches CONY holdings or cumulative after-tax payouts');
+equal(mightyLocal.read('isa-us-holdings-v1').cony.qty,12.5,
+ 'Mighty domestic change never alters existing CONY quantity');
+equal(mightyLocal.read('isa-private-toss-domestic-snapshot-v1').rows.biotech.qty,3,
+ 'historical Toss domestic screenshot is preserved as a dated record');
+mightyQuantity.value='1.5';mightyQuantity.change();
+equal(mightyLocal.read('isa-private-toss-domestic-holdings-v1').biotech.qty,4,
+ 'non-integer Toss domestic quantity is refused without corrupting saved shares');
 // Behaviour test: domestic editor change updates a saved position without altering cost basis.
 const domesticSrc=html.slice(html.indexOf('function renderPositions(){'),html.indexOf('function renderPlan(){'));
 truth(domesticSrc.startsWith('function renderPositions(){')&&domesticSrc.includes("positions[id]=h;persist();render();"),
