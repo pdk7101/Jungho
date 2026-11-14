@@ -528,6 +528,43 @@ function ma20Comparison(id){
   source:q?'당일 공개 체결가'+(q.method==='published'?' (지연 게시 가능)':''):
    '확정 일봉 종가 (당일 현재가 아님)'};
 }
+function chartAssessment(id){
+ // Use only recent completed day bars; graph events never create a standalone buy order.
+ var x=byId[id];
+ if(!verified(id))return {level:'unknown',ratio:null,note:'확정 일봉·이동평균 자료 확인 대기'};
+ var t=x.trend,bars=x.bars,latest=bars[bars.length-1];
+ var volume=Number(t.volumeToday),average=Number(t.avgVolume20);
+ var hasVolume=t.volumeToday!==null&&t.volumeToday!==undefined&&
+  t.avgVolume20!==null&&t.avgVolume20!==undefined&&Number.isFinite(volume)&&
+  Number.isFinite(average)&&volume>=0&&average>0;
+ var ratio=hasVolume?volume/average:null;
+ var cross=null,dayOfCross=null;
+ // Detect latest cross in the last three completed sessions using the plotted MA data.
+ for(var i=bars.length-3;i<bars.length;i++){
+  if(i<20)continue;
+  var m5=0,m20=0,p5=0,p20=0;
+  for(var j=i-4;j<=i;j++)m5+=Number(bars[j].close)/5;
+  for(var j=i-19;j<=i;j++)m20+=Number(bars[j].close)/20;
+  for(var j=i-5;j<i;j++)p5+=Number(bars[j].close)/5;
+  for(var j=i-20;j<i;j++)p20+=Number(bars[j].close)/20;
+  if(![m5,m20,p5,p20].every(function(v){return Number.isFinite(v)&&v>0;}))continue;
+  if(p5<=p20&&m5>m20){cross='golden';dayOfCross=bars[i].date;}
+  else if(p5>=p20&&m5<m20){cross='dead';dayOfCross=bars[i].date;}
+ }
+ var close=Number(latest.close),ma5=Number(t.ma5),ma20=Number(t.ma20);
+ var bearish=ma5<ma20&&!t.maRising&&close<ma20;
+ var risk=ratio!==null&&ratio>=1.5&&(cross==='dead'||bearish);
+ var support=ratio!==null&&ratio>=1.2&&cross==='golden'&&
+  !!t.maRising&&close>=ma20;
+ var detail=ratio===null?'거래량 비교값 미확인':'확정 일봉 거래량 '+ratio.toFixed(2)+'배';
+ if(cross)detail+=' · 최근 3거래일 '+(cross==='golden'?'골든크로스':'데드크로스')+' ('+day(dayOfCross)+')';
+ if(risk)return {level:'risk',ratio:ratio,cross:cross,note:
+  detail+' · 약세 차트에서 거래량 급증(1.5배 이상) · 신규매수 보류 검토'};
+ if(support)return {level:'support',ratio:ratio,cross:cross,note:
+  detail+' · 20일선 상승 확인 · 기존 매수조건 보조 확인 (단독 매수 신호 아님)'};
+ return {level:ratio===null?'unknown':'neutral',ratio:ratio,cross:cross,note:
+  detail+' · 교차/거래량만으로 매수 확정하지 않음'};
+}
 function renderHoldingInCard(id,p){
  // Read the same on-device holdings used by Korean ETF cost-basis calculations.
  // Never embed personal share counts/average prices in the published site source.
@@ -556,7 +593,8 @@ function renderMa20InCard(id){
   '<div class="fund-ma20-detail">'+safe(z.note)+' · 5일선 '+avgMoney(z.ma5)+
   ' · 20일선 '+(z.maRising?'상승·횡보':'하락')+'</div>'+
   '<div class="fund-ma20-detail">20일선 기준 '+safe(z.day)+' · '+safe(z.source)+
-  ' · 관찰용 (매수 신호 아님)</div></div>';
+  ' · 관찰용 (매수 신호 아님)</div>'+ 
+  '<div class="fund-ma20-detail"><b>그래프 매수 보조:</b> '+safe(chartAssessment(id).note)+'</div></div>';
 }
 function renderCaps(){
  var host=el('cap-preview');if(!host)return;
@@ -579,8 +617,10 @@ function solDailyEntry(){
  if(Number(q.price)>Number(cap.value))return {state:'stop',reason:'SOL 체결가 '+money(q.price)+' > 적용 상한 '+money(cap.value)+' ('+cap.reason+')'};
  if(!hasBars(x)||stale(x))return {state:'wait',reason:'SOL 확정 일봉 및 박스권·이동평균 자료 부족'};
  var p=Number(q.price),b=band(x,p),h=holding('sol',p),t=x.trend;
+ var graph=chartAssessment('sol');
+ if(graph.level==='risk')return {state:'stop',reason:'SOL 그래프 위험: '+graph.note+' · 상한 이내여도 당일 신규매수 제외'};
  var lowEntry=b.low&&(!h||h.canLower),trendEntry=!!(t.twoDaysAbove&&t.maRising&&t.ma5Above20);
- if(lowEntry||trendEntry)return {state:'buy',reason:'SOL '+money(p)+' · '+(lowEntry?b.name+(h?' / 평단 인하 가능':''):'5·20일선 상승 추세')+' · 상한 이내'};
+ if(lowEntry||trendEntry)return {state:'buy',reason:'SOL '+money(p)+' · '+(lowEntry?b.name+(h?' / 평단 인하 가능':''):'5·20일선 상승 추세')+' · 상한 이내'+(graph.level==='support'?' · 차트 보조: '+graph.note:'')};
  return {state:'stop',reason:'SOL '+money(p)+' · 상한 이내지만 박스권 저가/평단인하 및 5·20일선 상승 매수조건 미충족'};
 }
 function pairPlan(){
@@ -665,6 +705,11 @@ function verdict(f){
   if(!valid(cap.value))return {type:'wait',title:'자동상한 자료 확인 대기',info:cap.reason+' · 신규매수 보류.',qty:0};
   if(p>cap.value)return {type:'stop',title:'매수 중단',info:'적용 매수상한 '+money(cap.value)+' 초과 ('+cap.reason+'). 추격매수 중단.'+liveNote,qty:0};
  }
+ if(['robot','space'].includes(id)&&quote){
+  var graph=chartAssessment(id);
+  if(graph.level==='risk')return {type:'wait',title:'저가·추세 확인 대기',qty:0,
+   info:'그래프 위험: '+graph.note+' · 상한·평단 조건만으로 매수하지 않습니다. (당일 추가매수 보류)'};
+ }
  if(id==='reit'){
  var pair=pairPlan(),n=pair.reitQty;
  if(!pair.known)return {type:'wait',title:'리츠 기본 1주 계획 · 장중 판단 대기',qty:1,info:'기존 거래일 기본 적립 1주는 유지합니다. 로봇·우주 당일 확인가격 미수신으로 2·3·4주 증액은 미확정이며, 오늘 매수조건 충족 신호가 아닙니다.'};
@@ -691,7 +736,8 @@ function verdict(f){
  if(h&&h.canLower&&b.low){
   var at20=p<=b.b20;
   return {type:'buy',title:at20?'평단인하 저가 우선 검토':'평단인하 분할 검토',
-  info:b.name+'이며 내 평단 '+avgMoney(h.avg)+'보다 낮아 평단을 낮출 수 있습니다. '+(decline?'20일선 아래/약세 가능성: 첫 매수는 소액으로 제한하고 추가 하락 가능성을 확인.':'5·20일선 추세도 확인.')+' 매수 상한·예산 우선.'+liveNote,qty:1};
+  info:b.name+'이며 내 평단 '+avgMoney(h.avg)+'보다 낮아 평단을 낮출 수 있습니다. '+(decline?'20일선 아래/약세 가능성: 첫 매수는 소액으로 제한하고 추가 하락 가능성을 확인.':'5·20일선 추세도 확인.')+' 매수 상한·예산 우선.'+liveNote+
+   (chartAssessment(id).level==='support'?' · 차트 보조: '+chartAssessment(id).note:''),qty:1};
  }
  if(id==='sol'&&b.low){
   return {type:'buy',title:'저가 대체 1주 검토',info:b.name+'이며 로봇·우주항공 상한 초과로 SOL 대체매수를 소액 검토합니다. '+(decline?'하락 추세 위험 및 분배금 지속 여부 점검.':'추세도 함께 점검.')+' 하루 최대 1주.'+liveNote,qty:1};
