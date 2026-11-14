@@ -56,9 +56,9 @@ function chart(x){
  const ma20s=last.map((d,i)=>b.slice(i+1,i+21).reduce((s,e)=>s+e.close,0)/20);
  const lo=Math.min(...closes,...ma5s,...ma20s),hi=Math.max(...closes,...ma5s,...ma20s),range=Math.max(.01,hi-lo);
  const poly=series=>series.map((v,i)=>(12+i*276/19).toFixed(1)+','+(83-68*(v-lo)/range).toFixed(1)).join(' ');
- return '<svg viewBox="0 0 300 100" role="img" aria-label="미국장 20거래일 종가 파랑, 5일선 초록, 20일선 노랑">'+
+ return '<svg viewBox="0 0 300 100" role="img" aria-label="미국장 20거래일 종가 빨강, 5일선 초록, 20일선 노랑">'+
  '<line x1="12" y1="83" x2="288" y2="83" stroke="#52627a"/>'+
- '<polyline points="'+poly(closes)+'" fill="none" stroke="#60a5fa" stroke-width="2.8"/>'+
+ '<polyline points="'+poly(closes)+'" fill="none" stroke="#f87171" stroke-width="2.8"/>'+
  '<polyline points="'+poly(ma5s)+'" fill="none" stroke="#24bf9a" stroke-width="2.1"/>'+
  '<polyline points="'+poly(ma20s)+'" fill="none" stroke="#eab308" stroke-width="2.1"/></svg>';
 }
@@ -181,7 +181,7 @@ function details(){
  const split=x.splits||[];
  let section='<h3>'+f.ticker+' · '+text(f.name)+'</h3><p class="us-small">'+text(f.type)+' · '+text(f.hint)+'</p>'+
  '<p class="us-small">기술분석: '+date(x.date)+' 확정 일봉 · 장중 시세와 별개</p>'+
- (window.ISA_US_SIGNAL?.detailLine?.(f.id)||'')+chart(x)+'<p class="us-legend">파랑 종가 · 초록 5일선 · 노랑 20일선 (원본 달러 차트)</p>'+
+ (window.ISA_US_SIGNAL?.detailLine?.(f.id)||'')+chart(x)+'<p class="us-legend">빨강 종가 · 초록 5일선 · 노랑 20일선 (원본 달러 차트)</p>'+
  '<div class="us-statgrid"><div>종가<strong>'+metric(x.close)+'</strong></div><div>5일선<strong>'+metric(t.ma5)+'</strong></div>'+
  '<div>20일선<strong>'+metric(t.ma20)+'</strong></div><div>20일 저가<strong>'+metric(x.low20)+'</strong></div>'+
  '<div>20일 고가<strong>'+metric(x.high20)+'</strong></div><div>하단 30% · 20%<strong>'+metric(z.b30)+' / '+metric(z.b20)+'</strong></div></div>'+
