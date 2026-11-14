@@ -266,6 +266,14 @@ function addDistribution(){
   message.textContent='재투자한 지급금은 해당 지급일의 세후 실수령액 이하로 입력해 주세요.';return;
  }
  const entries=ledgerEntries();
+ const rawEntries=storage(LEDGER_KEY);
+ if(rawEntries!==null&&(!Array.isArray(rawEntries)||rawEntries.length!==entries.length)){
+  message.textContent='현재 저장된 기록 중 확인이 필요한 항목이 있습니다. 기존 내역 보존을 위해 추가 저장을 중단했습니다.';return;
+ }
+ const sameDate=entries.filter(r=>r.id===id&&r.date===date);
+ if(sameDate.length){message.textContent=sameDate.length===1&&Math.abs(sameDate[0].net-net)<.005?
+  '해당 종목·지급일·세후 금액은 이미 저장되어 있습니다. 중복 저장하지 않았습니다.':
+  '해당 종목·지급일에 다른 기록이 있습니다. 기존 금액을 덮어쓰거나 중복 저장하지 않았습니다.';return;}
  if(entries.length>=500){message.textContent='기록 500건 한도에 도달했습니다. 오래된 기록을 정리해 주세요.';return;}
  const unique='d'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
  entries.push({key:unique,id,date,net,gross,tax,reinvest});
@@ -295,7 +303,11 @@ function importDatedReceipts(){
   }
   dates.add(date);input.push({date,net});
  }
- const old=ledgerEntries(),same=old.filter(v=>v.id===id),insert=[],duplicates=[];
+ const old=ledgerEntries(),rawOld=storage(LEDGER_KEY);
+ if(rawOld!==null&&(!Array.isArray(rawOld)||rawOld.length!==old.length)){
+  message.textContent='기존 기록에 형식이 다른 항목이 있어 자동 복원을 중단했습니다. 기록을 삭제하거나 덮어쓰지 않았습니다.';return;
+ }
+ const same=old.filter(v=>v.id===id),insert=[],duplicates=[];
  for(const row of input){
   const matched=same.filter(v=>v.date===row.date);
   if(matched.length>1){message.textContent=row.date+' 기존 내역이 여러 건이라 자동 병합하지 않았습니다.';return;}
