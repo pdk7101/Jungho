@@ -223,11 +223,11 @@ truth(planHost.innerHTML.includes('KODEX 미국달러SOFR 1주 (월요일 정기
  'SOFR Monday 1 share remains a scheduled broker plan, not a verified BUY');
 truth(planHost.innerHTML.includes('조건별 추가 수량 판정 보류'),
  'unverified paired quotes cannot produce a conditional trade recommendation');
-truth(planHost.innerHTML.includes('리츠 1주 / SOL 0주')&&
- planHost.innerHTML.includes('리츠 2주 / SOL 1주')&&
- planHost.innerHTML.includes('리츠 3주 / SOL 1주')&&
- planHost.innerHTML.includes('리츠 4주 / SOL 0주'),
- 'all four agreed REIT/SOL fallback branches remain visible as unchanged rules');
+truth(!planHost.innerHTML.includes('기존 조건별 적립 규칙 확인')&&
+ !html.includes('class="plan-rules"')&&
+ html.includes('조건별 검토 수량:')&&
+ html.includes('function pairPlan(){'),
+ 'repeated explanation removed from UI while the original REIT/SOL fallback decision logic remains');
 truth(planHost.innerHTML.includes('검토 비용:</b> 당일 확정 불가')&&
  !planHost.innerHTML.includes('현재 매수 조건 충족 (실제 주문'),
  'missing price and paired state cannot show a fake confirmed purchase amount');
@@ -501,7 +501,7 @@ equal(domesticSaved.reit.qty,43,'domestic non-integer share quantities are rejec
 
 // Behaviour test: US editor updates local investment holdings without overwriting dividends.
 const usFormSrc=usKrwCode.slice(usKrwCode.indexOf('function renderForm(){'),
- usKrwCode.indexOf('function importHoldings(){'));
+ usKrwCode.indexOf('/* Personal portfolio snapshots'));
 truth(usFormSrc.startsWith('function renderForm(){'),
  'US share and cost editor is separately executable for synthetic local holdings');
 let usSaved={schd:{qty:24.330226,krwAvg:47864,krwNet:12345}},usRenders=0;
@@ -873,8 +873,9 @@ truth(!JSON.stringify(exceptionFeed).includes('synthetic unsafe internal detail'
 truth(usDashboardCode.includes('function conversionLine(q){')&&
  usDashboardCode.includes("const calculation=conversionLine(chosenQuote)")&&
  usDashboardCode.includes("host.innerHTML=section;")&&
- html.includes('#us-panel .us-list-fx{'),
- 'US card shows a concise USD-to-KRW reference, full conversion only in selected ticker detail');
+ !html.includes('#us-panel .us-list-fx{')&&
+ !usDashboardCode.includes('fxText?'),
+ 'repeated per-ticker FX equation removed while the selected ticker keeps one complete conversion explanation');
 truth(usDashboardCode.includes('function movingAverageCard(x,wonQuote){')&&
  usDashboardCode.includes('movingAverageCard(x,q)+holdingCard(f.id,px)')&&
  html.includes('#us-panel .us-card-ma20{'),
