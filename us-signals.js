@@ -38,6 +38,34 @@ function latest(x){
  const age=Date.now()-dt.getTime();
  return Number.isFinite(age)&&age>=0&&age<=7*86400000;
 }
+function chartAssessment(x){
+ // Supplementary chart evidence based only on US completed daily bars.
+ if(!latest(x))return {level:'unknown',ratio:null,note:'미국장 확정 일봉 확인 대기'};
+ const t=x.trend||{},close=Number(x.close),ma5=Number(t.ma5),ma20=Number(t.ma20);
+ const volume=t.volume!==null&&t.volume!==undefined?Number(t.volume):NaN;
+ const previous=t.previousVolumeAverage!==null&&t.previousVolumeAverage!==undefined?
+  Number(t.previousVolumeAverage):NaN;
+ const ratio=Number.isFinite(volume)&&volume>=0&&Number.isFinite(previous)&&previous>0?
+  volume/previous:null;
+ const bars=x.bars,mean=(end,count)=>bars.slice(end-count+1,end+1)
+  .reduce((sum,bar)=>sum+Number(bar.close),0)/count;
+ let cross=null,crossDate=null;
+ for(let i=bars.length-3;i<bars.length;i++){
+  if(i<20)continue;
+  const m5=mean(i,5),m20=mean(i,20),p5=mean(i-1,5),p20=mean(i-1,20);
+  if(![m5,m20,p5,p20].every(v=>valid(v)))continue;
+  if(p5<=p20&&m5>m20){cross='golden';crossDate=bars[i].date;}
+  else if(p5>=p20&&m5<m20){cross='dead';crossDate=bars[i].date;}
+ }
+ const bearish=ma5<ma20&&!t.maRising&&close<ma20;
+ const risk=ratio!==null&&ratio>=1.5&&(bearish||cross==='dead');
+ const support=ratio!==null&&ratio>=1.2&&cross==='golden'&&!!t.maRising&&close>=ma20;
+ const detail=(ratio!==null?'거래량 '+ratio.toFixed(2)+'배':'거래량 미확인')+
+  (cross?' · 최근 3거래일 '+(cross==='golden'?'골든크로스':'데드크로스')+
+   ' ('+String(crossDate).slice(4,6)+'/'+String(crossDate).slice(6,8)+')':'');
+ return {level:risk?'risk':support?'support':ratio===null?'unknown':'neutral',
+  ratio,cross,note:detail+(risk?' · 매수 보류 위험':support?' · 매수 보조 확인':' · 단독 매수 신호 아님')};
+}
 function dailyAmount(id){
  // All Toss US orders use KRW amounts with fractional shares; never 1-share orders.
  const fromPlanner=window.ISA_ORDER_PLAN?.tossDailyKrw?.(id);
@@ -58,7 +86,8 @@ function evaluate(id,source,cap){
  const t=x.trend,ma20=Number(t.ma20),ma5=Number(t.ma5);
  const b30=x.low20+(x.high20-x.low20)*.30,b20=x.low20+(x.high20-x.low20)*.20;
  const low=usd<=b30,deep=usd<=b20;
- const healthy=!!t.twoDaysAbove&&!!t.maRising&&!!t.ma5Above20&&usd>ma20&&ma5>ma20;
+ // Allow a normal MA uptrend near the 20-day average, without mandatory two-day closes.
+ const healthy=!!t.maRising&&ma5>ma20&&usd>=ma20*.99&&usd<=ma20*1.05;
  const down=usd<ma20||!t.maRising;
  const steep=usd<ma20*.9&&down;
  const splitRecent=id==='cony'&&Array.isArray(x.splits)&&x.splits.some(e=>{
@@ -67,9 +96,12 @@ function evaluate(id,source,cap){
   const age=end-d;
   return Number.isFinite(age)&&age>=0&&age<=30*86400000;
  });
+ const graph=chartAssessment(x);
  const reasons=[low?(deep?'20거래일 저가 하단 20%':'20거래일 저가 하단 30%'):'20거래일 박스권 일반 구간',
-  healthy?'5·20일선 상승 추세 확인':down?'20일선 이탈 또는 기울기 약세':'상승 추세 추가 확인 필요'];
+  healthy?'5·20일선 상승·가격 20일선 부근 확인':down?'20일선 이탈 또는 기울기 약세':'상승 추세 추가 확인 필요',
+  '그래프 매수 보조: '+graph.note];
  const extras={priceKRW:kr.amount,ma20USD:ma20,ma5USD:ma5,low,healthy,down,steep,
+  graphLevel:graph.level,volumeRatio:graph.ratio,
   quoteSource:kr.source,quoteManual:!!kr.manual,notes:reasons};
  if(cap!==null&&(!valid(cap)||cap<100||cap>10000000))return basic('wait','상한 설정 확인','원화 매수 상한 설정이 올바르지 않습니다.',extras);
  if(cap!==null&&kr.amount>cap)return basic('stop','매수 중단 · 원화 상한 초과',
@@ -98,10 +130,13 @@ function evaluate(id,source,cap){
  if(kr.manual)return basic('wait','직접 입력 현재가 · 재확인',
   '토스 당일 가격과 확정 일봉을 혼합하지 않도록 주문 전 최신 가격을 재확인하세요. 표시 원화 가격은 자동매수 신호가 아닙니다.',extras);
  const canLower=avg!==null&&kr.amount<avg;
+ const lowOpportunity=low&&(avg===null||canLower);
+ if(graph.level==='risk')return basic('wait','거래량·약세 위험 확인 대기',
+  '최근 확정 일봉의 강한 약세와 거래량 급증이 동시에 확인됐습니다. 무리한 추가매수를 보류하고 추세 안정 여부를 확인하세요. '+graph.note,extras);
  if(id==='agnc'){
   if(steep||t.deadCross)return basic('wait','AGNC 배당·자산가치 점검',
    'AGNC는 모기지 리츠 개별주입니다. 하락추세가 강해 장부가치(BVPS), 레버리지, 금리 민감도와 배당 지속성을 확인할 때까지 추가매수를 보류합니다.',extras);
-  if((low&&canLower&&!down)||healthy)return basic('buy','AGNC 원화 적립 유지 검토',
+  if(lowOpportunity||healthy)return basic('buy','AGNC 소액 정액 적립 검토',
    '기술적 조건을 충족했으나 배당만으로 안전성을 판단할 수 없습니다. 공식 BVPS·배당 지속성 확인과 별도 예산 점검 후 매일 설정된 원화 금액의 소수점 적립을 검토하세요.',
    {...extras,qty:0,amountKRW:dailyAmount(id)});
   return basic('wait','AGNC 추세·배당 확인 대기',
@@ -109,11 +144,11 @@ function evaluate(id,source,cap){
  }
  if(steep||t.deadCross)return basic('wait','하락 추세 확인 대기',
   '20일선 대비 큰 하락 또는 데드크로스 위험이 있습니다. 저가라도 반등 확인 전 분할매수는 보수적으로 대기합니다.',extras);
- if(low&&canLower&&!down)return basic('buy','평단 인하 분할매수 검토',
-  '저가 구간이며 입력된 원화 평단보다 낮고 20일선 약세가 완화됐습니다. 보유 비중과 예산을 확인한 뒤 매일 설정한 원화 금액으로 소수점 적립을 검토하세요.',
+ if(lowOpportunity)return basic('buy','저가 소액 분할매수 검토',
+  '저가 구간이므로 기존 원화 정액 적립 범위에서 분할매수를 검토합니다. 약세가 남아 있을 수 있으므로 과도한 추가매수는 피하고 보유 비중·예산을 확인하세요.',
   {...extras,qty:0,amountKRW:dailyAmount(id)});
- if(healthy&&usd<=ma20*1.05)return basic('buy','추세 전환 매수 검토',
-  '종가가 20일선 위에서 2거래일 유지하고 5일선이 우위이며 20일선이 상승·횡보입니다. 원화 정액 소수점 주식모으기 지속 여부를 검토하세요.',
+ if(healthy)return basic('buy','추세 확인 소액매수 검토',
+  '5일선 우위·20일선 상승 및 표시가격이 20일선 -1%~+5% 범위입니다. 최근 2일 종가 연속 확인은 필수 조건이 아니며, 원화 정액 소수점 적립을 검토하세요.',
   {...extras,qty:0,amountKRW:dailyAmount(id)});
  return basic('wait',low?'저가·추세 확인 대기':'추세·가격 조건 대기',
   (avg!==null&&kr.amount>=avg?'현재 가격은 입력된 원화 평단보다 낮지 않습니다. ':'')+
