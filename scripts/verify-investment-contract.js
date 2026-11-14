@@ -201,6 +201,45 @@ graphApp.byId.robot.trend.volumeToday=null;
 equal(graphApp.chartAssessment('robot').level,'unknown',
  'missing volume data cannot fabricate a bearish high-volume warning');
 
+// The same flexible "low OR near-MA uptrend" approach extends to the three US core holdings,
+// but a real broker order and the separate CONY pause are never inferred from these signals.
+const usSignalCode=txt('us-signals.js');
+truth(!!new vm.Script(usSignalCode,{filename:'us-signals.js'}), 
+ 'US buy-decision module is valid client-side JavaScript');
+const usSignalSource=usSignalCode.slice(usSignalCode.indexOf('function latest(x){'),
+ usSignalCode.indexOf('function decision(id){'));
+truth(usSignalSource.startsWith('function latest(x){')&&
+ usSignalSource.includes('function chartAssessment(x){')&&
+ usSignalSource.includes('function evaluate(id,source,cap){'),
+ 'US chart and entry decision functions remain separately testable');
+const usRules=new Function('Date','NAMES','valid','krw','window','read',
+ usSignalSource+'\\nreturn {evaluate,chartAssessment};')(
+ Date,{schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY'},
+ v=>typeof v==='number'&&Number.isFinite(v)&&v>0,
+ v=>Number(v).toLocaleString('ko-KR')+'원',
+ {ISA_ORDER_PLAN:{tossDailyKrw:id=>id==='schd'?4000:3000}},
+ ()=>null);
+const usTestDate=new Date(Date.now()-86400000).toISOString().slice(0,10).replace(/-/g,'');
+const usFixture=(price,ma5,ma20,volume=100,maRising=false)=>{
+ const bars=Array.from({length:40},(_,i)=>({date:usTestDate,close:i===39?price:100,volume}));
+ return {id:'schd',ok:true,date:usTestDate,close:price,low20:90,high20:120,bars,
+  trend:{ma5,ma20,maRising,ma5Above20:ma5>ma20,twoDaysAbove:false,
+   deadCross:false,volume,previousVolumeAverage:100}};
+};
+const usCase=(id,x,avg=110)=>usRules.evaluate(id,
+ {x,usdClose:x.close,krw:{amount:x.close*1400,source:'synthetic FX',manual:false},qty:10,avg:avg*1400},null);
+for(const id of ['schd','spym','agnc']){
+ const low=usCase(id,usFixture(99,100,100));
+ equal(low.type,'buy',id+' low-price entry does not also require a bullish MA trend');
+ const trend=usCase(id,usFixture(101,101,100,100,true),90);
+ equal(trend.type,'buy',id+' near-MA uptrend no longer requires two completed above-MA closes');
+ const risk=usCase(id,usFixture(93,96,100,180,false));
+ equal(risk.type,'wait',id+' 1.8x-volume bearish chart still blocks a low-price buy');
+}
+truth(usSignalCode.includes("id==='cony'&&read('isa-cony-autobuy-plan-v1')?.status!=='review'")&&
+ usSignalCode.includes('현재 자동매수 중단 유지'),
+ 'CONY graph information cannot automatically restart paused buying');
+
 // Moving-average mode: compare each validated intraday price with dynamic cap.
 delete app.manual.robot; // Clear the earlier manual-price test override.
 app.settings.capMode='ma';
