@@ -25,6 +25,8 @@ label{font-size:.82rem;color:#b9c6db;display:block;margin-bottom:8px}
 .metrics div{padding:10px;background:#101b2e;border-radius:10px}
 .metrics small{display:block;font-size:.71rem}.metrics strong{font-size:.98rem}
 svg{display:block;width:100%;height:105px}.long{height:auto}
+.kr-trend-chart{height:auto;min-height:180px;max-height:270px}
+.kr-chart-signal-note{font-size:.73rem;color:#adbfd8;margin:6px 0 10px;line-height:1.5}
 .divider{height:1px;background:#35435a;margin:14px 0}
 .range{height:10px;border-radius:6px;background:#556176;position:relative;margin:16px 4px}
 .range .low{background:#0ea37f;height:100%;position:absolute;left:0;border-radius:6px}
@@ -744,12 +746,64 @@ window.ISA_KR_APP={
  }
 };
 function chart(bars){
- var last=bars.slice(-20),all=last.map(function(x){return Number(x.close);});
- var ma20s=last.map(function(x,i){return bars.slice(i+1,i+21).reduce(function(s,b){return s+Number(b.close);},0)/20;});
- var ma5s=last.map(function(x,i){return bars.slice(i+16,i+21).reduce(function(s,b){return s+Number(b.close);},0)/5;});
- var lo=Math.min.apply(null,all.concat(ma5s,ma20s)),hi=Math.max.apply(null,all.concat(ma5s,ma20s)),diff=Math.max(1,hi-lo);
- var plot=function(values){return values.map(function(v,i){return (12+i*276/(values.length-1)).toFixed(1)+','+(83-68*(v-lo)/diff).toFixed(1);}).join(' ');};
- return '<svg viewBox="0 0 300 100" aria-label="20거래일 종가 빨강, 5일선 초록, 20일선 노랑"><line x1="12" y1="83" x2="288" y2="83" stroke="#52627a"/><polyline points="'+plot(all)+'" fill="none" stroke="#f87171" stroke-width="2.8"/><polyline points="'+plot(ma5s)+'" fill="none" stroke="#24bf9a" stroke-width="2.3"/><polyline points="'+plot(ma20s)+'" fill="none" stroke="#eab308" stroke-width="2.3"/></svg>';
+ // Only completed Korean daily bars: intraday quotes must never be mixed into MA curves.
+ if(!Array.isArray(bars)||bars.length<40)return '<p class="sub">확정 일봉 40개 미만 · 5·20일선 그래프 보류</p>';
+ var last=bars.slice(-20);
+ var all=last.map(function(x){return Number(x.close);});
+ if(!all.every(function(v){return Number.isFinite(v)&&v>0;}))return '<p class="sub">종가 검증 실패 · 차트 표시 보류</p>';
+ var ma20s=last.map(function(x,i){
+  return bars.slice(i+1,i+21).reduce(function(sum,b){return sum+Number(b.close);},0)/20;
+ });
+ var ma5s=last.map(function(x,i){
+  return bars.slice(i+16,i+21).reduce(function(sum,b){return sum+Number(b.close);},0)/5;
+ });
+ if(!ma20s.concat(ma5s).every(function(v){return Number.isFinite(v)&&v>0;}))
+  return '<p class="sub">이동평균 계산 확인 필요 · 차트 표시 보류</p>';
+ var lo=Math.min.apply(null,all.concat(ma5s,ma20s));
+ var hi=Math.max.apply(null,all.concat(ma5s,ma20s));
+ var diff=Math.max(1,hi-lo),left=48,right=326,top=13,bottom=120;
+ var xAt=function(i){return left+i*(right-left)/(last.length-1);};
+ var yAt=function(value){return bottom-(bottom-top)*(value-lo)/diff;};
+ var plot=function(values){return values.map(function(v,i){
+  return xAt(i).toFixed(1)+','+yAt(v).toFixed(1);
+ }).join(' ');};
+ var wonAxis=function(v){return Math.round(v).toLocaleString('ko-KR');};
+ var dateLabel=function(v){
+  var t=String(v||'').replace(/-/g,'');
+  return /^[0-9]{8}$/.test(t)?t.slice(4,6)+'/'+t.slice(6,8):'날짜 미확인';
+ };
+ var guide=[hi,(hi+lo)/2,lo].map(function(v){
+  var y=yAt(v).toFixed(1);
+  return '<line x1="'+left+'" y1="'+y+'" x2="'+right+'" y2="'+y+'" stroke="#41516a" stroke-width="0.8" stroke-dasharray="2 4"/>'+
+   '<text x="42" y="'+(Number(y)+3).toFixed(1)+'" text-anchor="end" font-size="9" fill="#b6c7dd">'+wonAxis(v)+'</text>';
+ }).join('');
+ var volumes=last.map(function(v){return v.volume===null||v.volume===undefined?null:Number(v.volume);});
+ var maxVolume=Math.max.apply(null,volumes.filter(function(v){return Number.isFinite(v)&&v>=0;}).concat([0]));
+ var volume=maxVolume>0?volumes.map(function(v,i){
+  if(!Number.isFinite(v)||v<0)return '';
+  var height=23*v/maxVolume;
+  return '<rect x="'+(xAt(i)-3.2).toFixed(1)+'" y="'+(162-height).toFixed(1)+'" width="6.4" height="'+height.toFixed(1)+'" fill="#6b829f" opacity="0.8"/>';
+ }).join(''):'<text x="187" y="154" text-anchor="middle" font-size="10" fill="#98a8bd">거래량 미제공</text>';
+ var crossMarkers='',golden=0,dead=0;
+ for(var i=1;i<last.length;i++){
+  var prev=ma5s[i-1]-ma20s[i-1],curr=ma5s[i]-ma20s[i];
+  var direction=prev<=0&&curr>0?'golden':prev>=0&&curr<0?'dead':null;
+  if(!direction)continue;
+  if(direction==='golden')golden++;else dead++;
+  var color=direction==='golden'?'#78d9a5':'#fb923c',label=direction==='golden'?'골든크로스':'데드크로스';
+  crossMarkers+='<circle cx="'+xAt(i).toFixed(1)+'" cy="'+yAt(ma5s[i]).toFixed(1)+'" r="4.5" fill="'+color+'" stroke="#101b2e" stroke-width="1.4"><title>'+label+' · '+dateLabel(last[i].date)+'</title></circle>';
+ }
+ return '<svg class="kr-trend-chart" viewBox="0 0 340 184" role="img" aria-label="최근 20거래일 종가 빨강, 5일선 초록, 20일선 노랑, 거래량 막대와 골든·데드크로스 위치 표시">'+
+  guide+
+  '<polyline points="'+plot(all)+'" fill="none" stroke="#f87171" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"/>'+
+  '<polyline points="'+plot(ma5s)+'" fill="none" stroke="#24bf9a" stroke-width="2.5" stroke-linejoin="round"/>'+
+  '<polyline points="'+plot(ma20s)+'" fill="none" stroke="#eab308" stroke-width="2.5" stroke-linejoin="round"/>'+
+  crossMarkers+
+  '<line x1="'+left+'" y1="162" x2="'+right+'" y2="162" stroke="#52627a"/>'+volume+
+  '<text x="48" y="136" font-size="9" fill="#adbfd8">거래량</text>'+
+  '<text x="'+left+'" y="179" font-size="10" text-anchor="start" fill="#b9c7d9">'+dateLabel(last[0].date)+'</text>'+
+  '<text x="'+right+'" y="179" font-size="10" text-anchor="end" fill="#b9c7d9">'+dateLabel(last[last.length-1].date)+'</text></svg>'+
+  '<p class="kr-chart-signal-note">20거래일 5·20일선 교차: 골든크로스 '+golden+'회 · 데드크로스 '+dead+'회 · 원형 표시는 교차 지점 (확정 일봉 기준)</p>';
 }
 function renderTossDomesticPositions(){
  // The existing browser-only Toss Korea override is separate from Kiwoom ISA.
@@ -920,7 +974,7 @@ function render(){
  d.innerHTML='<div class="divider"></div><div class="flex"><strong>'+money(p)+'</strong><span class="status state-'+v.type+'">'+actionLabel(v.type)+'</span></div>'+
  '<p class="sub">'+(freshQuote(f.id)?'현재 표시 가격은 비공식 당일 조회가 · 5·20일선 및 박스권은 '+day(x.date)+' 확정 일봉 기준':'게시 일봉 종가 '+day(x.date))+' · 20거래일 '+day(x.rangeStart)+'~'+day(x.rangeEnd)+'</p>'+
  chart(x.bars)+
- '<div class="leg20"><span><i class="legend-dot" style="background:#f87171"></i>종가</span><span><i class="legend-dot" style="background:#24bf9a"></i>5일선</span><span><i class="legend-dot" style="background:#eab308"></i>20일선</span></div>'+
+ '<div class="leg20"><span><i class="legend-dot" style="background:#f87171"></i>종가</span><span><i class="legend-dot" style="background:#24bf9a"></i>5일선</span><span><i class="legend-dot" style="background:#eab308"></i>20일선</span><span><i class="legend-dot" style="background:#6b829f;height:8px;width:5px"></i>거래량</span></div>'+
  '<div class="metrics"><div><small>20거래일 저가</small><strong>'+money(low)+'</strong></div><div><small>20거래일 고가</small><strong>'+money(high)+'</strong></div><div><small>하단 30% 기준</small><strong>'+money(b.b30)+'</strong></div><div><small>하단 20% 기준</small><strong>'+money(b.b20)+'</strong></div><div><small>5일 이동평균</small><strong>'+avgMoney(t.ma5)+'</strong></div><div><small>20일 이동평균</small><strong>'+avgMoney(t.ma20)+'</strong></div></div>'+
  '<p class="context">현재 '+safe(b.name)+' · 종가와 20일선 차이 '+(ratio>=0?'+':'')+ratio.toFixed(2)+'% · 거래량(이전 20일 평균 대비) '+vol+'</p>'+
  '<p class="context"><b>이동평균 해석:</b> '+safe(trend(x))+' · 5일선 '+(t.ma5Rising?'상승·횡보':'하락')+' / 20일선 '+(t.maRising?'상승·횡보':'하락')+'</p>'+
