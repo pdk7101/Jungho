@@ -163,7 +163,7 @@ equal(app.freshQuote('space'),null,'prior-day quote rejected');
 // Completed-bar graphic crossover/volume checks must modify entry risk, not create new standalone buys.
 const graphStore=storage();
 const graphApp=new Function('window','localStorage','document','Date',appCode+
- '\\nreturn {FUNDS,settings,byId,chartAssessment,verdict,solDailyEntry,pairPlan,setQuotes:q=>liveQuotes=q};')(
+ '\nreturn {FUNDS,settings,byId,chartAssessment,verdict,solDailyEntry,pairPlan,setQuotes:q=>liveQuotes=q};')(
  {ISA_livePriceFetch:{active:()=>true}},graphStore,{getElementById:()=>null},FixedDate
 );
 function graphFixture(id,low){
