@@ -158,6 +158,17 @@ details[open]>summary{margin-bottom:12px}
 .us-dist-form input,.us-dist-form select{min-width:0;font-size:.88rem;padding:10px}
 .us-dist-record,.us-dist-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #394d68;font-size:.81rem}
 .us-dist-record small,.us-dist-row small{display:block;font-size:.72rem;color:#aabdd4;margin-top:4px}
+.us-dist-months{display:grid;gap:8px;margin:12px 0}
+.us-dist-month{border:1px solid #425b7a;border-radius:10px;background:#182d47;overflow:hidden}
+.us-dist-month>summary{padding:12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;list-style:none}
+.us-dist-month>summary::-webkit-details-marker{display:none}
+.us-dist-month>summary::before{content:"▸";font-size:.75rem;color:#aabdd4}
+.us-dist-month[open]>summary::before{content:"▾"}
+.us-dist-month>summary>span{display:flex;flex:1;gap:8px;align-items:baseline;flex-wrap:wrap}
+.us-dist-month>summary small{color:#aabdd4;font-size:.72rem}
+.us-dist-month>summary strong{font-size:.94rem;color:#eff6ff;white-space:nowrap}
+.us-dist-month-weeks{padding:0 12px 10px;border-top:1px solid #40516a}
+.us-dist-month-weeks .us-dist-record:last-child{border-bottom:none}
 .us-dist-delete{background:#3a475d;border:1px solid #62738d;font-size:.75rem;padding:7px 10px;flex-shrink:0}
 #us-distribution-details{margin-top:15px;padding-top:12px;border-top:1px solid #3a4e69}
 #us-dist-message{margin:8px 0}
@@ -1184,4 +1195,4 @@ var reload=document.getElementById('reload');
 if(reload)reload.addEventListener('click',update);
 update();
 })();
-</script><script src="./insights.js" defer></script><script src="./personal-us-live.js" defer></script><script src="./us-dashboard.js?v=20261115-clean1" defer></script><script src="./us-krw.js?v=20261115-dist-restore2" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script><script src="./account-summary.js" defer></script></body></html>
+</script><script src="./insights.js" defer></script><script src="./personal-us-live.js" defer></script><script src="./us-dashboard.js?v=20261115-clean1" defer></script><script src="./us-krw.js?v=20261115-monthly-cony1" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script><script src="./account-summary.js" defer></script></body></html>
