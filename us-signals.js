@@ -156,9 +156,12 @@ function evaluate(id,source,cap){
 }
 function decision(id){
  if(id==='cony'&&read('isa-cony-autobuy-plan-v1')?.status!=='review'){
+  // CONY shares the same chart interpretation, but a positive signal NEVER overrides the user's pause.
+  const x=item(id),graph=chartAssessment(x);
   return {type:'wait',title:'CONY 자동매수 일시중단 유지',
    reason:'11월 1일부터 CONY 일 15,000원 자동매수를 일시 중단하고 그 금액을 현금으로 모으기로 한 최신 계획을 우선합니다. 실시간 COIN·공식 NAV·분배금 포함 총수익률·병합 공시 안정성을 이 앱에서 검증할 수 없으므로 가격 반등만으로 자동매수 재개하지 않습니다.',
-   qty:0,amountKRW:null,sourceDate:item(id)?.date||null};
+   notes:['그래프 매수 보조: '+graph.note+' · 현재 자동매수 중단 유지'],
+   qty:0,amountKRW:null,sourceDate:x?.date||null};
  }
  const q=quote(id),cap=getLimit(id);
  return evaluate(id,q,cap);
