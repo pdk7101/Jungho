@@ -160,6 +160,46 @@ equal(verdict('space').type,'wait','expired quote cannot trigger BUY or STOP');
 app.setQuotes({robot:trade(9300),space:{...trade(9701),tradeAt:'2026-11-01T06:30:00Z'},sol:trade(9400)});
 equal(app.freshQuote('space'),null,'prior-day quote rejected');
 
+// Completed-bar graphic crossover/volume checks must modify entry risk, not create new standalone buys.
+const graphStore=storage();
+const graphApp=new Function('window','localStorage','document','Date',appCode+
+ '\\nreturn {FUNDS,settings,byId,chartAssessment,verdict,solDailyEntry,pairPlan,setQuotes:q=>liveQuotes=q};')(
+ {ISA_livePriceFetch:{active:()=>true}},graphStore,{getElementById:()=>null},FixedDate
+);
+function graphFixture(id,low){
+ const source=bars(id,low?80:120);
+ source.bars=Array.from({length:40},(_,i)=>({
+  date:'20261102',open:100,high:120,low:80,
+  close:i>=38?(low?80:120):100,volume:i===39?(low?180:135):100
+ }));
+ source.close=low?80:120;
+ Object.assign(source.trend,{ma5:low?92:108,ma20:low?98:102,
+  previousMa5:low?96:104,previousMa20:low?99:101,
+  maRising:!low,ma5Above20:!low,volumeToday:low?180:135,avgVolume20:100});
+ return source;
+}
+graphApp.settings.capMode='manual';
+graphApp.settings.robotCap=1000;graphApp.settings.spaceCap=1000;graphApp.settings.solCap=1000;
+graphApp.byId.robot=graphFixture('robot',true);
+graphApp.byId.space=graphFixture('space',false);
+graphApp.byId.sol=graphFixture('sol',true);
+graphApp.setQuotes({robot:trade(80),space:trade(120),sol:trade(80)});
+equal(graphApp.chartAssessment('robot').level,'risk',
+ '1.8x completed-bar volume with recent dead cross flags new robot entry risk');
+equal(graphApp.verdict(graphApp.FUNDS.find(f=>f.id==='robot')).type,'wait',
+ 'robot entry below manual cap still waits after bearish high-volume chart warning');
+equal(graphApp.chartAssessment('space').level,'support',
+ '1.35x volume with confirmed golden cross is supportive and never a standalone buy');
+truth(graphApp.verdict(graphApp.FUNDS.find(f=>f.id==='space')).type!=='buy',
+ 'a golden cross by itself cannot authorize an aerospace buy');
+equal(graphApp.solDailyEntry().state,'stop',
+ 'SOL chart danger blocks new substitute purchase while preserving the fallback computation');
+equal([graphApp.pairPlan().reitQty,graphApp.pairPlan().solQty],[4,0],
+ 'with both alternatives confirmed no-buy, the existing four-REIT fallback is preserved');
+graphApp.byId.robot.trend.volumeToday=null;
+equal(graphApp.chartAssessment('robot').level,'unknown',
+ 'missing volume data cannot fabricate a bearish high-volume warning');
+
 // Moving-average mode: compare each validated intraday price with dynamic cap.
 delete app.manual.robot; // Clear the earlier manual-price test override.
 app.settings.capMode='ma';
