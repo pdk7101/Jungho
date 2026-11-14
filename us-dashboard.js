@@ -132,16 +132,27 @@ function holdingCard(id,usdPx){
    Number.isFinite(Number(h.qty))&&Number(h.qty)>=0?Number(h.qty):null;
  const avg=valid(h.krwAvg)?Number(h.krwAvg):null;
  const position=window.ISA_US_KRW?.basisKrw?.(id,usdPx);
+ const receipt=window.ISA_US_KRW?.netDividend?.(id);
+ // Cash actually received is not the same as dividend-inclusive P/L.
+ // Render it independently, even if a live quote or average cost is missing.
+ const receiptLine=receipt&&Number.isFinite(Number(receipt.amount))&&Number(receipt.amount)>=0?
+   '<div class="us-card-dividend">누적 세후 배당·분배금 <b>'+wonAmount(receipt.amount)+'</b>'+
+   '<small> · '+(receipt.kind==='ledger'?'날짜별 입력 합계(과거 누락 가능)':'직접 입력 누적액')+'</small></div>':
+   '<div class="us-card-dividend">누적 세후 배당·분배금 미확인 · 입력값 필요</div>';
  const holdings='보유 '+(qty===null?'미입력':fmtQty(qty))+
   ' · 평단 '+(avg===null?'미입력':wonAmount(avg,2));
- if(qty===0)return '<div class="us-card-holding">'+holdings+' · 현재 미보유</div>';
+ if(qty===0)return '<div class="us-card-holding">'+holdings+' · 현재 미보유'+receiptLine+'</div>';
  if(!position)return '<div class="us-card-holding">'+holdings+
-  '<div class="us-card-pnl">평가손익 계산 대기 · 보유정보와 원화 참고가격 확인</div></div>';
+  '<div class="us-card-pnl">평가손익 계산 대기 · 보유정보와 원화 참고가격 확인</div>'+
+  receiptLine+'</div>';
  return '<div class="us-card-holding">'+holdings+
   '<div class="us-card-pnl '+(position.pnl>=0?'us-positive':'us-negative')+'">평가손익 '+
    signedWon(position.pnl)+' ('+pct(position.rate)+')</div>'+
-  (position.inclusive!==null?'<div class="us-card-dividend">누적 세후 분배금 포함 '+
-   signedWon(position.inclusive)+' ('+pct(position.inclusiveRate)+')</div>':'')+
+  receiptLine+
+  (position.inclusive!==null?
+   '<div class="us-card-inclusive '+(position.inclusive>=0?'us-positive':'us-negative')+'">분배금 포함 총손익 '+
+    signedWon(position.inclusive)+' ('+pct(position.inclusiveRate)+')</div>':
+   '<div class="us-card-inclusive">분배금 포함 총손익: 누적 세후 지급금 확인 후 계산</div>')+
   '</div>';
 }
 function cards(){
