@@ -288,9 +288,48 @@ details[open]>summary{margin-bottom:12px}
 .us-head-actions{display:flex;flex-wrap:wrap;gap:7px}
 .us-head-actions .us-header-button{white-space:nowrap}
 #us-live-badge{font-size:.84rem;font-weight:650;line-height:1.55}
+.account-summary h2{font-size:1rem;margin-bottom:11px}
+.account-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.account-summary-card{min-width:0;background:#13223a;border:1px solid #425775;border-radius:11px;padding:12px}
+.account-summary-name{font-size:.95rem;display:block;margin-bottom:10px}
+.account-summary-name small{display:block;font-size:.7rem;color:#9fb4d0;font-weight:500;margin-top:2px}
+.account-summary-item{display:flex;flex-wrap:wrap;gap:5px;justify-content:space-between;align-items:baseline;margin:7px 0;font-size:.8rem}
+.account-summary-item span{color:#b6c6dd}
+.account-summary-item b{font-size:1.03rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.account-summary-source{color:#9fb6d2;font-size:.73rem;margin-top:11px;line-height:1.5}
+.account-summary-combined{font-size:.85rem;font-weight:700;border-top:1px solid #40526d;padding-top:11px;margin-top:12px}
+.account-summary-foot{font-size:.73rem;color:#a7b8d0}
+.account-edit h3{font-size:.9rem;margin:10px 0 5px}
+.account-edit .grid label{font-size:.8rem}
+.account-edit input{font-size:.92rem}
+.account-edit .us-head-actions{margin-top:10px}
+@media(max-width:560px){
+ .account-summary-grid{grid-template-columns:1fr}
+ .account-summary-card{padding:12px}
+ .account-summary-item b{font-size:1.07rem}
+}
 </style><script src="./live-prices.js"></script>
 </head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
+<section class="panel account-summary" id="account-summary" aria-labelledby="account-summary-title">
+ <h2 id="account-summary-title">계좌별 총투자금 · 평가금액</h2>
+ <div class="account-summary-grid">
+  <div class="account-summary-card" aria-label="토스증권 계좌 전체">
+   <strong class="account-summary-name">토스증권 <small>국내·미국 주식 합산</small></strong>
+   <div class="account-summary-item"><span>총투자금</span><b id="toss-total-invested">확인 중</b></div>
+   <div class="account-summary-item"><span>평가금액</span><b id="toss-total-value">확인 중</b></div>
+   <p id="toss-total-source" class="account-summary-source">보유정보 확인 중</p>
+  </div>
+  <div class="account-summary-card" aria-label="키움증권 중개형 ISA">
+   <strong class="account-summary-name">키움증권 <small>중개형 ISA 6종목</small></strong>
+   <div class="account-summary-item"><span>총투자금</span><b id="kiwoom-total-invested">확인 중</b></div>
+   <div class="account-summary-item"><span>평가금액</span><b id="kiwoom-total-value">확인 중</b></div>
+   <p id="kiwoom-total-source" class="account-summary-source">보유정보 확인 중</p>
+  </div>
+ </div>
+ <p id="account-summary-total" class="account-summary-combined">계좌 합계 확인 중</p>
+ <p class="account-summary-foot">보유주식 매수원금과 평가금액 기준 · 배당·분배금은 평가금액에 가산하지 않습니다. 사진·사용자 입력값과 현재 시세는 기준일이 다를 수 있습니다.</p>
+</section>
 <section class="panel flex"><div><b>한국 ETF 장중 공개 시세 자동 갱신 · 약 60초 간격 (페이지 열린 동안)</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
 <div id="alert">공개 일봉 종가와 당일 비공식 조회 가격은 다릅니다. 마지막 체결 시각을 확인하지 못하면 최신 가격으로 표시하지 않습니다.</div>
 <section class="panel" id="cap-settings">
@@ -319,6 +358,26 @@ details[open]>summary{margin-bottom:12px}
   <h3>미국 주식 · 토스 4종목</h3>
   <div id="us-krw-editor"></div>
   <p id="us-holding-message" class="fieldset-note" role="status">미국 수량과 원화 평단을 변경하면 시세 카드와 원화 손익이 갱신됩니다. 세후 분배금 기록은 별도 보존됩니다.</p>
+  <details class="account-edit" id="account-edit">
+   <summary>계좌 전체 합계 직접 입력 · 수정 (선택)</summary>
+   <p class="fieldset-note">토스는 국내 9종목과 미국 5종목이 포함되므로 4종목의 시세만으로 전체 평가액을 계산하지 않습니다. 토스증권 앱의 전체 계좌 금액을 입력하면 상단에 반영됩니다. 키움은 6종목 시세 기준 자동 계산이 가능하며, 증권사 앱 합계를 우선 표시하고 싶을 때만 입력하세요.</p>
+   <h3>토스증권 · 계좌 전체</h3>
+   <div class="grid">
+    <label>총투자금 (원)<input id="account-toss-invested" type="number" min="0" step="1" placeholder="주식 매수원금 전체"></label>
+    <label>평가금액 (원)<input id="account-toss-value" type="number" min="0" step="1" placeholder="전체 주식 평가액"></label>
+   </div>
+   <h3>키움증권 · 중개형 ISA</h3>
+   <div class="grid">
+    <label>총투자금 (원)<input id="account-kiwoom-invested" type="number" min="0" step="1" placeholder="자동계산 또는 직접 입력"></label>
+    <label>평가금액 (원)<input id="account-kiwoom-value" type="number" min="0" step="1" placeholder="자동계산 또는 직접 입력"></label>
+   </div>
+   <p class="fieldset-note">계좌별 두 금액을 모두 입력해야 저장합니다. 빈 칸은 기존 스냅샷·시세 계산을 유지합니다. 사용자 입력 금액은 자동 갱신되지 않으며 기준 날짜가 표시됩니다.</p>
+   <div class="us-head-actions">
+    <button type="button" id="account-total-save" class="us-header-button">입력한 계좌 합계 저장</button>
+    <button type="button" id="account-total-reset" class="us-header-button outline">직접 입력값 지우기</button>
+   </div>
+   <p id="account-total-message" class="fieldset-note" role="status"></p>
+  </details>
  </details>
 </section>
 <div class="legend"><span class="state-buy"><b>●</b> 매수 · 조건 충족(주문 아님)</span><span class="state-stop"><b>●</b> 중지 · 상한 초과</span><span class="state-wait"><b>●</b> 대기 · 미충족·확인 필요</span></div>
@@ -648,7 +707,31 @@ function verdict(f){
 function actionLabel(type){
  return type==='buy'?'매수':type==='stop'?'중지':'대기';
 }
+function accountTotals(){
+ // The Kiwoom ISA holds the six listed domestic ETFs. Never mix in Toss positions.
+ var principal=0,value=0,missingHoldings=[],missingPrice=[],usedIntraday=0,usedClose=0,dates=[];
+ FUNDS.forEach(function(f){
+  var h=positions[f.id],qty=h&&qtyValid(h.qty)?Number(h.qty):null;
+  if(qty===null){missingHoldings.push(f.id+' 수량');return;}
+  if(qty===0)return;
+  if(!valid(h.avg)){missingHoldings.push(f.id+' 평단');return;}
+  principal+=qty*Number(h.avg);
+  var q=freshQuote(f.id),x=byId[f.id],price=null;
+  if(q){price=Number(q.price);usedIntraday++;}
+  else if(verified(f.id)){price=Number(x.close);usedClose++;dates.push(day(x.date));}
+  if(price!==null&&Number.isFinite(price)&&price>0)value+=qty*price;
+  else missingPrice.push(f.id);
+ });
+ return {
+  principal:missingHoldings.length?null:principal,
+  value:missingHoldings.length||missingPrice.length?null:value,
+  missingHoldings:missingHoldings,missingPrice:missingPrice,
+  intraday:usedIntraday,close:usedClose,dates:dates,
+  count:FUNDS.length
+ };
+}
 window.ISA_KR_APP={
+ accountTotals:accountTotals,
  pairPlan:pairPlan,
  solDailyEntry:solDailyEntry,
  effectiveCap:effectiveCap,
