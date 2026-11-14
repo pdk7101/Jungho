@@ -38,12 +38,23 @@ function dividendTotals(){
   if(!v){missing.push(id.toUpperCase());continue;}
   us+=v.amount;usKnown++;if(v.kind==='ledger')provisional.push(id.toUpperCase());
  }
- const stored=read(DIV),domestic=payoutEntry(stored.tossDomestic),kiwoom=payoutEntry(stored.kiwoom);
+ const stored=read(DIV),domesticBase=payoutEntry(stored.tossDomestic),kiwoomBase=payoutEntry(stored.kiwoom);
+ // Account-wide Excel/photo totals are opening balances. Only receipts dated later
+ // than that baseline may increase them: historical per-stock entries are never added twice.
+ const calculator=window.ISA_KR_DIVIDENDS?.accountTotal;
+ const domesticItem=typeof calculator==='function'?calculator('tossDomestic',domesticBase):null;
+ const kiwoomItem=typeof calculator==='function'?calculator('kiwoom',kiwoomBase):null;
+ const domestic=domesticItem?{amount:domesticItem.amount,date:domesticBase?.date||null}:domesticBase;
+ const kiwoom=kiwoomItem?{amount:kiwoomItem.amount,date:kiwoomBase?.date||null}:kiwoomBase;
  if(!domestic)missing.push('토스 국내주식');
  if(!kiwoom)missing.push('키움 ISA');
+ if(domesticItem?.kind==='partial')provisional.push('토스 국내주식 일부 종목');
+ if(kiwoomItem?.kind==='partial')provisional.push('키움 ISA 일부 종목');
  return {us,usKnown,domestic:domestic?.amount??null,kiwoom:kiwoom?.amount??null,
   toss:us+(domestic?.amount||0),all:us+(domestic?.amount||0)+(kiwoom?.amount||0),
-  complete:!missing.length,missing,provisional,dates:[domestic?.date,kiwoom?.date].filter(Boolean)};
+  complete:!missing.length&&!provisional.length,missing,provisional,
+  dates:[domestic?.date,kiwoom?.date].filter(Boolean),
+  afterBase:[domesticItem?.added||0,kiwoomItem?.added||0]};
 }
 function renderDividends(){
  const x=dividendTotals(),label=$('account-dividend-label'),total=$('account-dividend-total'),
@@ -54,7 +65,8 @@ function renderDividends(){
  breakdown.textContent='토스 미국 '+x.usKnown+'/4종목 '+money(x.us)+' · 토스 국내 '+
   (x.domestic===null?'미입력':money(x.domestic))+' · 키움 ISA '+(x.kiwoom===null?'미입력':money(x.kiwoom));
  note.textContent=(x.missing.length?'미확인: '+x.missing.join(', ')+'. ':'')+
-  (x.provisional.length?'날짜별 지급 기록만 있는 '+x.provisional.join(', ')+'은 과거 누락 가능. ':'')+
+  (x.provisional.length?'누적 기준금액이 없는 '+x.provisional.join(', ')+'은 과거 지급내역 누락 가능. ':'')+
+  (x.afterBase?.some(x=>x>0)?'계좌 전체 누적액 기준일 이후 종목별 지급기록만 추가 합산. ':'')+
   (x.dates.length?'국내 지급금 입력 기준 '+x.dates.join(' / ')+'. ':'')+
   '실제 세후 수령 누적액이며 주식 평가액에 더하지 않습니다.';
 }
@@ -269,6 +281,7 @@ function mount(){
  applyPrivateDividendPhoto();
  document.addEventListener('isa-rendered',render);
  window.addEventListener('isa-us-valuation-refreshed',render);
+ document.addEventListener('isa-kr-dividends-updated',render);
  window.addEventListener('storage',render);
  window.addEventListener('pageshow',render);
  render();
