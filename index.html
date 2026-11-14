@@ -288,45 +288,44 @@ details[open]>summary{margin-bottom:12px}
 .us-head-actions{display:flex;flex-wrap:wrap;gap:7px}
 .us-head-actions .us-header-button{white-space:nowrap}
 #us-live-badge{font-size:.84rem;font-weight:650;line-height:1.55}
-.account-summary h2{font-size:1rem;margin-bottom:11px}
-.account-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.account-summary-card{min-width:0;background:#13223a;border:1px solid #425775;border-radius:11px;padding:12px}
-.account-summary-name{font-size:.95rem;display:block;margin-bottom:10px}
-.account-summary-name small{display:block;font-size:.7rem;color:#9fb4d0;font-weight:500;margin-top:2px}
-.account-summary-item{display:flex;flex-wrap:wrap;gap:5px;justify-content:space-between;align-items:baseline;margin:7px 0;font-size:.8rem}
-.account-summary-item span{color:#b6c6dd}
-.account-summary-item b{font-size:1.03rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-.account-summary-source{color:#9fb6d2;font-size:.73rem;margin-top:11px;line-height:1.5}
-.account-summary-combined{font-size:.85rem;font-weight:700;border-top:1px solid #40526d;padding-top:11px;margin-top:12px}
+.account-summary h2{font-size:1rem;margin-bottom:12px}
+.account-summary-table{width:100%;table-layout:fixed;border-collapse:collapse}
+.account-summary-table th,.account-summary-table td{padding:9px 6px;vertical-align:middle;min-width:0}
+.account-summary-table thead th{font-size:.75rem;font-weight:650;color:#b7c8df;text-align:right}
+.account-summary-table thead th:first-child{width:31%;text-align:left}
+.account-summary-table tbody tr.account-main-row th,.account-summary-table tbody tr.account-main-row td{border-top:1px solid #40526d}
+.account-summary-table tbody th{text-align:left;font-size:.88rem;line-height:1.4}
+.account-summary-table tbody th small{display:block;color:#9fb4d0;font-weight:500;font-size:.7rem;margin-top:2px}
+.account-summary-table tbody tr.account-main-row td{text-align:right;white-space:nowrap;font-weight:750;font-variant-numeric:tabular-nums;font-size:clamp(.74rem,2.8vw,.95rem);letter-spacing:-.025em}
+.account-summary-table tbody tr.account-source-row td{padding:0 6px 10px;text-align:left;font-size:.72rem;color:#9fb6d2;line-height:1.5;white-space:normal;overflow-wrap:anywhere}
+.account-summary-combined{font-size:.85rem;font-weight:700;border-top:1px solid #40526d;padding-top:11px;margin-top:5px;line-height:1.6}
 .account-summary-foot{font-size:.73rem;color:#a7b8d0}
 .account-edit h3{font-size:.9rem;margin:10px 0 5px}
 .account-edit .grid label{font-size:.8rem}
 .account-edit input{font-size:.92rem}
 .account-edit .us-head-actions{margin-top:10px}
-@media(max-width:560px){
- .account-summary-grid{grid-template-columns:1fr}
- .account-summary-card{padding:12px}
- .account-summary-item b{font-size:1.07rem}
-}
 </style><script src="./live-prices.js"></script>
 </head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel account-summary" id="account-summary" aria-labelledby="account-summary-title">
- <h2 id="account-summary-title">계좌별 총투자금 · 평가금액</h2>
- <div class="account-summary-grid">
-  <div class="account-summary-card" aria-label="토스증권 계좌 전체">
-   <strong class="account-summary-name">토스증권 <small>국내·미국 주식 합산</small></strong>
-   <div class="account-summary-item"><span>총투자금</span><b id="toss-total-invested">확인 중</b></div>
-   <div class="account-summary-item"><span>평가금액</span><b id="toss-total-value">확인 중</b></div>
-   <p id="toss-total-source" class="account-summary-source">보유정보 확인 중</p>
-  </div>
-  <div class="account-summary-card" aria-label="키움증권 중개형 ISA">
-   <strong class="account-summary-name">키움증권 <small>중개형 ISA 6종목</small></strong>
-   <div class="account-summary-item"><span>총투자금</span><b id="kiwoom-total-invested">확인 중</b></div>
-   <div class="account-summary-item"><span>평가금액</span><b id="kiwoom-total-value">확인 중</b></div>
-   <p id="kiwoom-total-source" class="account-summary-source">보유정보 확인 중</p>
-  </div>
- </div>
+ <h2 id="account-summary-title">토스·키움 전체 계좌 투자 현황</h2>
+ <table class="account-summary-table" aria-label="증권사별 투자금과 평가금액">
+  <thead><tr><th scope="col">증권사</th><th scope="col">총투자금</th><th scope="col">평가금액</th></tr></thead>
+  <tbody>
+   <tr class="account-main-row">
+    <th scope="row">토스증권<small>국내·미국 주식</small></th>
+    <td><b id="toss-total-invested">확인 중</b></td>
+    <td><b id="toss-total-value">확인 중</b></td>
+   </tr>
+   <tr class="account-source-row"><td colspan="3"><span id="toss-total-source">보유정보 확인 중</span></td></tr>
+   <tr class="account-main-row">
+    <th scope="row">키움증권<small>중개형 ISA 6종목</small></th>
+    <td><b id="kiwoom-total-invested">확인 중</b></td>
+    <td><b id="kiwoom-total-value">확인 중</b></td>
+   </tr>
+   <tr class="account-source-row"><td colspan="3"><span id="kiwoom-total-source">보유정보 확인 중</span></td></tr>
+  </tbody>
+ </table>
  <p id="account-summary-total" class="account-summary-combined">계좌 합계 확인 중</p>
  <p class="account-summary-foot">보유주식 매수원금과 평가금액 기준 · 배당·분배금은 평가금액에 가산하지 않습니다. 사진·사용자 입력값과 현재 시세는 기준일이 다를 수 있습니다.</p>
 </section>
