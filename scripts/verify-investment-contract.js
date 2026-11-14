@@ -965,4 +965,111 @@ truth(usDashboardCode.includes("const calculation=conversionLine(chosenQuote)")&
  usDashboardCode.includes("host.innerHTML=section;"),
  'selected US ticker details include complete FX provenance and render visible content');
 
+
+// Top account cards: never embed personal amounts or pretend four tracked US
+// prices cover Toss's 5 US and 9 Korean positions.
+const accountCode=txt('account-summary.js');
+truth(!!new vm.Script(accountCode,{filename:'account-summary.js'}),
+ 'separate private account summary script is syntactically valid');
+truth(html.includes('id="account-summary"')&&
+ html.includes('id="toss-total-invested"')&&html.includes('id="toss-total-value"')&&
+ html.includes('id="kiwoom-total-invested"')&&html.includes('id="kiwoom-total-value"'),
+ 'both Toss/Kiwoom total-invested and valuation amounts sit at the top of the program');
+truth(html.indexOf('id="account-summary"')<html.indexOf('한국 ETF 장중 공개 시세 자동 갱신')&&
+ html.indexOf('id="account-toss-invested"')>html.indexOf('id="holdings-settings"'),
+ 'account overview is above live quotes while editing remains inside existing holdings settings');
+truth(accountCode.includes("const US=['schd','spym','cony','agnc','spacex']")&&
+ accountCode.includes("const TD=['tsofr','treit','ttr','biotech','tspace','media','trobot','hongah','sensor']"),
+ 'Toss total includes all 14 held symbols, not solely four US quotes');
+truth(!accountCode.includes("91.820669")&&!accountCode.includes('8975'),
+ 'no personal positions or prices are hardcoded into public account totals code');
+truth(html.includes('src="./account-summary.js"')&&
+ txt('scripts/stamp-assets.js').includes("'account-summary.js'")&&
+ txt('.github/workflows/pages.yml').includes('account-summary.js quotes.json'),
+ 'new account totals script is published and deployment-cache-versioned');
+
+// Isolated Kiwoom summary calculation: 6 positions and last-confirmed price,
+// without Toss equities or fabricated values when data are missing.
+const calcStart=html.indexOf('function accountTotals(){');
+const calcEnd=html.indexOf('window.ISA_KR_APP={',calcStart);
+truth(calcStart>=0&&calcEnd>calcStart,'domestic account aggregation function is accessible to local tests');
+const makeISA=(ps,prices,available={})=>{
+ const funds=['reit','sol','robot','space','sofr','tr'].map(id=>({id}));
+ const fn=new Function('FUNDS','positions','qtyValid','valid','freshQuote','verified','byId','day',
+  html.slice(calcStart,calcEnd)+'\nreturn accountTotals;')(
+  funds,ps,
+  v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isInteger(Number(v))&&Number(v)>=0,
+  v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0,
+  id=>available[id]?{price:available[id]}:null,
+  id=>id in prices,Object.fromEntries(Object.entries(prices).map(([id,close])=>[id,{close,date:'20261113'}])),
+  s=>s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6)
+ );
+ return fn();
+};
+const six=Object.fromEntries(['reit','sol','robot','space','sofr','tr'].map(id=>[id,{qty:2,avg:3000}]));
+const sixClose=Object.fromEntries(Object.keys(six).map(id=>[id,3100]));
+const isaTotals=makeISA(six,sixClose,{reit:3200});
+equal(isaTotals.principal,36000,'Kiwoom 6 ETFs cost basis sums quantity times KRW average');
+equal(isaTotals.value,37400,'Kiwoom valuation mixes one confirmed intraday quote and five dated closes');
+equal(isaTotals.intraday,1,'Kiwoom summary tracks intraday versus completed daily prices');
+const missingISA=makeISA({...six,space:{avg:3000}},sixClose);
+equal(missingISA.principal,null,'Kiwoom missing quantity forbids a deceptively partial whole-account cost');
+equal(missingISA.value,null,'Kiwoom missing quantity forbids a deceptively partial whole-account valuation');
+const staleISA=makeISA(six,{reit:3100});
+equal(staleISA.value,null,'Kiwoom missing prices forbid a fabricated complete total');
+
+const snapUS=['schd','spym','cony','agnc','spacex'];
+const snapTD=['tsofr','treit','ttr','biotech','tspace','media','trobot','hongah','sensor'];
+const aggStore=storage({
+ 'isa-user-portfolio-snapshot-v1':{
+  us:Object.fromEntries(snapUS.map(id=>[id,{value:300,pnl:-20}])),
+  tossDomestic:Object.fromEntries(snapTD.map(id=>[id,{value:200,pnl:-10}])),
+  usDate:'2026-11-14',tdDate:'2026-11-14',
+  tossTotal:{amount:2500,pnl:-500},tossTotalDate:'2026-11-12'
+ }
+});
+const cards={};
+const handlers={};
+function accountEl(id){
+ if(!cards[id])cards[id]={textContent:'',value:'',
+   addEventListener:(event,cb)=>{handlers[id+':'+event]=cb;}};
+ return cards[id];
+}
+const krOne={principal:36000,value:37400,missingHoldings:[],missingPrice:[],
+ intraday:1,close:5,dates:['2026-11-13'],count:6};
+const accountWindow={
+ ISA_KR_APP:{accountTotals:()=>krOne},
+ addEventListener:()=>{}
+};
+const accountDocument={getElementById:accountEl,addEventListener:()=>{}};
+vm.runInNewContext(accountCode,{
+ window:accountWindow,document:accountDocument,localStorage:aggStore,
+ Date,Intl,Number,JSON,Object,Array,Math,String
+},{filename:'account-summary.js'});
+const totalData=accountWindow.ISA_ACCOUNT_SUMMARY.getTotals();
+equal(totalData.toss.value,3300,'newer 14-position Toss snapshot wins over older broker account record');
+equal(totalData.toss.invested,3700,'Toss total cost sums valuation less P/L across all 14 positions');
+equal(totalData.kiwoom.value,37400,'Kiwoom total comes from 6 domestic ETF calculations');
+truth(cards['toss-total-value'].textContent.includes('3,300원')&&
+ cards['kiwoom-total-invested'].textContent.includes('36,000원'),
+ 'top portfolio cards render totals in KRW without USD amounts');
+truth(cards['account-summary-total'].textContent.includes('기준일 다름'),
+ 'combined valuation with different dates is explicitly labeled as mixed-date reference');
+accountEl('account-toss-invested').value='5000';
+accountEl('account-toss-value').value='4300';
+handlers['account-total-save:click']();
+equal(aggStore.read('isa-account-totals-v1').toss.invested,5000,
+ 'explicit user-entered Toss whole-account total is saved only to the browser');
+equal(accountWindow.ISA_ACCOUNT_SUMMARY.getTotals().toss.value,4300,
+ 'manual Toss total overrides older screenshots without modifying any stock holdings');
+truth(cards['toss-total-source'].textContent.includes('사용자 직접 입력'),
+ 'manually entered account value is labeled with its source');
+handlers['account-total-reset:click']();
+equal(aggStore.read('isa-account-totals-v1'),null,
+ 'reset clears only account total overrides, leaving position histories untouched');
+equal(accountWindow.ISA_ACCOUNT_SUMMARY.getTotals().toss.value,3300,
+ 'reset falls back to existing dated Toss screenshot automatically');
+truth(usKrwCode.includes("window.dispatchEvent(new Event('isa-us-valuation-refreshed'))"),
+ 'US holding changes trigger account total rerender without touching payout ledger');
+
 console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
