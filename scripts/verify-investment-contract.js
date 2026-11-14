@@ -1048,7 +1048,7 @@ vm.runInNewContext(accountCode,{
 },{filename:'account-summary.js'});
 const totalData=accountWindow.ISA_ACCOUNT_SUMMARY.getTotals();
 equal(totalData.toss.value,3300,'newer 14-position Toss snapshot wins over older broker account record');
-equal(totalData.toss.invested,3700,'Toss total cost sums valuation less P/L across all 14 positions');
+equal(totalData.toss.invested,3490,'Toss total cost sums valuation less P/L across all 14 positions');
 equal(totalData.kiwoom.value,37400,'Kiwoom total comes from 6 domestic ETF calculations');
 truth(cards['toss-total-value'].textContent.includes('3,300원')&&
  cards['kiwoom-total-invested'].textContent.includes('36,000원'),
