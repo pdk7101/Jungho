@@ -213,7 +213,7 @@ truth(usSignalSource.startsWith('function latest(x){')&&
  usSignalSource.includes('function evaluate(id,source,cap){'),
  'US chart and entry decision functions remain separately testable');
 const usRules=new Function('Date','NAMES','valid','krw','window','read',
- usSignalSource+'\\nreturn {evaluate,chartAssessment};')(
+ usSignalSource+'\nreturn {evaluate,chartAssessment};')(
  Date,{schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY'},
  v=>typeof v==='number'&&Number.isFinite(v)&&v>0,
  v=>Number(v).toLocaleString('ko-KR')+'원',
