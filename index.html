@@ -134,7 +134,6 @@ details[open]>summary{margin-bottom:12px}
 .us-krw-panel{margin:14px 0;padding:13px;border:1px solid #4e688a;border-radius:12px;background:#15233d}
 .us-krw-panel h3{margin:0 0 7px;font-size:1.05rem}
 .us-krw-panel details{margin-top:12px}
-.us-krw-panel textarea{width:100%;box-sizing:border-box;background:#101c31;color:#e8f0ff;border:1px solid #526789;border-radius:8px;padding:10px;font-size:.84rem;margin:8px 0}
 .us-krw-form-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:11px 0;border-bottom:1px solid #344962}
 .us-krw-form-row strong{grid-column:1/-1}
 .us-krw-form-row label{min-width:0;font-size:.77rem}
@@ -214,7 +213,6 @@ details[open]>summary{margin-bottom:12px}
 #us-panel .us-list-arrow{color:#a9bed8;font-size:1.2rem}
 #us-panel .us-list-subtitle,
 #us-panel .us-list-source,
-#us-panel .us-list-fx,
 #us-panel .us-list-foot{
  display:block;min-width:0;font-size:.79rem;line-height:1.55;
  color:#b5c9e3;overflow-wrap:anywhere
@@ -224,7 +222,6 @@ details[open]>summary{margin-bottom:12px}
 #us-panel .us-list-source.live{color:#abd6ff}
 #us-panel .us-list-source.close{color:#b5c5d9}
 #us-panel .us-list-source.manual{color:#d7c59f}
-#us-panel .us-list-fx{margin-top:3px;color:#97aeca;font-size:.73rem}
 #us-panel .us-card-ma20{
  display:block;border:1px solid #4a6a8d;border-radius:12px;
  background:#122942;padding:13px;margin-top:13px
@@ -350,13 +347,13 @@ details[open]>summary{margin-bottom:12px}
   <p class="fieldset-note">여기서 보유수량과 원화 평단가를 수정하고 다른 입력칸을 누르면 자동 저장되며 종목 카드와 원화 손익에 적용됩니다. 국내는 키움 ISA 6종목과 토스 일반계좌의 마이티, 미국은 토스 4종목(소수점 수량 허용)입니다. 미국 평단도 달러가 아닌 원화로 입력하세요. 기존 저장값을 불러오며 이 기기의 브라우저에만 보관됩니다. 실제 증권사 계좌나 주문은 변경되지 않습니다.</p>
   <h3>국내 ETF · 키움 ISA 6종목</h3>
   <div id="positions"></div>
-  <p id="positionMessage" class="fieldset-note" role="status">입력 후 다른 칸을 누르면 보유정보가 자동 저장됩니다.</p>
+  <p id="positionMessage" class="fieldset-note" role="status">국내 ETF 보유정보 입력 대기</p>
   <h3>국내 주식 · 토스 일반계좌</h3>
   <div id="toss-domestic-positions"></div>
   <p id="toss-domestic-message" class="fieldset-note" role="status">마이티의 수량과 원화 평단을 수정할 수 있습니다. 키움 ISA와 다른 토스 보유종목은 변경되지 않습니다.</p>
   <h3>미국 주식 · 토스 4종목</h3>
   <div id="us-krw-editor"></div>
-  <p id="us-holding-message" class="fieldset-note" role="status">미국 수량과 원화 평단을 변경하면 시세 카드와 원화 손익이 갱신됩니다. 세후 분배금 기록은 별도 보존됩니다.</p>
+  <p id="us-holding-message" class="fieldset-note" role="status">미국 주식 보유정보 입력 대기</p>
   <details class="account-edit" id="account-edit">
    <summary>계좌 전체 합계 직접 입력 · 수정 (선택)</summary>
    <p class="fieldset-note">토스는 국내 9종목과 미국 5종목이 포함되므로 4종목의 시세만으로 전체 평가액을 계산하지 않습니다. 토스증권 앱의 전체 계좌 금액을 입력하면 상단에 반영됩니다. 키움은 6종목 시세 기준 자동 계산이 가능하며, 증권사 앱 합계를 우선 표시하고 싶을 때만 입력하세요.</p>
@@ -391,7 +388,7 @@ details[open]>summary{margin-bottom:12px}
   </div>
  </div>
  <p class="sub" id="us-updated">미국장 확정 일봉 확인 중</p>
- <p class="sub" id="us-live-badge">개인 미국 주식 시세 확인 중 · 원화 참고환율 사용</p>
+ <p class="sub" id="us-live-badge">개인 미국 주식 시세 확인 중</p>
  <details id="personal-us-live">
   <summary>시세 연결 관리 · 오류 확인</summary>
   <p class="live-note">Finnhub 개인용 시세 연결 · 페이지가 열려 있는 동안 약 2분마다 조회합니다. 토스 API 키는 사용하지 않습니다.</p>
@@ -1088,4 +1085,4 @@ var reload=document.getElementById('reload');
 if(reload)reload.addEventListener('click',update);
 update();
 })();
-</script><script src="./insights.js" defer></script><script src="./personal-us-live.js" defer></script><script src="./us-dashboard.js" defer></script><script src="./us-krw.js" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script><script src="./account-summary.js" defer></script></body></html>
+</script><script src="./insights.js" defer></script><script src="./personal-us-live.js" defer></script><script src="./us-dashboard.js?v=20261115-clean1" defer></script><script src="./us-krw.js?v=20261115-clean1" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script><script src="./account-summary.js" defer></script></body></html>
