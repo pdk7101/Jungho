@@ -310,6 +310,14 @@ details[open]>summary{margin-bottom:12px}
 .account-summary-table tbody tr.account-source-row td{padding:0 6px 10px;text-align:left;font-size:.72rem;color:#9fb6d2;line-height:1.5;white-space:normal;overflow-wrap:anywhere}
 .account-summary-combined{font-size:.85rem;font-weight:700;border-top:1px solid #40526d;padding-top:11px;margin-top:5px;line-height:1.6}
 .account-summary-foot{font-size:.73rem;color:#a7b8d0}
+.account-dividend{border-top:1px solid #40526d;margin-top:12px;padding-top:12px}
+.account-dividend-title{font-size:.78rem;color:#b7c8df;font-weight:600}
+.account-dividend-amount{font-size:1.3rem;line-height:1.5;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.account-dividend-breakdown{font-size:.81rem;color:#dfebfa;line-height:1.7;margin-top:5px}
+.account-dividend-source{font-size:.72rem;color:#a7b8d0;line-height:1.6;margin-top:4px}
+.us-card-inclusive{margin-top:4px;font-size:.8rem;font-weight:600}
+.us-card-dividend b{color:#f2f7ff}
+.us-card-dividend small{font-size:.7rem;color:#9fb4d0;font-weight:400}
 .account-edit h3{font-size:.9rem;margin:10px 0 5px}
 .account-edit .grid label{font-size:.8rem}
 .account-edit input{font-size:.92rem}
@@ -337,6 +345,12 @@ details[open]>summary{margin-bottom:12px}
   </tbody>
  </table>
  <p id="account-summary-total" class="account-summary-combined">계좌 합계 확인 중</p>
+ <div class="account-dividend" aria-live="polite">
+  <div class="account-dividend-title" id="account-dividend-label">누적 세후 배당·분배금</div>
+  <div class="account-dividend-amount" id="account-dividend-total">지급금 확인 중</div>
+  <div class="account-dividend-breakdown" id="account-dividend-breakdown">토스·키움 분배금 확인 중</div>
+  <p class="account-dividend-source" id="account-dividend-source"></p>
+ </div>
  <p class="account-summary-foot">보유주식 매수원금과 평가금액 기준 · 배당·분배금은 평가금액에 가산하지 않습니다. 사진·사용자 입력값과 현재 시세는 기준일이 다를 수 있습니다.</p>
 </section>
 <section class="panel flex"><div><b>한국 ETF 장중 공개 시세 자동 갱신 · 약 60초 간격 (페이지 열린 동안)</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
@@ -386,6 +400,19 @@ details[open]>summary{margin-bottom:12px}
     <button type="button" id="account-total-reset" class="us-header-button outline">직접 입력값 지우기</button>
    </div>
    <p id="account-total-message" class="fieldset-note" role="status"></p>
+  </details>
+  <details class="account-edit" id="account-dividend-edit">
+   <summary>세후 누적 분배금 · 토스 국내 / 키움 ISA 입력 (선택)</summary>
+   <p class="fieldset-note">미국 SCHD·AGNC·SPYM·CONY는 기존 각 종목의 세후 누적 지급금을 자동 합산합니다. 여기에는 토스 국내주식 전체와 키움 ISA 전체의 세후 누적 지급금만 입력합니다. 미국 분배금을 다시 더하지 마세요.</p>
+   <div class="grid">
+    <label>토스 국내주식 누적 세후 지급금 (원)<input id="account-div-toss-domestic" type="number" min="0" step="1" placeholder="미국 4종목 제외"></label>
+    <label>키움 ISA 누적 세후 지급금 (원)<input id="account-div-kiwoom" type="number" min="0" step="1" placeholder="키움 ISA 6종목 합계"></label>
+   </div>
+   <div class="us-head-actions">
+    <button type="button" id="account-dividend-save" class="us-header-button">누적 지급금 저장</button>
+    <button type="button" id="account-dividend-clear" class="us-header-button outline">국내 지급금 입력 해제</button>
+   </div>
+   <p id="account-dividend-message" class="fieldset-note" role="status"></p>
   </details>
  </details>
 </section>
@@ -1195,4 +1222,4 @@ var reload=document.getElementById('reload');
 if(reload)reload.addEventListener('click',update);
 update();
 })();
-</script><script src="./insights.js" defer></script><script src="./personal-us-live.js" defer></script><script src="./us-dashboard.js?v=20261115-clean1" defer></script><script src="./us-krw.js?v=20261115-monthly-cony1" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script><script src="./account-summary.js" defer></script></body></html>
+</script><script src="./insights.js" defer></script><script src="./personal-us-live.js" defer></script><script src="./us-dashboard.js?v=20261115-payout-card1" defer></script><script src="./us-krw.js?v=20261115-monthly-cony1" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script><script src="./account-summary.js" defer></script></body></html>
