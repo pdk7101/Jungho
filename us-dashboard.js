@@ -152,10 +152,6 @@ function cards(){
    q=window.ISA_US_KRW?.priceKrw?.(f.id,px);
   const krwPrice=valid(q?.amount)?wonAmount(q.amount):'원화 가격 미확인';
   const source=priceSource(f,x,q);
-  const fxText=valid(q?.usd)&&valid(q?.fxRate)?
-   Number(q.usd).toLocaleString('en-US',{maximumFractionDigits:6})+' USD × '+
-   Number(q.fxRate).toLocaleString('ko-KR',{maximumFractionDigits:2})+
-   '원 = 약 '+wonAmount(q.amount):'';
   const selectedClass=selected===f.id?'us-selected':'';
   return '<div role="button" tabindex="0" class="us-card us-list-row '+selectedClass+'" data-us="'+f.id+
    '" aria-label="'+text(f.ticker+' '+krwPrice+' '+source.short)+'" aria-pressed="'+
@@ -165,7 +161,6 @@ function cards(){
     '<span class="us-list-arrow" aria-hidden="true">›</span></span>'+
    '<span class="us-list-subtitle">'+text(f.type)+'</span>'+
    '<span class="us-list-source '+source.type+'">'+text(source.short)+'</span>'+
-   (fxText?'<span class="us-list-fx">'+text(fxText)+' · 참고환율</span>':'')+
    movingAverageCard(x,q)+holdingCard(f.id,px)+
    '<span class="us-list-foot">종목을 누르면 차트·분배금·매수 판단 상세 확인</span>'+
    '</div>';
