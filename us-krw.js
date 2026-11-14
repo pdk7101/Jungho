@@ -14,11 +14,8 @@ const day=()=>{
 };
 const storage=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch(_){return null}};
 const write=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true}catch(_){return false}};
-const savedFx=storage('isa-us-fx-v1');
-let manualFx=savedFx&&finitePositive(savedFx.rate)&&Number(savedFx.rate)>700&&Number(savedFx.rate)<3000?Number(savedFx.rate):null;
 function holdings(){return storage('isa-us-holdings-v1')||{}}
 function fx(){
- if(finitePositive(manualFx))return {rate:manualFx,source:'사용자 직접 입력 환율',when:'수동 입력',manual:true};
  const r=window.ISA_US_APP?.getData?.()?.fx;
  if(!r?.ok||!finitePositive(r.usdKrw)||!r.observedAt)return null;
  const age=Date.now()-new Date(r.observedAt).getTime();
@@ -132,20 +129,6 @@ function compactLine(id,priceUsd){
  if(p)parts.push('평가손익 '+signed(p.pnl)+' ('+signedPercent(p.rate)+')');
  else parts.push('손익 미확인');
  return parts.join(' · ');
-}
-function showHoldingsCheck(){
- const el=$('us-krw-holdings-check');if(!el)return;
- const all=holdings();let present=0,netKnown=0;let missing=[];
- for(const symbol of ITEMS){
-  const id=symbol.toLowerCase(),p=all[id]||{};
-  if(finitePositive(p.qty)&&finitePositive(p.krwAvg))present++;
-  else missing.push(symbol);
-  if(netDividend(id)!==null)netKnown++;
- }
- el.innerHTML='<p><b>이 기기에 저장된 미국주식 보유정보: '+present+'/4종목</b></p>'+
- (present===4?'<p class="us-small">4종목 보유수량·원화 평단이 저장되어 있습니다. 이전 스냅샷 이후 거래 여부는 직접 확인해야 합니다.</p>':
-  '<p class="us-small">아직 보유정보 '+missing.join('·')+'가 미등록입니다. 채팅에서 수치를 알려주신 것만으로 이 기기에 저장되지는 않습니다. 별도 전용 적용 링크 또는 아래 입력란을 사용해 주세요.</p>')+
- '<p class="us-small">누적 세후 배당·분배금 확인: '+netKnown+'/4종목 · 미입력을 0원으로 취급하지 않습니다.</p>';
 }
 function totalKrw(){
  const app=window.ISA_US_APP;
@@ -311,7 +294,7 @@ function renderForm(){
   const invalid=value!==null&&(!Number.isFinite(value)||value<0||
    (k==='krwAvg'&&value===0)||(k==='krwCurrent'&&value===0)||
    (k==='qty'&&Math.abs(value-Math.round(value*1000000)/1000000)>1e-10));
-  const topMsg=$('us-holding-message'),subMsg=$('us-krw-message');
+  const topMsg=$('us-holding-message');
   if(invalid){
    input.value=p[k]===null||p[k]===undefined?'':String(p[k]);
    if(topMsg)topMsg.textContent='보유수량(0 이상 · 소수점 6자리까지) 또는 원화 평단가(0보다 큼)를 확인해 주세요.';
@@ -328,29 +311,9 @@ function renderForm(){
   }
   const message=id.toUpperCase()+' 원화 보유정보 저장 완료 · 미국 주식 카드와 평가손익에 반영했습니다.';
   if(topMsg)topMsg.textContent=message;
-  if(subMsg)subMsg.textContent=message;
   render();
  }));
 }
-function importHoldings(){
- const field=$('us-krw-import'),msg=$('us-krw-message');
- if(!field)return;
- const lines=field.value.trim().split(/\r?\n/),h=holdings();let good=0,bad=0;
- for(const line of lines){
-  if(!line.trim())continue;
-  const m=line.trim().match(/^(SCHD|AGNC|SPYM|CONY)\s+([\d.]+)\s+([\d,.]+)\s+([\d,.]+)$/i);
-  if(!m){bad++;continue;}
-  const id=m[1].toLowerCase(),qty=Number(m[2]),avg=Number(m[3].replace(/,/g,'')),current=Number(m[4].replace(/,/g,''));
-  if(!(qty>=0)||!Number.isFinite(qty)||!(avg>0)||!(current>0)){bad++;continue;}
-  h[id]={...(h[id]||{}),qty,krwAvg:avg,krwCurrent:current,krwDay:day(),krwSnapshotDate:day()};
-  good++;
- }
- if(!good){msg.textContent='형식 확인: SCHD 10 50000 49000 (티커 수량 평단원 현재가원)';return;}
- write('isa-us-holdings-v1',h);
- field.value='';renderForm();render();
- msg.textContent=good+'종목을 이 기기에 저장했습니다.'+(bad?' 형식 불일치 '+bad+'줄 제외.':'')+' 분배금은 별도 입력하세요.';
-}
-
 /* Personal portfolio snapshots are accepted only via a fragment on the user's
  * own link. Fragment data is not part of an HTTP request to GitHub Pages;
  * remove it from the address bar after one use. Never put private holdings
@@ -358,7 +321,7 @@ function importHoldings(){
 function applyPersonalLink(){
  const hash=String(window.location?.hash||'');
  if(!hash.startsWith('#us-holdings='))return;
- const info=$('us-krw-applied'),notice=$('us-krw-message');
+ const info=$('us-krw-applied'),notice=$('us-holding-message');
  try{
   const value=decodeURIComponent(hash.slice('#us-holdings='.length));
   if(!value)throw Error('보유정보 없음');
@@ -419,11 +382,10 @@ function applyPersonalLink(){
 }
 function showRate(){
  const r=fx(),area=$('us-krw-rate-status');if(!area)return;
- area.textContent=r?'적용 환율: 1 USD = '+won(r.rate,2)+' · '+r.source+' ('+r.when+')':'환율 확인 실패 · 환율 직접 입력 또는 토스 현재가를 사용하세요.';
+ area.textContent=r?'자동 참고환율: 1 USD = '+won(r.rate,2)+' · '+r.source+' ('+r.when+')':'자동 참고환율 확인 실패 · 토스 원화 현재가를 직접 보정하면 해당 종목의 원화 평가액을 표시할 수 있습니다.';
 }
 function render(){
  showRate();
- showHoldingsCheck();
  showTotal();
  renderLedger();
  window.ISA_US_SIGNAL?.refreshSummary?.();
@@ -435,17 +397,10 @@ function mount(){
  const head=$('us-updated');
  const holder=document.createElement('div');
  holder.id='us-krw-panel';holder.className='us-krw-panel';
- holder.innerHTML='<h3>미국주식 원화 투자현황</h3>'+
- '<div id="us-krw-rate-status" class="us-small">환율 확인 중…</div>'+
- '<div id="us-krw-holdings-check" class="us-holdings-check"></div>'+
+ holder.innerHTML='<h3>미국 4종목 손익 · 세후 분배금</h3>'+
+ '<div id="us-krw-rate-status" class="us-small">자동 참고환율 확인 중…</div>'+
  '<div id="us-krw-total" class="us-total-summary"></div>'+
  '<p id="us-krw-applied" class="us-small" aria-live="polite"></p>'+
- '<details id="us-krw-details"><summary>선택: 참고 환율·보유정보 일괄 가져오기</summary>'+
- '<p class="us-small">보유수량과 원화 평단가는 위쪽 국내 ETF 매수상한 영역의 통합 입력란에서 수정합니다. 이곳에는 환율과 기존 일괄 입력만 남겨둡니다.</p>'+
- '<label>직접 지정할 USD/KRW 환율 (선택)<input id="us-krw-fx" type="number" min="700" max="3000" step="0.01" placeholder="비우면 참고 환율 자동 사용" value="'+(manualFx||'')+'"></label>'+
- '<textarea id="us-krw-import" rows="5" placeholder="SCHD 10 50000 49000&#10;SPYM 5 120000 118000"></textarea>'+
- '<button type="button" id="us-krw-import-button" class="us-header-button">입력한 4종목 저장</button>'+
- '<p class="us-small" id="us-krw-message">누적 세후 분배금은 실수령액을 따로 입력해 주세요.</p></details>'+
  '<details id="us-distribution-details"><summary>세후 배당·분배금 원화 지급내역 상세 등록</summary>'+
  '<p class="us-small">실제 토스 입금내역의 날짜와 원화 금액을 입력하세요. 세전 지급금·세금·재투자액은 선택사항입니다. 과거 지급내역이 누락되어 있다면 별도의 누적 실수령액을 우선 사용하며 두 값을 합산하지 않습니다.</p>'+
  '<div class="us-dist-form">'+
@@ -459,14 +414,6 @@ function mount(){
  '<p id="us-dist-message" class="us-small" aria-live="polite"></p>'+
  '<div id="us-distribution-ledger"></div></details>';
  head.insertAdjacentElement('afterend',holder);
- $('us-krw-fx').addEventListener('change',function(){
-  const rate=this.value.trim()===''?null:Number(this.value);
-  if(rate===null){manualFx=null;try{localStorage.removeItem('isa-us-fx-v1')}catch(_){}}
-  else if(rate>700&&rate<3000&&Number.isFinite(rate)){manualFx=rate;write('isa-us-fx-v1',{rate});}
-  else{$('us-krw-message').textContent='유효 환율을 확인해 주세요. 임의 환율을 적용하지 않았습니다.';return;}
-  render();
- });
- $('us-krw-import-button').onclick=importHoldings;
  $('us-dist-add').onclick=addDistribution;
  $('us-distribution-date').value=day();
  $('us-distribution-ticker').value=ledgerSelected;
