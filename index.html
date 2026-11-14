@@ -619,7 +619,10 @@ function solDailyEntry(){
  var p=Number(q.price),b=band(x,p),h=holding('sol',p),t=x.trend;
  var graph=chartAssessment('sol');
  if(graph.level==='risk')return {state:'stop',reason:'SOL 그래프 위험: '+graph.note+' · 상한 이내여도 당일 신규매수 제외'};
- var lowEntry=b.low&&(!h||h.canLower),trendEntry=!!(t.twoDaysAbove&&t.maRising&&t.ma5Above20);
+ // One of two opportunities is enough: safe low-zone entry OR validated MA trend near MA20.
+ // Strong chart risk, verified intraday quote and price cap remain independent safeguards.
+ var lowEntry=b.low&&(!h||h.canLower),trendEntry=!!(t.ma5Above20&&t.maRising&&
+  p>=Number(t.ma20)*.99&&p<=Number(t.ma20)*1.04);
  if(lowEntry||trendEntry)return {state:'buy',reason:'SOL '+money(p)+' · '+(lowEntry?b.name+(h?' / 평단 인하 가능':''):'5·20일선 상승 추세')+' · 상한 이내'+(graph.level==='support'?' · 차트 보조: '+graph.note:'')};
  return {state:'stop',reason:'SOL '+money(p)+' · 상한 이내지만 박스권 저가/평단인하 및 5·20일선 상승 매수조건 미충족'};
 }
@@ -697,7 +700,10 @@ function verdict(f){
  if(!hasBars(x))return {type:'wait',title:'가격·이평선 미확인',info:'40거래일 실제 일봉이 부족합니다. 가격을 추정하지 않습니다.',qty:0};
  if(stale(x))return {type:'wait',title:'오래된 시세 · 확인',info:'마지막 일봉 '+day(x.date)+'. 주문 전 최신 종가를 확인하세요.',qty:0};
  var p=current(x,id),t=x.trend,b=band(x,p),h=holding(id,p);
- var goodTrend=!!(t.twoDaysAbove&&t.maRising&&t.ma5Above20)&&!quote;
+ // Intraday price is allowed when it is independently verified: do not require BOTH
+ // a 2-day confirmed close and a low-zone entry for a small long-term accumulation.
+ var goodTrend=!!(t.ma5Above20&&t.maRising&&
+  p>=Number(t.ma20)*.99&&p<=Number(t.ma20)*1.04);
  var decline=Number(x.close)<Number(t.ma20)||!t.maRising;
  var liveNote=quote?' 당일 조회 현재가로 계산한 잠정 판단입니다. 5·20일선은 '+day(x.date)+'까지의 확정 일봉 기준입니다.':'';
  if(['robot','space','sol'].includes(id)){
@@ -733,17 +739,17 @@ function verdict(f){
  return {type:'buy',title:'SOL 일일 매수조건 충족 · 1주',info:s.reason+' → SOL 1주. 실제 키움 주문 별도 확인.',qty:1};
 }
  if(valid(manual[id]))return {type:'wait',title:'수동 가격 · 재확인',info:'직접 입력 가격으로 상한과 박스권은 비교할 수 있지만 5·20일선은 이전 종가이므로 신규매수 결정 전 다시 확인하세요.',qty:0};
- if(h&&h.canLower&&b.low){
+ if(b.low&&(!h||h.canLower)&&['robot','space'].includes(id)){
   var at20=p<=b.b20;
-  return {type:'buy',title:at20?'평단인하 저가 우선 검토':'평단인하 분할 검토',
-  info:b.name+'이며 내 평단 '+avgMoney(h.avg)+'보다 낮아 평단을 낮출 수 있습니다. '+(decline?'20일선 아래/약세 가능성: 첫 매수는 소액으로 제한하고 추가 하락 가능성을 확인.':'5·20일선 추세도 확인.')+' 매수 상한·예산 우선.'+liveNote+
+  return {type:'buy',title:at20?'저가 소액 분할 검토':'저가 분할 검토',
+  info:b.name+'이며 '+(h?'현재가가 내 평단 '+avgMoney(h.avg)+'보다 낮아 평단을 낮출 수 있습니다. ':'보유 평단 미확인 또는 신규 진입 구간입니다. ')+(decline?'20일선 아래/약세 가능성: 첫 매수는 소액으로 제한하고 추가 하락 가능성을 확인.':'5·20일선 추세도 확인.')+' 매수 상한·예산 우선.'+liveNote+
    (chartAssessment(id).level==='support'?' · 차트 보조: '+chartAssessment(id).note:''),qty:1};
  }
  if(id==='sol'&&b.low){
   return {type:'buy',title:'저가 대체 1주 검토',info:b.name+'이며 로봇·우주항공 상한 초과로 SOL 대체매수를 소액 검토합니다. '+(decline?'하락 추세 위험 및 분배금 지속 여부 점검.':'추세도 함께 점검.')+' 하루 최대 1주.'+liveNote,qty:1};
  }
  if(goodTrend){
-  return {type:'buy',title:'추세 전환 매수 검토',info:'종가 20일선 위 2일 유지, 5일선 우위, 20일선 상승·횡보. '+(h&&!h.canLower?'현재가가 평단보다 높아 평균단가는 오를 수 있습니다. ':'')+'기존 상한·예산 안에서 최대 1주 검토.',qty:1};
+  return {type:'buy',title:'추세 확인 소액 매수 검토',info:'5일선 우위·20일선 상승 확인 및 표시가격이 20일선 -1%~+4% 이내. 최근 2일 종가 연속 상승은 필수 조건이 아닙니다. '+(h&&!h.canLower?'현재가가 평단보다 높아 평균단가는 오를 수 있습니다. ':'')+'기존 상한·예산 안에서 최대 1주 검토.',qty:1};
  }
  if(b.low&&!h)return {type:'wait',title:'저가 관심 · 평단 입력',info:b.name+'입니다. 평단가를 입력하면 실제 평단 인하 효과를 확인할 수 있습니다. 5·20일선: '+trend(x),qty:0};
  return {type:'wait',title:b.low?'저가·추세 확인 대기':'추세/가격 조건 대기',info:(h&&!h.canLower?'현재가가 평단보다 높아 평단 인하가 되지 않습니다. ':'')+b.name+' · '+trend(x)+'. 30%·20% 가격대가 아니더라도 상승 전환 시 재검토.',qty:0};
