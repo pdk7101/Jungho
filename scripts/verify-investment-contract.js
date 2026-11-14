@@ -1000,7 +1000,8 @@ const fakeWin={
  ISA_US_KRW:{
   fx:()=>({rate:1400}),
   priceKrw:()=>testUs,
-  basisKrw:()=>({pnl:2800,rate:5,net:1000,inclusive:3800,inclusiveRate:6.78})
+  basisKrw:()=>({pnl:2800,rate:5,net:1000,inclusive:3800,inclusiveRate:6.78}),
+  netDividend:()=>({amount:1000,kind:'cumulative'})
  }
 };
 const cardCtx=vm.createContext({
@@ -1023,8 +1024,9 @@ truth(fakeCards.innerHTML.includes('2,800원 (+5.00%)')&&
 truth(fakeCards.innerHTML.includes('보유 24.330226주 · 평단 47,864.00원')&&
  fakeCards.innerHTML.includes('평가손익 +2,800원 (+5.00%)'),
  'US card shows local share count, KRW average price and evaluation return');
-truth(fakeCards.innerHTML.includes('누적 세후 분배금 포함 +3,800원 (+6.78%)'),
- 'known cumulative after-tax distributions remain visible and are not double counted');
+truth(fakeCards.innerHTML.includes('누적 세후 배당·분배금 <b>1,000원</b>')&&
+ fakeCards.innerHTML.includes('분배금 포함 총손익 +3,800원 (+6.78%)'),
+ 'US card keeps actual received dividends separate from dividend-inclusive total P/L');
 truth(fakeCards.innerHTML.includes('Finnhub 장중 체결')&&
  !fakeCards.innerHTML.includes('직전 확정 종가'),
  'valid intraday quote is distinctly labeled without suggesting a completed close');
@@ -1108,7 +1110,11 @@ const aggStore=storage({
   tossDomestic:Object.fromEntries(snapTD.map(id=>[id,{value:200,pnl:-10}])),
   usDate:'2026-11-14',tdDate:'2026-11-14',
   tossTotal:{amount:2500,pnl:-500},tossTotalDate:'2026-11-12'
- }
+ },
+ 'isa-us-holdings-v1':{schd:{krwNet:100},spym:{krwNet:200},cony:{krwNet:300},agnc:{krwNet:400}},
+ 'isa-account-dividend-totals-v1':{
+  tossDomestic:{amount:500,date:'2026-11-14'},
+  kiwoom:{amount:600,date:'2026-11-14'}}
 });
 const cards={};
 const handlers={};
@@ -1129,6 +1135,12 @@ vm.runInNewContext(accountCode,{
  Date,Intl,Number,JSON,Object,Array,Math,String
 },{filename:'account-summary.js'});
 const totalData=accountWindow.ISA_ACCOUNT_SUMMARY.getTotals();
+const payoutData=accountWindow.ISA_ACCOUNT_SUMMARY.getDividends();
+equal(payoutData.us,1000,'four verified US after-tax dividends total without adding total P/L');
+equal(payoutData.toss,1500,'Toss domestic-only dividends are added once to the US dividend total');
+equal(payoutData.all,2100,'Toss and Kiwoom actual after-tax dividends combine without duplicating US payouts');
+truth(payoutData.complete&&cards['account-dividend-total'].textContent.includes('2,100원'),
+ 'top account card displays a complete dividend sum from local records');
 equal(totalData.toss.value,3300,'newer 14-position Toss snapshot wins over older broker account record');
 equal(totalData.toss.invested,3490,'Toss total cost sums valuation less P/L across all 14 positions');
 equal(totalData.kiwoom.value,37400,'Kiwoom total comes from 6 domestic ETF calculations');
