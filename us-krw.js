@@ -178,6 +178,7 @@ function distributionDetail(id){
  if(stats.count){
   const moneyPart=(label,amount,count)=>count===stats.count?'<p>'+label+' 합계 '+won(amount)+'</p>':
    '<p class="us-small">'+label+' 일부 입력 '+count+'/'+stats.count+'건 · 입력된 금액 합계 '+won(amount)+' (미입력액 제외)</p>';
+  html+='<p class="us-small">현재 브라우저 최근 저장 지급일: '+clean(stats.rows[0].date)+' · 브라우저를 바꾸면 지급기록이 자동으로 공유되지 않습니다.</p>';
   html+='<p>입력된 지급 횟수 '+stats.count+'건 · 세후 실수령 기록 합계 '+won(stats.net)+'</p>'+
    moneyPart('세전 지급금',stats.gross,stats.grossCount)+moneyPart('원천징수·세금',stats.tax,stats.taxCount)+
    moneyPart('재투자한 지급금',stats.reinvest,stats.reinvestCount);
@@ -269,8 +270,53 @@ function addDistribution(){
  const unique='d'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
  entries.push({key:unique,id,date,net,gross,tax,reinvest});
  if(!write(LEDGER_KEY,entries)){message.textContent='기기 저장소 저장 실패 · 지급금 기록을 저장하지 못했습니다.';return;}
+ if(!ledgerEntries().some(r=>r.key===unique&&r.id===id&&r.date===date&&Math.abs(r.net-net)<.005)){
+  message.textContent='저장 후 확인에 실패했습니다. 브라우저 저장소를 확인해 주세요.';return;
+ }
  ['us-dist-net','us-dist-gross','us-dist-tax','us-dist-reinvest'].forEach(k=>{const el=$(k);if(el)el.value='';});
  message.textContent=clean(id.toUpperCase())+' '+date+' 세후 '+won(net)+' 지급기록을 이 기기에 저장했습니다.';
+ render();
+}
+// Restore user-owned dated receipts without putting private investment data in the public repo.
+function importDatedReceipts(){
+ const area=$('us-dist-bulk-input'),message=$('us-dist-bulk-message');
+ const id=$('us-distribution-ticker')?.value;
+ if(!area||!message||!ITEMS.includes(String(id||'').toUpperCase()))return;
+ const lines=area.value.trim().split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+ if(!lines.length||lines.length>500){message.textContent='지급일과 세후 원화금액을 1~500줄 입력해 주세요.';return;}
+ const input=[],dates=new Set();
+ for(const line of lines){
+  const match=/^([0-9]{4}-[0-9]{2}-[0-9]{2})[\s,;|]+([0-9][0-9,]*(?:\.[0-9]{1,2})?)$/.exec(line);
+  if(!match){message.textContent='형식 확인: 2026-10-01 5000처럼 지급일과 세후 원화금액을 입력해 주세요.';return;}
+  const date=match[1],net=Number(match[2].replace(/,/g,'')),parsed=new Date(date+'T00:00:00Z');
+  if(!Number.isFinite(parsed.getTime())||parsed.toISOString().slice(0,10)!==date||
+   date>day()||date<'2000-01-01'||!Number.isFinite(net)||net<=0||net>100000000||dates.has(date)){
+   message.textContent=clean(date)+'의 날짜·금액 또는 중복 입력을 확인해 주세요.';return;
+  }
+  dates.add(date);input.push({date,net});
+ }
+ const old=ledgerEntries(),same=old.filter(v=>v.id===id),insert=[],duplicates=[];
+ for(const row of input){
+  const matched=same.filter(v=>v.date===row.date);
+  if(matched.length>1){message.textContent=row.date+' 기존 내역이 여러 건이라 자동 병합하지 않았습니다.';return;}
+  if(matched.length){
+   if(Math.abs(matched[0].net-row.net)>.005){
+    message.textContent=row.date+' 기존 '+won(matched[0].net)+' · 입력 '+won(row.net)+
+     '으로 불일치합니다. 기존 데이터를 덮어쓰지 않았습니다.';return;
+   }
+   duplicates.push(row);continue;
+  }
+  insert.push({key:'excel-'+id+'-'+row.date,id,date:row.date,net:row.net,gross:null,tax:null,reinvest:null});
+ }
+ if(old.length+insert.length>500){message.textContent='기존 기록을 포함해 500건 한도를 초과합니다.';return;}
+ if(!insert.length){message.textContent='같은 날짜·금액 '+duplicates.length+'건이 이미 저장되어 있습니다. 중복 저장하지 않았습니다.';return;}
+ if(typeof window.confirm==='function'&&!window.confirm(
+  id.toUpperCase()+' 과거 지급기록 '+insert.length+'건을 현재 브라우저에 추가할까요? 동일 날짜 '+duplicates.length+
+  '건과 별도 누적 세후 금액은 변경하지 않습니다.'))return;
+ if(!write(LEDGER_KEY,old.concat(insert))){message.textContent='브라우저 저장에 실패했습니다.';return;}
+ const persisted=ledgerEntries(),ok=insert.every(row=>persisted.some(v=>v.key===row.key&&v.date===row.date&&Math.abs(v.net-row.net)<.005));
+ if(!ok){message.textContent='저장 직후 확인에 실패했습니다. 브라우저 저장 권한을 확인해 주세요.';return;}
+ message.textContent='복원 '+insert.length+'건 · 중복 제외 '+duplicates.length+'건. 누적 세후 분배금은 변경하지 않았습니다.';
  render();
 }
 function renderForm(){
@@ -412,9 +458,15 @@ function mount(){
  '<label>지급금 중 재투자액 (원, 선택)<input type="number" min="0" step="0.01" id="us-dist-reinvest" placeholder="지급금 내 재투자"></label>'+
  '</div><button type="button" class="us-header-button" id="us-dist-add">세후 지급내역 저장</button>'+
  '<p id="us-dist-message" class="us-small" aria-live="polite"></p>'+
- '<div id="us-distribution-ledger"></div></details>';
+ '<div id="us-distribution-ledger"></div>'+
+ '<details class="us-krw-optional"><summary>엑셀의 날짜별 세후 분배금 복원 (선택)</summary>'+
+ '<p class="us-small">현재 선택한 종목의 지급일과 세후 원화금액을 한 줄씩 붙여넣으세요. 기존 동일 날짜·금액은 중복 제외하며 서로 다른 금액은 자동 덮어쓰지 않습니다. 업로드 없이 이 브라우저에만 저장됩니다.</p>'+
+ '<textarea id="us-dist-bulk-input" rows="5" placeholder="2026-10-01 5000" style="width:100%;box-sizing:border-box;min-height:110px;border-radius:9px;padding:10px;background:#101c31;color:#e8f0ff;border:1px solid #526789"></textarea>'+
+ '<button type="button" class="us-header-button" id="us-dist-bulk-add">지급일 중복 검사 후 복원</button>'+
+ '<p id="us-dist-bulk-message" class="us-small" role="status"></p></details></details>';
  head.insertAdjacentElement('afterend',holder);
  $('us-dist-add').onclick=addDistribution;
+ $('us-dist-bulk-add').onclick=importDatedReceipts;
  $('us-distribution-date').value=day();
  $('us-distribution-ticker').value=ledgerSelected;
  $('us-distribution-ticker').addEventListener('change',function(){ledgerSelected=this.value;renderLedger();});
