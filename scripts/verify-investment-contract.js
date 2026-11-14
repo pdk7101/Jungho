@@ -608,10 +608,11 @@ truth(!!new vm.Script(feedCode,{filename:'personal-us-live.js'}),
 truth(!!new vm.Script(workerCode.replace('export default {','const worker = {'),
    {filename:'private-us-quotes-worker.js'}),
  'free Worker bridge is valid JavaScript');
-truth(html.includes('src="./personal-us-live.js" defer')&&
- html.indexOf('src="./personal-us-live.js" defer')<
- html.indexOf('src="./us-dashboard.js" defer'),
- 'private source is available before US valuation dashboard');
+truth(html.includes('src="./personal-us-live.js')&&
+ html.includes('src="./us-dashboard.js')&&
+ html.indexOf('src="./personal-us-live.js')<
+ html.indexOf('src="./us-dashboard.js'),
+ 'private source is available before US valuation dashboard, regardless of cache-version query');
 truth(html.includes('id="us-live-url"')&&html.includes('id="us-live-secret"')&&
  html.includes('id="us-live-connect"')&&html.includes('id="us-live-badge"'),
  'mobile dashboard can configure private personal endpoint');
