@@ -314,7 +314,22 @@ details[open]>summary{margin-bottom:12px}
 .account-dividend-title{font-size:.78rem;color:#b7c8df;font-weight:600}
 .account-dividend-amount{font-size:1.3rem;line-height:1.5;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
 .account-dividend-breakdown{font-size:.81rem;color:#dfebfa;line-height:1.7;margin-top:5px}
-.account-dividend-source{font-size:.72rem;color:#a7b8d0;line-height:1.6;margin-top:4px}
+ .account-dividend-source{font-size:.72rem;color:#a7b8d0;line-height:1.6;margin-top:4px}
+.kr-div-card-info{border:1px solid #46617c;background:#152842;border-radius:9px;padding:10px;margin:9px 0;font-size:.79rem;line-height:1.5}
+.kr-div-card-line b{color:#e8f4ff}.kr-div-card-line small{display:block;color:#a9bfd9;font-size:.7rem}
+.kr-div-card-return{font-size:.75rem;margin-top:5px;color:#b3c6df}.kr-div-card-return b{color:#e9f3ff}
+.kr-toss-dividend-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}
+.kr-toss-dividend-card{background:#142841;border:1px solid #405b7b;border-radius:9px;padding:10px;min-width:0;font-size:.78rem}
+.kr-toss-dividend-card .kr-div-card-line{margin-top:8px}.kr-div-note{color:#b4c5db;font-size:.78rem;line-height:1.6}
+.kr-div-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
+.kr-div-form label{font-size:.77rem;min-width:0}.kr-div-form input,.kr-div-form select{width:100%;min-width:0;box-sizing:border-box;padding:9px;font-size:.86rem}
+.kr-div-form .kr-div-wide{grid-column:1/-1}.kr-div-status{color:#add5fe;font-size:.8rem}
+.kr-dist-months{display:grid;gap:8px;margin:12px 0}.kr-dist-month{border:1px solid #46627e;border-radius:10px;background:#162b43;overflow:hidden}
+.kr-dist-month summary{display:flex;justify-content:space-between;gap:9px;padding:12px;cursor:pointer}
+.kr-dist-month summary small{color:#9fb4d0}.kr-dist-weeks{padding:0 12px 10px;border-top:1px solid #435776}
+.kr-dist-week{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:9px 0;border-bottom:1px solid #354b66;font-size:.78rem}
+.kr-dist-week small{display:block;font-size:.7rem;color:#9db4d0}.kr-div-delete{flex-shrink:0;padding:6px 10px;font-size:.75rem;background:#3a506e}
+@media(max-width:460px){.kr-toss-dividend-grid,.kr-div-form{grid-template-columns:1fr}}
 .us-card-inclusive{margin-top:4px;font-size:.8rem;font-weight:600}
 .us-card-dividend b{color:#f2f7ff}
 .us-card-dividend small{font-size:.7rem;color:#9fb4d0;font-weight:400}
@@ -419,6 +434,35 @@ details[open]>summary{margin-bottom:12px}
 <div class="legend"><span class="state-buy"><b>●</b> 매수 · 조건 충족(주문 아님)</span><span class="state-stop"><b>●</b> 중지 · 상한 초과</span><span class="state-wait"><b>●</b> 대기 · 미충족·확인 필요</span></div>
 <section class="panel" id="summary"><b>국내 ETF 매수계획 · 거래일 조건 점검</b><p class="sub">당일 검증 체결가격이 없을 때는 기본 적립 계획과 미확정 조건을 구분합니다. 5·20일선은 확정 일봉 기준이며 실제 증권사 주문은 실행하지 않습니다.</p><div id="plan">시세 확인 중</div></section>
 <section id="funds" class="funds"></section>
+<details id="kr-toss-dividend-panel" class="panel">
+ <summary><b>토스 국내주식 9종목 · 누적 세후 분배금 카드</b></summary>
+ <p class="kr-div-note">종목별 지급금과 저장된 사진 기준 참고 손익입니다. 사진 평가손익은 현재 시세가 아닙니다.</p>
+ <div class="kr-toss-dividend-grid" id="kr-toss-dividend-cards"></div>
+</details>
+<details id="kr-dividend-panel" class="panel">
+ <summary><b>국내주식 · 세후 배당·분배금 지급내역 입력</b></summary>
+ <p class="kr-div-note">키움 ISA 6종목과 토스 국내주식 9종목의 실제 입금 기록입니다. 지급일과 세후 원화 금액을 저장하면 월별 합계 및 종목 카드가 갱신됩니다. 계좌 전체 누적금액과 중복 합산하지 않습니다.</p>
+ <div class="kr-div-form">
+  <label class="kr-div-wide">계좌·종목<select id="kr-div-symbol"></select></label>
+  <label>실제 지급일<input type="date" id="kr-div-date"></label>
+  <label>세후 실제 입금액 (원 · 필수)<input type="number" min="0" step="0.01" id="kr-div-net" placeholder="원화 실수령액"></label>
+  <label>세전 지급금 (원 · 선택)<input type="number" min="0" step="0.01" id="kr-div-gross"></label>
+  <label>원천징수·세금 (원 · 선택)<input type="number" min="0" step="0.01" id="kr-div-tax"></label>
+  <label>재투자액 (원 · 선택)<input type="number" min="0" step="0.01" id="kr-div-reinvest"></label>
+ </div>
+ <button type="button" id="kr-div-save">주별·월별 지급기록 저장</button>
+ <p id="kr-div-status" class="kr-div-status" role="status"></p>
+ <div id="kr-div-records"></div>
+ <details class="account-edit">
+  <summary>기존 누적 세후 분배금 기준 입력 (선택)</summary>
+  <p class="kr-div-note">과거 지급일을 모두 기록하지 않은 경우, 기준일 이전 누적 세후금액을 한 번만 입력하세요. 이후 지급일에만 새 분배금을 추가합니다.</p>
+  <div class="kr-div-form">
+   <label>기존 세후 누적 지급금 (원)<input type="number" min="0" step="1" id="kr-div-baseline"></label>
+   <label>기준일<input type="date" id="kr-div-baseline-date"></label>
+  </div>
+  <button type="button" id="kr-div-baseline-save">종목별 누적 기준 저장</button>
+ </details>
+</details>
 <section id="us-panel" class="panel">
  <div class="us-head">
   <div><h2>미국 주식 · SCHD / AGNC / SPYM / CONY</h2><p class="sub">원화 참고가격 · 보유손익 · 분배금</p></div>
@@ -820,6 +864,7 @@ function accountTotals(){
 }
 window.ISA_KR_APP={
  accountTotals:accountTotals,
+ renderCards:render,
  pairPlan:pairPlan,
  solDailyEntry:solDailyEntry,
  effectiveCap:effectiveCap,
@@ -1035,7 +1080,7 @@ function render(){
   var tag=b?'<span class="band-tag '+(b.name==='하단 20%'?'band20':'')+'">'+b.name+'</span>':'';
   var avgText=renderHoldingInCard(f.id,p);
   return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+safe(f.plan)+'</small><strong>'+(p?money(p):'미확인')+'</strong><small>'+(live?'오늘 공개 체결가 ('+(live.method==='published'?'GitHub 게시 · 지연 가능':'네이버 직접 조회')+') · 체결 '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+' · '+Math.max(0,Math.floor((Date.now()-new Date(live.tradeAt).getTime())/60000))+'분 경과':'과거 일봉 종가 · '+(hasBars(x)?day(x.date):'확인 불가'))+'</small>'+
-  (['robot','space','sol'].includes(f.id)?'<small>매수 적용상한 '+(valid(effectiveCap(f.id).value)?money(effectiveCap(f.id).value):'확인 대기')+' · '+safe(effectiveCap(f.id).reason)+'</small>':'')+avgText+renderMa20InCard(f.id)+tag+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+actionLabel(v.type)+'</div></div>';
+  (['robot','space','sol'].includes(f.id)?'<small>매수 적용상한 '+(valid(effectiveCap(f.id).value)?money(effectiveCap(f.id).value):'확인 대기')+' · '+safe(effectiveCap(f.id).reason)+'</small>':'')+avgText+renderMa20InCard(f.id)+tag+(window.ISA_KR_DIVIDENDS?.cardLine?.(f.id,p)||'')+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+actionLabel(v.type)+'</div></div>';
  }).join('');
  document.dispatchEvent(new Event('isa-rendered'));
  Array.from(list.querySelectorAll('[data-id]')).forEach(function(node){
@@ -1222,4 +1267,4 @@ var reload=document.getElementById('reload');
 if(reload)reload.addEventListener('click',update);
 update();
 })();
-</script><script src="./insights.js" defer></script><script src="./personal-us-live.js" defer></script><script src="./us-dashboard.js?v=20261115-payout-card1" defer></script><script src="./us-krw.js?v=20261115-monthly-cony1" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script><script src="./account-summary.js" defer></script></body></html>
+</script><script src="./insights.js" defer></script><script src="./personal-us-live.js" defer></script><script src="./us-dashboard.js?v=20261115-payout-card1" defer></script><script src="./us-krw.js?v=20261115-monthly-cony1" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script><script src="./account-summary.js" defer></script><script src="./kr-dividends.js" defer></script></body></html>
