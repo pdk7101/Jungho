@@ -64,6 +64,30 @@ function distributionStats(id){
   grossCount:rows.filter(r=>r.gross!==null).length,taxCount:rows.filter(r=>r.tax!==null).length,
   reinvestCount:rows.filter(r=>r.reinvest!==null).length,months:Object.entries(month).sort((a,b)=>b[0].localeCompare(a[0]))};
 }
+// All weekly CONY receipts remain stored as individual rows; only their display is grouped.
+function monthlyGroups(stats){
+ const map=new Map();
+ stats.rows.forEach(row=>{
+  const month=row.date.slice(0,7);
+  if(!map.has(month))map.set(month,{month,net:0,count:0,rows:[]});
+  const g=map.get(month);g.net+=row.net;g.count++;g.rows.push(row);
+ });
+ return [...map.values()].sort((a,b)=>b.month.localeCompare(a.month));
+}
+function conyMonthlyView(stats,editable){
+ return '<div class="us-dist-months" aria-label="CONY 월별 세후 분배금 합계">'+monthlyGroups(stats).map(g=>
+  '<details class="us-dist-month"><summary><span><b>'+clean(g.month)+'</b>'+
+    '<small>주별 '+g.count+'건</small></span><strong>'+won(g.net)+'</strong></summary>'+
+  '<div class="us-dist-month-weeks">'+g.rows.map(r=>
+    '<div class="us-dist-record"><div><b>'+clean(r.date)+'</b> · 세후 '+won(r.net)+
+     '<small>'+(r.gross!==null?'세전 '+won(r.gross)+' · ':'')+
+     (r.tax!==null?'세금 '+won(r.tax)+' · ':'')+
+     (r.reinvest!==null?'재투자 '+won(r.reinvest):'')+'</small></div>'+
+    (editable?'<button type="button" class="us-dist-delete" data-ledger-key="'+clean(r.key)+
+     '" aria-label="'+clean(r.date)+' 기록 삭제">삭제</button>':'')+'</div>'
+  ).join('')+'</div></details>'
+ ).join('')+'</div>';
+}
 function netDividend(id){
  const h=holdings()[id]||{},v=h.krwNet;
  const manual=v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>=0?Number(v):null;
@@ -182,11 +206,16 @@ function distributionDetail(id){
   html+='<p>입력된 지급 횟수 '+stats.count+'건 · 세후 실수령 기록 합계 '+won(stats.net)+'</p>'+
    moneyPart('세전 지급금',stats.gross,stats.grossCount)+moneyPart('원천징수·세금',stats.tax,stats.taxCount)+
    moneyPart('재투자한 지급금',stats.reinvest,stats.reinvestCount);
-  html+='<p class="us-small">월별 실제 입력 기록: '+stats.months.slice(0,4).map(([month,total])=>clean(month)+' '+won(total)).join(' · ')+'</p>';
-  html+='<div class="us-dist-recent">'+stats.rows.slice(0,6).map(r=>
-   '<div class="us-dist-row"><span>'+clean(r.date)+'</span><span>세후 '+won(r.net)+
-   '<small>'+(r.gross!==null?'세전 '+won(r.gross)+' · ':'')+(r.tax!==null?'세금 '+won(r.tax)+' · ':'')+
-   (r.reinvest!==null?'재투자 '+won(r.reinvest):'')+'</small></span></div>').join('')+'</div>';
+  if(id==='cony'){
+   html+='<p class="us-small">월별 세후 지급금만 표시합니다. 해당 월을 누르면 주별 입금 내역을 볼 수 있습니다.</p>'+
+    conyMonthlyView(stats,false);
+  }else{
+   html+='<p class="us-small">월별 실제 입력 기록: '+stats.months.slice(0,4).map(([month,total])=>clean(month)+' '+won(total)).join(' · ')+'</p>';
+   html+='<div class="us-dist-recent">'+stats.rows.slice(0,6).map(r=>
+    '<div class="us-dist-row"><span>'+clean(r.date)+'</span><span>세후 '+won(r.net)+
+    '<small>'+(r.gross!==null?'세전 '+won(r.gross)+' · ':'')+(r.tax!==null?'세금 '+won(r.tax)+' · ':'')+
+    (r.reinvest!==null?'재투자 '+won(r.reinvest):'')+'</small></span></div>').join('')+'</div>';
+  }
  }
  return html+'</div>';
 }
@@ -215,17 +244,19 @@ function renderLedger(){
  const area=$('us-distribution-ledger'),select=$('us-distribution-ticker');if(!area||!select)return;
  const id=select.value||ledgerSelected;
  const stats=distributionStats(id),net=netDividend(id);
- let html='<p><b>'+clean(id.toUpperCase())+' · 날짜별 세후 분배금 내역</b></p>';
+ let html='<p><b>'+clean(id.toUpperCase())+(id==='cony'?' · 월별 세후 분배금':' · 날짜별 세후 분배금 내역')+'</b></p>';
  if(!stats.count){
   html+='<p class="us-small">아직 입력된 지급내역이 없습니다. 실제 토스 입금내역의 원화 세후 금액을 등록해 주세요.</p>';
  }else{
   html+='<div class="us-dist-figures"><div>기록된 세후 지급금<strong>'+won(stats.net)+'</strong></div>'+
   '<div>입력된 지급횟수<strong>'+stats.count+'회</strong></div>'+
   '<div>원화 재투자 기록<strong>'+(stats.reinvestCount===stats.count?won(stats.reinvest):'일부만 입력')+'</strong></div></div>';
-  html+='<p class="us-small">월별 입력 내역: '+stats.months.slice(0,6).map(([m,v])=>clean(m)+' '+won(v)).join(' · ')+'</p>';
+  if(id==='cony')html+='<p class="us-small">매주 입력한 지급금을 월별로 합산합니다. 월을 누르면 날짜별 기록과 삭제 버튼을 확인할 수 있습니다.</p>';
+  else html+='<p class="us-small">월별 입력 내역: '+stats.months.slice(0,6).map(([m,v])=>clean(m)+' '+won(v)).join(' · ')+'</p>';
   if(net&&net.kind==='cumulative'&&net.discrepancy!==null)html+='<p class="us-small">별도 누적 세후 수령액 '+won(net.amount)+' / 날짜별 기록 '+won(stats.net)+
     ' / 차이 '+signed(net.discrepancy)+'. 손익에는 누적 수령액만 반영하며 합산하지 않습니다.</p>';
-  html+='<div class="us-dist-records">'+stats.rows.map(r=>
+  if(id==='cony')html+=conyMonthlyView(stats,true);
+  else html+='<div class="us-dist-records">'+stats.rows.map(r=>
    '<div class="us-dist-record"><div><b>'+clean(r.date)+'</b> · 세후 '+won(r.net)+
     '<small>'+(r.gross!==null?'세전 '+won(r.gross)+' · ':'')+
     (r.tax!==null?'세금 '+won(r.tax)+' · ':'')+
