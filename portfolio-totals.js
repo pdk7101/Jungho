@@ -149,7 +149,7 @@ function renderEditor(containerId,market,ids){
    const validQty=val!==null&&Number.isFinite(val)&&val>=0&&
     (market==='us'?Math.abs(val-Math.round(val*1e6)/1e6)<1e-9:Number.isSafeInteger(val));
    const validAvg=val!==null&&Number.isFinite(val)&&val>0&&val<=1e9;
-   const hint=$('toss-domestic-message')||$('toss-other-us-message');
+   const hint=$(market==='us'?'toss-other-us-message':'toss-domestic-message');
    if(val!==null&&!(kind==='qty'?validQty:validAvg)){
     if(hint)hint.textContent='보유수량은 '+(market==='us'?'소수점 6자리까지':'0 이상 정수')+
      ', 원화 평단은 0원 초과로 입력해 주세요.';
