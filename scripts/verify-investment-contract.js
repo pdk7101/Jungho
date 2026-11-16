@@ -1076,6 +1076,62 @@ truth(html.includes('src="./account-summary.js"')&&
   html.includes('src="./kr-dividends.js"'),
  'new account totals script is published and deployment-cache-versioned');
 
+// New complete Toss 14-position cost basis must recalculate without losing manual totals,
+// confusing dated screenshot quotes with real-time prices or changing distribution records.
+const portfolioTotalsCode=txt('portfolio-totals.js');
+truth(!!new vm.Script(portfolioTotalsCode,{filename:'portfolio-totals.js'}),
+ '14-stock auto-totals module is valid client JavaScript');
+const pTD=['tsofr','treit','ttr','biotech','tspace','media','trobot','hongah','sensor'];
+const pUS=['schd','spym','cony','agnc','spacex'];
+const pSnap={usDate:'2026-11-14',tdDate:'2026-11-14',us:{},tossDomestic:{}};
+for(const id of pUS)pSnap.us[id]={qty:10,value:1100,pnl:100};
+for(const id of pTD)pSnap.tossDomestic[id]={qty:2,value:240,pnl:40};
+const pLocal=storage({
+ 'isa-user-portfolio-snapshot-v1':pSnap,
+ 'isa-account-totals-v1':{toss:{invested:9999,value:8888,date:'2026-11-14'}}
+});
+const pDocument={getElementById:()=>null,dispatchEvent:()=>{}};
+const pWindow={
+ addEventListener:()=>{},
+ ISA_US_APP:{getPrice:()=>110},
+ ISA_US_KRW:{priceKrw:()=>({amount:110,source:'synthetic confirmed close',stamp:'2026-11-14'})},
+ ISA_KR_APP:{decisions:()=>[],accountTotals:()=>({
+  principal:3000,value:3120,missingHoldings:[],missingPrice:[],
+  intraday:0,close:6,dates:['2026-11-14']
+ })}
+};
+vm.runInNewContext(portfolioTotalsCode,{window:pWindow,document:pDocument,
+ localStorage:pLocal,Date,Intl,Number,JSON,Object,Array,Math,String,Map,Set,Event:class {}},
+ {filename:'portfolio-totals.js'});
+const pInitial=pWindow.ISA_PORTFOLIO_TOTALS.totals();
+equal([pInitial.invested,pInitial.value,pInitial.count,pInitial.knownCount],
+ [6800,7660,14,14],'Toss 5 US and 9 Korea quantities and KRW averages combine in one cost basis');
+truth(pInitial.prices.photo>0&&pInitial.source.includes('과거 사진 가격')&&
+ !pInitial.source.includes('실시간 장중 시세'),
+ 'dated broker photo prices are never misrepresented as live quotes');
+vm.runInNewContext(accountCode,{window:pWindow,document:pDocument,localStorage:pLocal,
+ Date,Intl,Number,JSON,Object,Array,Math,String},
+ {filename:'account-summary-autotest.js'});
+equal(pWindow.ISA_ACCOUNT_SUMMARY.getTotals().toss.invested,9999,
+ 'existing manually saved broker total remains visible until an actual auto edit');
+pLocal.setItem('isa-private-toss-domestic-holdings-v1',
+ JSON.stringify({biotech:{qty:3,avg:90}}));
+pWindow.ISA_PORTFOLIO_TOTALS.markAuto('toss');
+const pChanged=pWindow.ISA_PORTFOLIO_TOTALS.totals();
+equal([pChanged.invested,pChanged.value],[6870,7780],
+ 'changing one Toss domestic holding recalculates its cost and dated valuation');
+equal(pWindow.ISA_ACCOUNT_SUMMARY.getTotals().toss.invested,6870,
+ 'updated Toss total immediately supersedes stale manually entered account total');
+equal(pLocal.read('isa-account-totals-v1').toss.invested,9999,
+ 'old user-entered account reference is not erased when automatic mode takes over');
+pWindow.ISA_PORTFOLIO_TOTALS.markAuto('kiwoom');
+equal(pWindow.ISA_ACCOUNT_SUMMARY.getTotals().kiwoom.invested,3000,
+ 'after Kiwoom holding edit its six-position cost basis appears automatically');
+pLocal.setItem('isa-private-toss-domestic-holdings-v1',
+ JSON.stringify({biotech:{qty:3,avg:90},sensor:{qty:7}}));
+equal(pWindow.ISA_PORTFOLIO_TOTALS.totals().invested,7370,
+ 'Toss other domestic holding quantity changes also contribute to portfolio totals');
+
 // Isolated Kiwoom summary calculation: 6 positions and last-confirmed price,
 // without Toss equities or fabricated values when data are missing.
 const calcStart=html.indexOf('function accountTotals(){');
