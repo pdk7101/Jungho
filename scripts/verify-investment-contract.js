@@ -1069,7 +1069,9 @@ truth(!accountCode.includes("91.820669")&&!accountCode.includes('8975'),
  'no personal positions or prices are hardcoded into public account totals code');
 truth(html.includes('src="./account-summary.js"')&&
  txt('scripts/stamp-assets.js').includes("'account-summary.js'")&&
- txt('.github/workflows/pages.yml').includes('account-summary.js kr-dividends.js quotes.json')&&
+ txt('.github/workflows/pages.yml').includes('portfolio-totals.js account-summary.js kr-dividends.js quotes.json')&&
+  txt('scripts/stamp-assets.js').includes("'portfolio-totals.js'")&&
+  html.includes('src="./portfolio-totals.js"')&&
   txt('scripts/stamp-assets.js').includes("'kr-dividends.js'")&&
   html.includes('src="./kr-dividends.js"'),
  'new account totals script is published and deployment-cache-versioned');
