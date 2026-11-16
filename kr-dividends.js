@@ -217,7 +217,22 @@ function renderTossCards(){
   const symbol='toss:'+id,payout=netFor(symbol),item=rows[id],hasPnL=item&&
    Number.isFinite(Number(item.pnl))&&Number.isFinite(Number(item.value));
   let total='';
-  if(payout&&hasPnL){
+  const computed=window.ISA_PORTFOLIO_TOTALS?.row?.('domestic',id);
+  if(computed){
+   const cost=computed.invested,pnl=computed.profit,value=computed.value;
+   total='<div class="kr-div-card-return">보유 '+(computed.qty===null?'미입력':computed.qty+'주')+
+    ' · 평단 '+(computed.avg===null?'미입력':money(computed.avg))+
+    ' · 매수원가 '+(cost===null?'미확인':money(cost))+'</div>';
+   if(value!==null){
+    const overall=payout?pnl+payout.amount:null;
+    total+='<div class="kr-div-card-return">참고 평가 '+money(value)+
+     ' · 평가손익 '+signed(pnl)+
+     (overall!==null?' · <b>분배금 포함 총손익 '+signed(overall)+
+      (cost>0?' ('+(overall>=0?'+':'')+(overall/cost*100).toFixed(2)+'%)':'')+'</b>':'')+
+     ' <small>('+clean(computed.priceSource||'가격 근거 미확인')+' · '+
+      clean(computed.priceDate||'날짜 미확인')+')</small></div>';
+   }else total+='<p class="kr-div-note">평가액 미확인 · 검증된 시세 또는 사진 기준 가격 확인 필요</p>';
+  }else if(payout&&hasPnL){
    const overall=Number(item.pnl)+payout.amount,cost=Number(item.value)-Number(item.pnl);
    total='<div class="kr-div-card-return">사진 기준 평가손익 '+signed(item.pnl)+
     ' · <b>분배금 포함 총손익 '+signed(overall)+
@@ -271,6 +286,7 @@ function mount(){
  $('kr-div-baseline-save')?.addEventListener('click',saveBaseline);
  $('kr-div-date').value=localDay();
  document.addEventListener('isa-rendered',renderTossCards);
+ document.addEventListener('isa-portfolio-holdings-updated',renderTossCards);
  document.addEventListener('click',e=>{
   const card=e.target?.closest?.('[data-id]');
   if(card&&allowed.has('kiwoom:'+card.dataset.id)){
