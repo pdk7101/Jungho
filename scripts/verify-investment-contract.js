@@ -500,7 +500,7 @@ truth(!html.includes('function renderTossDomesticPositions(){')&&
  txt('portfolio-totals.js').includes("renderEditor('toss-domestic-positions','domestic',TOSS_KR.map"),
  'a single nine-stock Toss holdings editor replaces the legacy single-stock UI');
 truth(txt('portfolio-totals.js').includes("const TD='isa-private-toss-domestic-holdings-v1'")&&
- txt('portfolio-totals.js').includes("const SNAP='isa-user-portfolio-snapshot-v1'")&&
+ txt('portfolio-totals.js').includes("SNAP='isa-user-portfolio-snapshot-v1'")&&
  txt('portfolio-totals.js').includes("if(val===null)delete entry[field];else entry[field]=val;"),
  'unified Toss stock editor preserves existing private holdings keys and old screenshot references');
 // Behaviour test: domestic editor change updates a saved position without altering cost basis.
