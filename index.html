@@ -944,44 +944,6 @@ function chart(bars){
   '<text x="'+right+'" y="179" font-size="10" text-anchor="end" fill="#b9c7d9">'+dateLabel(last[last.length-1].date)+'</text></svg>'+
   '<p class="kr-chart-signal-note">20거래일 5·20일선 교차: 골든크로스 '+golden+'회 · 데드크로스 '+dead+'회 · 원형 표시는 교차 지점 (확정 일봉 기준)</p>';
 }
-function renderTossDomesticPositions(){
- // The existing browser-only Toss Korea override is separate from Kiwoom ISA.
- const place=el('toss-domestic-positions'),notice=el('toss-domestic-message');if(!place)return;
- const KEY='isa-private-toss-domestic-holdings-v1',SNAP='isa-private-toss-domestic-snapshot-v1';
- function read(k){try{const v=JSON.parse(localStorage.getItem(k)||'null');return v&&typeof v==='object'&&!Array.isArray(v)?v:{};}catch(_){return {};}}
- const stored=read(KEY).biotech||{},prior=read(SNAP).rows?.biotech||{};
- let qty=qtyValid(stored.qty)?Number(stored.qty):qtyValid(prior.qty)?Number(prior.qty):null;
- const inferred=Number(prior.qty)>0&&Number.isFinite(Number(prior.value))&&Number.isFinite(Number(prior.pnl))?
-  (Number(prior.value)-Number(prior.pnl))/Number(prior.qty):null;
- let avg=valid(stored.avg)?Number(stored.avg):valid(inferred)?Math.round(inferred*100)/100:null;
- place.innerHTML='<div class="pos-row"><div class="pos-name">마이티 신약포커스바이오액티브'+
-  '<div class="pos-sub">토스 국내주식 · 키움 ISA와 별도</div></div>'+
-  '<label>보유수량 (주)<input data-toss-domestic="biotech" data-kind="qty" type="number" min="0" step="1" placeholder="수량" value="'+(qty===null?'':qty)+'"></label>'+
-  '<label>원화 평단가 (원)<input data-toss-domestic="biotech" data-kind="avg" type="number" min="0" step="0.01" placeholder="평균매수가" value="'+(avg===null?'':avg)+'"></label></div>';
- if(!valid(stored.avg)&&valid(inferred))notice.textContent='이전 사진에서 추정한 평단 참고값입니다. 토스 실제 평균매수가와 대조 후 수정해 주세요.';
- place.querySelectorAll('input[data-toss-domestic]').forEach(function(input){
-  input.addEventListener('change',function(){
-   const kind=this.dataset.kind,raw=this.value.trim(),value=raw===''?null:Number(raw);
-   if(value!==null&&(kind==='qty'?(!Number.isSafeInteger(value)||value<0||value>1e7):
-    (!Number.isFinite(value)||value<=0||value>1e9))){
-    this.value=kind==='qty'?(qty===null?'':qty):(avg===null?'':avg);
-    notice.textContent='유효한 수량(0 이상 정수) 또는 원화 평단가(0보다 큼)를 입력해 주세요.';return;
-   }
-   const data=read(KEY),item={...(data.biotech||{})};
-   if(value===null)delete item[kind];else item[kind]=value;
-   const stamp=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',
-    year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(p=>[p.type,p.value]));
-   item.updatedAt=stamp.year+'-'+stamp.month+'-'+stamp.day;
-   data.biotech=item;
-   try{localStorage.setItem(KEY,JSON.stringify(data));}
-   catch(_){this.value=kind==='qty'?(qty===null?'':qty):(avg===null?'':avg);
-    notice.textContent='저장 실패 · 기기의 브라우저 저장소를 확인해 주세요.';return;}
-   if(kind==='qty')qty=value;else avg=value;
-   notice.textContent='마이티 '+(kind==='qty'?'보유수량':'원화 평단가')+' 저장 완료 · 다른 종목, CONY 분배금, 매수 규칙은 변경되지 않았습니다.';
-  });
- });
-}
-
 function renderPositions(){
  var place=el('positions');if(!place)return;
  place.innerHTML=FUNDS.map(function(f){
@@ -1184,7 +1146,6 @@ FUNDS.forEach(function(f){var o=document.createElement('option');o.value=f.id;o.
 el('selection').value=selected;el('selection').onchange=function(){selected=this.value;render();};
 Object.keys(defaults).forEach(function(k){el(k).value=settings[k];el(k).onchange=function(){var v=this.value.trim();settings[k]=k==='capMode'?(['ma','manual','both'].includes(v)?v:defaults.capMode):k==='dailyBudget'?(valid(v)?Number(v):''):(valid(v)?Number(v):defaults[k]);persist();render();};});
 renderPositions();
-renderTossDomesticPositions();
 el('reload').onclick=refresh;
 // While this page is visible, refresh public KR quotes approximately once a minute.
 // Browsers may throttle timers in background; never claim push while the app is closed.
