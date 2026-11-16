@@ -5,7 +5,7 @@
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
-const KEY='isa-account-totals-v1',SNAP='isa-user-portfolio-snapshot-v1';
+const KEY='isa-account-totals-v1',SNAP='isa-user-portfolio-snapshot-v1',MODE='isa-account-calculation-mode-v1';
 const DIV='isa-account-dividend-totals-v1',US_HOLD='isa-us-holdings-v1',LEDGER='isa-us-distributions-krw-v1';
 const PAYOUT_US=['schd','spym','cony','agnc'];
 const US=['schd','spym','cony','agnc','spacex'];
@@ -173,6 +173,14 @@ function snapshotToss(){
  options.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
  return options[0];
 }
+function tossComputed(){
+ const data=window.ISA_PORTFOLIO_TOTALS?.totals?.();
+ if(!data)return null;
+ return {invested:data.invested,value:data.value,date:data.date,
+  source:data.source+(data.mixedDates?' · 가격 기준일 혼합·미확인':'')+
+   (data.invested===null?' · 확인된 일부 매수원가 '+money(data.knownInvested):''),
+  complete:data.completeBasis&&data.completeValue,estimated:true};
+}
 function kiwoomComputed(){
  const data=window.ISA_KR_APP?.accountTotals?.();
  if(!data)return null;
@@ -193,9 +201,14 @@ function kiwoomComputed(){
  };
 }
 function totals(){
+ const mode=read(MODE),tossManual=manualTotals('toss'),
+  kiwoomManual=manualTotals('kiwoom'),
+  tossAutomatic=tossComputed(),kiwoomAutomatic=kiwoomComputed();
  return {
-  toss:manualTotals('toss')||snapshotToss(),
-  kiwoom:manualTotals('kiwoom')||kiwoomComputed()
+  toss:mode.toss==='auto'?(tossAutomatic||tossManual||snapshotToss()):
+   (tossManual||(tossAutomatic&&tossAutomatic.invested!==null?tossAutomatic:null)||snapshotToss()||tossAutomatic),
+  kiwoom:mode.kiwoom==='auto'?(kiwoomAutomatic||kiwoomManual):
+   (kiwoomManual||kiwoomAutomatic)
  };
 }
 function displayAccount(id,data){
@@ -259,6 +272,7 @@ function initEditor(){
   const previous=localStorage.getItem(KEY);
   try{
    localStorage.setItem(KEY,JSON.stringify({...read(KEY),...changes}));
+   localStorage.setItem(MODE,JSON.stringify({...read(MODE),...Object.fromEntries(Object.keys(changes).map(id=>[id,'manual']))}));
    status.textContent='이 휴대전화에 계좌별 금액을 저장했습니다. 상단에 입력 날짜와 함께 표시됩니다.';
    render();
   }catch(_){
@@ -266,8 +280,15 @@ function initEditor(){
    status.textContent='계좌 금액 저장에 실패했습니다. 기존 설정은 보존하도록 처리했습니다.';
   }
  });
+ $('account-total-auto')?.addEventListener('click',()=>{
+  try{
+   localStorage.setItem(MODE,JSON.stringify({...read(MODE),toss:'auto',kiwoom:'auto'}));
+   status.textContent='보유수량·평단 기반 자동합계가 우선 적용됩니다. 기존 수동 계좌 합계는 삭제하지 않았습니다.';
+   render();
+  }catch(_){status.textContent='자동합계 모드 저장 실패 · 기존 설정을 유지합니다.';}
+ });
  reset.addEventListener('click',()=>{
-  try{localStorage.removeItem(KEY);}
+  try{localStorage.removeItem(KEY);localStorage.setItem(MODE,JSON.stringify({...read(MODE),toss:'auto',kiwoom:'auto'}));}
   catch(_){status.textContent='기기 저장소를 초기화할 수 없습니다.';return;}
   Object.values(fields).flat().forEach(id=>{if($(id))$(id).value='';});
   status.textContent='계좌별 직접 입력값만 해제했습니다. 보유수량·평단·분배금 기록은 그대로입니다.';
@@ -280,6 +301,7 @@ function mount(){
  initDividendEditor();
  applyPrivateDividendPhoto();
  document.addEventListener('isa-rendered',render);
+ document.addEventListener('isa-portfolio-holdings-updated',render);
  window.addEventListener('isa-us-valuation-refreshed',render);
  document.addEventListener('isa-kr-dividends-updated',render);
  window.addEventListener('storage',render);
