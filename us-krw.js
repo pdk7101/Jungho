@@ -170,23 +170,6 @@ function totalKrw(){
 }
 const signed=v=>(v>=0?'+':'')+won(v);
 const signedPercent=v=>(v>=0?'+':'')+v.toFixed(2)+'%';
-function showTotal(){
- const el=$('us-krw-total');if(!el)return;
- const v=totalKrw();
- if(!v.count){el.innerHTML='<p class="us-small">보유수량·원화 평단을 입력하면 4종목의 원화 평가손익을 계산합니다. 유효한 환율 또는 현재가가 필요합니다.</p>';return;}
- let html='<p><b>미국주식 평가·분배금 원화 합계 ('+v.count+'/4종목)</b></p>'+
- '<div class="us-total-grid"><div>누적 매수원가<strong>'+won(v.principal)+'</strong></div>'+
- '<div>추정 평가금액<strong>'+won(v.value)+'</strong></div>'+
- '<div>평가손익<strong class="'+(v.pnl>=0?'us-positive':'us-negative')+'">'+signed(v.pnl)+'</strong><small>'+signedPercent(v.rate)+'</small></div>'+
- '<div>확인된 누적 세후 배당금<strong>'+won(v.knownNet)+'</strong><small>'+(v.missing?'미입력 '+v.missing+'종목':'전체 입력/기록')+'</small></div>'+
- '<div>'+(v.provisional?'기록분 포함 잠정 총손익':'분배금 포함 총손익')+'<strong>'+(v.inclusive===null?'전체 계산 보류':signed(v.inclusive))+'</strong>'+
- (v.inclusiveRate!==null?'<small>'+signedPercent(v.inclusiveRate)+'</small>':'')+'</div></div>';
- if(v.missing)html+='<p class="us-small">미입력 '+v.missing+'종목이 있어 전체 분배금 포함 총손익을 계산하지 않았습니다. 빈 기록을 0원으로 가정하지 않습니다.</p>';
- if(v.provisional)html+='<p class="us-small">'+v.provisional+'종목은 날짜별로 기록된 지급금만 반영했습니다. 누락된 과거 분배금이 있으면 실제 누적 총손익과 다를 수 있습니다.</p>'; 
- html+='<p class="us-small">매수원가는 현재 보유수량 × 입력 평단가이며 분배금 재투자분도 포함될 수 있습니다. 외부에서 입금한 실제 투자원금과 다릅니다. 원화 평가액은 토스 입력 현재가 또는 비공식 참고환율로 계산한 추정치입니다.</p>';
- el.innerHTML=html;
-}
-
 function distributionDetail(id){
  const stats=distributionStats(id),net=netDividend(id);
  let html='<div class="us-dist-detail"><b>원화 분배금·배당금 상세</b>';
@@ -476,7 +459,6 @@ function showRate(){
 }
 function render(){
  showRate();
- showTotal();
  renderLedger();
  window.ISA_US_SIGNAL?.refreshSummary?.();
  window.ISA_US_APP?.rerender?.();
@@ -487,9 +469,7 @@ function mount(){
  const head=$('us-updated');
  const holder=document.createElement('div');
  holder.id='us-krw-panel';holder.className='us-krw-panel';
- holder.innerHTML='<h3>미국 4종목 손익 · 세후 분배금</h3>'+
- '<div id="us-krw-rate-status" class="us-small">자동 참고환율 확인 중…</div>'+
- '<div id="us-krw-total" class="us-total-summary"></div>'+
+ holder.innerHTML='<div id="us-krw-rate-status" class="us-small">자동 참고환율 확인 중…</div>'+
  '<p id="us-krw-applied" class="us-small" aria-live="polite"></p>'+
  '<details id="us-distribution-details"><summary>세후 배당·분배금 원화 지급내역 상세 등록</summary>'+
  '<p class="us-small">실제 토스 입금내역의 날짜와 원화 금액을 입력하세요. 세전 지급금·세금·재투자액은 선택사항입니다. 과거 지급내역이 누락되어 있다면 별도의 누적 실수령액을 우선 사용하며 두 값을 합산하지 않습니다.</p>'+
