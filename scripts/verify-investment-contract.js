@@ -493,56 +493,16 @@ truth(html.split('id="us-krw-editor"').length===2&&
  'existing CONY holding quantity and cost editor remains the only US entry route');
 truth(!html.includes('91.820669')&&!html.includes('8975'),
  'personal corrected holding values are not embedded in the public repository');
-truth(html.includes('function renderTossDomesticPositions(){')&&
- html.includes("isa-private-toss-domestic-holdings-v1")&&
- html.includes("isa-private-toss-domestic-snapshot-v1"),
- 'Mighty reuses previously created local Toss domestic records and their prior screenshot');
-const mightyStart=html.indexOf('function renderTossDomesticPositions(){');
-const mightyEnd=html.indexOf('function renderPositions(){',mightyStart);
-truth(mightyStart>=0&&mightyEnd>mightyStart,
- 'Toss domestic inline holdings editor can be tested independently');
-const mightySrc=html.slice(mightyStart,mightyEnd);
-const mightyLocal=storage({
- 'isa-us-holdings-v1':{cony:{qty:12.5,krwAvg:43000,krwNet:9500}},
- 'isa-private-toss-domestic-holdings-v1':{biotech:{qty:3,avg:8400},sensor:{qty:8,avg:7000}},
- 'isa-private-toss-domestic-snapshot-v1':{date:'2026-11-09',rows:{biotech:{qty:3,value:19000,pnl:-6000}}}
-});
-const mightyInputs=[],mightyHost={innerHTML:'',querySelectorAll:()=>mightyInputs};
-const mightyMsg={textContent:''};
-const mightyQuantity={dataset:{kind:'qty'},value:'4',
- addEventListener:(_name,cb)=>mightyQuantity.change=cb};
-const mightyAverage={dataset:{kind:'avg'},value:'8600',
- addEventListener:(_name,cb)=>mightyAverage.change=cb};
-mightyInputs.push(mightyQuantity,mightyAverage);
-const runMighty=new Function('el','localStorage','qtyValid','valid','Intl','Date',
- mightySrc+'\nreturn renderTossDomesticPositions;')(
- id=>id==='toss-domestic-positions'?mightyHost:mightyMsg,
- mightyLocal,
- v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isSafeInteger(Number(v))&&Number(v)>=0,
- v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0,
- Intl,Date
-);
-runMighty();
-truth(mightyHost.innerHTML.includes('마이티 신약포커스바이오액티브')&&
- mightyHost.innerHTML.includes('data-kind="qty"')&&mightyHost.innerHTML.includes('data-kind="avg"'),
- 'Mighty Korean equity row offers share count and average KRW cost');
-truth(mightyHost.innerHTML.includes('value="3"')&&mightyHost.innerHTML.includes('value="8400"'),
- 'the same pre-existing private Toss domestic overrides are displayed without migrating');
-mightyQuantity.change();
-mightyAverage.change();
-const afterMighty=mightyLocal.read('isa-private-toss-domestic-holdings-v1');
-equal(afterMighty.biotech.qty,4,'Mighty quantity is saved to existing local Toss domestic records');
-equal(afterMighty.biotech.avg,8600,'Mighty corrected average KRW price is saved locally');
-equal(afterMighty.sensor.avg,7000,'other Toss domestic records are untouched');
-equal(mightyLocal.read('isa-us-holdings-v1').cony.krwNet,9500,
- 'Mighty domestic change never touches CONY holdings or cumulative after-tax payouts');
-equal(mightyLocal.read('isa-us-holdings-v1').cony.qty,12.5,
- 'Mighty domestic change never alters existing CONY quantity');
-equal(mightyLocal.read('isa-private-toss-domestic-snapshot-v1').rows.biotech.qty,3,
- 'historical Toss domestic screenshot is preserved as a dated record');
-mightyQuantity.value='1.5';mightyQuantity.change();
-equal(mightyLocal.read('isa-private-toss-domestic-holdings-v1').biotech.qty,4,
- 'non-integer Toss domestic quantity is refused without corrupting saved shares');
+// The old Mighty-only Toss editor was redundant with the unified 9-stock holdings form.
+truth(!html.includes('function renderTossDomesticPositions(){')&&
+ !html.includes('renderTossDomesticPositions();')&&
+ html.includes('id="toss-domestic-positions"')&&
+ txt('portfolio-totals.js').includes("renderEditor('toss-domestic-positions','domestic',TOSS_KR.map"),
+ 'a single nine-stock Toss holdings editor replaces the legacy single-stock UI');
+truth(txt('portfolio-totals.js').includes("const TD='isa-private-toss-domestic-holdings-v1'")&&
+ txt('portfolio-totals.js').includes("const SNAP='isa-user-portfolio-snapshot-v1'")&&
+ txt('portfolio-totals.js').includes("if(val===null)delete entry[field];else entry[field]=val;"),
+ 'unified Toss stock editor preserves existing private holdings keys and old screenshot references');
 // Behaviour test: domestic editor change updates a saved position without altering cost basis.
 const domesticSrc=html.slice(html.indexOf('function renderPositions(){'),html.indexOf('function renderPlan(){'));
 truth(domesticSrc.startsWith('function renderPositions(){')&&domesticSrc.includes("positions[id]=h;persist();render();"),
