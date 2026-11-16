@@ -386,16 +386,19 @@ details[open]>summary{margin-bottom:12px}
  <p class="fieldset-note">이동평균선 자동: 상승 추세는 20일선 × 102%, 약세는 × 98%, 나머지는 × 100%의 자동 상한만 적용합니다. 직접 지정: 입력한 상한만 적용합니다. 이동평균선 & 직접 지정: 두 상한 중 낮은 값을 적용합니다. 이동평균선은 확정 일봉, 가격 비교는 당일 공개 체결가입니다. 자료 미확인 시 매수판단은 대기합니다.</p>
 <details id="holdings-settings" class="holdings-settings">
   <summary>국내·미국 주식 보유수량·원화 평단가 입력 (카드 자동 반영)</summary>
-  <p class="fieldset-note">여기서 보유수량과 원화 평단가를 수정하고 다른 입력칸을 누르면 자동 저장되며 종목 카드와 원화 손익에 적용됩니다. 국내는 키움 ISA 6종목과 토스 일반계좌의 마이티, 미국은 토스 4종목(소수점 수량 허용)입니다. 미국 평단도 달러가 아닌 원화로 입력하세요. 기존 저장값을 불러오며 이 기기의 브라우저에만 보관됩니다. 실제 증권사 계좌나 주문은 변경되지 않습니다.</p>
+  <p class="fieldset-note">여기서 보유수량·원화 평단가를 수정하고 다른 입력칸을 누르면 종목 손익과 계좌별 매수원가·전체 합계에 자동 반영됩니다. 키움 ISA 6종목, 토스 국내 9종목, 토스 미국 5종목(소수점 수량 허용)을 각각 한 번씩 입력합니다. 미국 평단도 달러가 아닌 원화로 입력하세요. 기존 저장값을 불러오며 이 기기의 브라우저에만 보관됩니다. 실제 증권사 계좌나 주문은 변경되지 않습니다.</p>
   <h3>국내 ETF · 키움 ISA 6종목</h3>
   <div id="positions"></div>
   <p id="positionMessage" class="fieldset-note" role="status">국내 ETF 보유정보 입력 대기</p>
   <h3>국내 주식 · 토스 일반계좌</h3>
   <div id="toss-domestic-positions"></div>
-  <p id="toss-domestic-message" class="fieldset-note" role="status">마이티의 수량과 원화 평단을 수정할 수 있습니다. 키움 ISA와 다른 토스 보유종목은 변경되지 않습니다.</p>
-  <h3>미국 주식 · 토스 4종목</h3>
+  <p id="toss-domestic-message" class="fieldset-note" role="status">토스 국내주식 9종목의 수량·평단을 수정하면 토스 계좌 합계도 다시 계산합니다. 미입력 종목은 사진 참고값으로 구분합니다.</p>
+  <h3>미국 주식 · 토스 SCHD / AGNC / SPYM / CONY</h3>
   <div id="us-krw-editor"></div>
   <p id="us-holding-message" class="fieldset-note" role="status">미국 주식 보유정보 입력 대기</p>
+  <h3>토스 미국 · 나머지 1종목</h3>
+  <div id="toss-other-us-positions"></div>
+  <p id="toss-other-us-message" class="fieldset-note" role="status">스페이스X 사진 기록의 보유수량·평단을 직접 보정할 수 있습니다. 실시간 시세는 별도 확인이 필요합니다.</p>
   <details class="account-edit" id="account-edit">
    <summary>계좌 전체 합계 직접 입력 · 수정 (선택)</summary>
    <p class="fieldset-note">토스는 국내 9종목과 미국 5종목이 포함되므로 4종목의 시세만으로 전체 평가액을 계산하지 않습니다. 토스증권 앱의 전체 계좌 금액을 입력하면 상단에 반영됩니다. 키움은 6종목 시세 기준 자동 계산이 가능하며, 증권사 앱 합계를 우선 표시하고 싶을 때만 입력하세요.</p>
@@ -409,9 +412,10 @@ details[open]>summary{margin-bottom:12px}
     <label>총투자금 (원)<input id="account-kiwoom-invested" type="number" min="0" step="1" placeholder="자동계산 또는 직접 입력"></label>
     <label>평가금액 (원)<input id="account-kiwoom-value" type="number" min="0" step="1" placeholder="자동계산 또는 직접 입력"></label>
    </div>
-   <p class="fieldset-note">계좌별 두 금액을 모두 입력해야 저장합니다. 빈 칸은 기존 스냅샷·시세 계산을 유지합니다. 사용자 입력 금액은 자동 갱신되지 않으며 기준 날짜가 표시됩니다.</p>
+   <p class="fieldset-note">계좌별 두 금액을 모두 입력해야 저장합니다. 빈 칸은 기존 스냅샷·시세 계산을 유지합니다. 계좌 합계를 직접 입력하면 수동 참고값으로 남습니다. 이후 보유정보를 수정하면 자동합계가 우선 적용되며, 수동 입력값은 삭제하지 않습니다.</p>
    <div class="us-head-actions">
     <button type="button" id="account-total-save" class="us-header-button">입력한 계좌 합계 저장</button>
+    <button type="button" id="account-total-auto" class="us-header-button outline">보유정보 자동합계 사용</button>
     <button type="button" id="account-total-reset" class="us-header-button outline">직접 입력값 지우기</button>
    </div>
    <p id="account-total-message" class="fieldset-note" role="status"></p>
@@ -996,6 +1000,7 @@ function renderPositions(){
    if(kind==='avg')h.avg=v===''?'':Number(v);
    else h.qty=v===''?'':Number(v);
    positions[id]=h;persist();render();
+    if(typeof window!=='undefined')window.ISA_PORTFOLIO_TOTALS?.markAuto?.('kiwoom');
    el('positionMessage').textContent=safe(FUNDS.find(function(f){return f.id===id;}).name)+' 보유정보를 저장하고 카드에 반영했습니다.';
   });
  });
@@ -1267,4 +1272,4 @@ var reload=document.getElementById('reload');
 if(reload)reload.addEventListener('click',update);
 update();
 })();
-</script><script src="./insights.js" defer></script><script src="./personal-us-live.js" defer></script><script src="./us-dashboard.js?v=20261115-payout-card1" defer></script><script src="./us-krw.js?v=20261115-monthly-cony1" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script><script src="./account-summary.js" defer></script><script src="./kr-dividends.js" defer></script></body></html>
+</script><script src="./insights.js" defer></script><script src="./personal-us-live.js" defer></script><script src="./us-dashboard.js?v=20261115-payout-card1" defer></script><script src="./us-krw.js?v=20261115-monthly-cony1" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script><script src="./portfolio-totals.js" defer></script><script src="./account-summary.js" defer></script><script src="./kr-dividends.js" defer></script></body></html>
