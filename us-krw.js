@@ -398,7 +398,7 @@ function renderForm(){
    if(topMsg)topMsg.textContent='브라우저 저장에 실패했습니다. 저장공간과 브라우저 설정을 확인해 주세요.';
    return;
   }
-  if(k==='qty'||k==='krwAvg')window.ISA_PORTFOLIO_TOTALS?.markAuto?.('toss');
+  if((k==='qty'||k==='krwAvg')&&typeof window!=='undefined')window.ISA_PORTFOLIO_TOTALS?.markAuto?.('toss');
   const message=id.toUpperCase()+' 원화 보유정보 저장 완료 · 미국 주식 카드·투자원가·상단 합계에 반영했습니다.';
   if(topMsg)topMsg.textContent=message;
   render();
