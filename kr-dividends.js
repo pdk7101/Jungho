@@ -106,8 +106,8 @@ function cardLine(id,price){
   valid(p.avg)&&avg>0){
   const principal=qty*avg,profit=qty*Number(price)-principal;
   const inclusive=profit+net.amount;
-  html+='<div class="kr-div-card-return">평가손익 '+signed(profit)+
-   ' · <b>분배금 포함 총손익 '+signed(inclusive)+
+  // The ordinary holding card already renders evaluation P/L. Avoid repeating it here.
+  html+='<div class="kr-div-card-return"><b>분배금 포함 총손익 '+signed(inclusive)+
    ' ('+(inclusive/principal*100>=0?'+':'')+(inclusive/principal*100).toFixed(2)+'%)</b></div>';
  }
  return '<div class="kr-div-card-info">'+html+'</div>';
