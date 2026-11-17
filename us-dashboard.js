@@ -94,6 +94,17 @@ function pct(n){
 function fmtQty(n){
  return Number(n).toLocaleString('ko-KR',{maximumFractionDigits:6})+'주';
 }
+function pendingUSCloseUpdate(x,now=new Date()){
+ // Informational only: US exchange holidays may have no new completed bar.
+ if(!x?.date||!/^[0-9]{8}$/.test(String(x.date)))return false;
+ const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{
+  timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',
+  hour:'2-digit',hourCycle:'h23',weekday:'short'
+ }).formatToParts(now).map(v=>[v.type,v.value]));
+ const today=String(parts.year)+String(parts.month)+String(parts.day);
+ return ['Mon','Tue','Wed','Thu','Fri'].includes(parts.weekday)&&
+  Number(parts.hour)>=17&&String(x.date)<today;
+}
 function priceSource(f,x,wonQuote){
  const state=window.ISA_PERSONAL_US?.state?.();
  if(wonQuote?.kind==='finnhub-private'){
@@ -106,7 +117,9 @@ function priceSource(f,x,wonQuote){
  const reason=state?.fetching?'장중 시세 확인 중':
   !state?.configured?'장중 시세 미연결':
   state?.error?'장중 시세 조회 실패':'장중 시세 미수신·만료';
- return {type:'close',short:x?'직전 확정 종가 '+date(x.date)+' · '+reason:
+ const pending=pendingUSCloseUpdate(x);
+ return {type:pending?'stale':'close',short:x?'직전 확정 종가 '+date(x.date)+
+   (pending?' · 최근 미국장 종가 갱신 대기':'')+' · '+reason:
   '시세 확인 대기 · '+reason};
 }
 function movingAverageCard(x,wonQuote){
@@ -164,6 +177,10 @@ function cards(){
   const krwPrice=valid(q?.amount)?wonAmount(q.amount):'원화 가격 미확인';
   const source=priceSource(f,x,q);
   const selectedClass=selected===f.id?'us-selected':'';
+  const priceMeaning=q?.manual?'토스 직접 입력 · 오늘 가격':
+   q?.kind==='finnhub-private'?'개인 체결가 · 원화 환산':
+   q?.kind==='usd-close'?'확정 종가 '+date(x?.date)+' × 참고환율 · 현재가 아님':
+   '원화 참고가격 미확인';
   return '<div role="button" tabindex="0" class="us-card us-list-row '+selectedClass+'" data-us="'+f.id+
    '" aria-label="'+text(f.ticker+' '+krwPrice+' '+source.short)+'" aria-pressed="'+
    (selected===f.id?'true':'false')+'">'+
@@ -171,6 +188,7 @@ function cards(){
     '<b class="us-list-price">'+text(krwPrice)+'</b>'+
     '<span class="us-list-arrow" aria-hidden="true">›</span></span>'+
    '<span class="us-list-subtitle">'+text(f.type)+'</span>'+
+   '<span class="us-price-meaning">'+text(priceMeaning)+'</span>'+
    '<span class="us-list-source '+source.type+'">'+text(source.short)+'</span>'+
    movingAverageCard(x,q)+holdingCard(f.id,px)+
    '<span class="us-list-foot">종목을 누르면 차트·분배금·매수 판단 상세 확인</span>'+
@@ -215,6 +233,7 @@ function details(){
  const chosenQuote=window.ISA_US_KRW?.priceKrw?.(f.id,price(f));
  const calculation=conversionLine(chosenQuote);
  if(calculation)section+='<p class="us-small">시세 환산 상세: '+text(calculation)+'</p>';
+ if(pendingUSCloseUpdate(x))section+='<p class="us-small us-quote-stale">미국장이 마감됐지만 최신 확정 일봉이 아직 반영되지 않았을 수 있습니다. 과거 종가와 참고환율로 환산한 가격은 토스 현재가가 아닙니다. 상단 보유정보 입력에서 해당 종목의 당일 원화 현재가를 보정할 수 있습니다.</p>';
  host.innerHTML=section;
 }
 function render(){cards();details();}
