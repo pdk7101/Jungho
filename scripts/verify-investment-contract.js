@@ -1195,11 +1195,11 @@ truth(usKrwCode.includes("window.dispatchEvent(new Event('isa-us-valuation-refre
 
 // Mixed-date reference must calculate evaluation P/L from value minus invested
 // without silently adding net distributions, including in a negative-return case.
-aggStore.setItem('isa-account-totals-v1',{
+aggStore.setItem('isa-account-totals-v1',JSON.stringify({
  toss:{invested:12639416,value:9047721,date:'2026-11-16'},
  kiwoom:{invested:615842,value:590040,date:'2026-11-17'}
-});
-aggStore.setItem('isa-account-calculation-mode-v1',{toss:'manual',kiwoom:'manual'});
+}));
+aggStore.setItem('isa-account-calculation-mode-v1',JSON.stringify({toss:'manual',kiwoom:'manual'}));
 accountWindow.ISA_ACCOUNT_SUMMARY.refresh();
 const screenshotReference=cards['account-summary-total'].textContent;
 truth(screenshotReference.includes('참고 단순합계 (계좌별 기준일 다름)')&&
