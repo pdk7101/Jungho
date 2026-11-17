@@ -13,6 +13,9 @@ on:
     # New York 16:00 close (both daylight saving and standard time): next day Korea morning.
     - cron: '35 22 * * 1-5'
     - cron: '15 23 * * 1-5'
+    # Extra 09:30 KST refresh (Tue-Sat) after the prior US regular session has ended.
+    # GitHub-hosted cron may run late; the dashboard must still label dated closes.
+    - cron: '30 0 * * 2-6'
 permissions:
   contents: write
   pages: write
