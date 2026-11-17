@@ -234,9 +234,14 @@ function render(){
  if(finite(t?.invested)&&finite(k?.invested)){
   const cost=Number(t.invested)+Number(k.invested);
   if(finite(t?.value)&&finite(k?.value)){
+   const value=Number(t.value)+Number(k.value);
+   const profit=value-cost;
+   const profitText=(profit>0?'+':'')+money(profit);
+   const rateText=cost>0?' ('+(profit>=0?'+':'')+(100*profit/cost).toFixed(2)+'%)':' (수익률 계산 불가)';
    const difference=!(t.date&&k.date&&t.date===k.date);
    combined.textContent=(difference?'참고 단순합계 (계좌별 기준일 다름)':'두 계좌 합계')+
-    ' · 총투자금 '+money(cost)+' · 평가금액 '+money(Number(t.value)+Number(k.value));
+    ' · 총투자금 '+money(cost)+' · 평가금액 '+money(value)+
+    ' · 평가손익 '+profitText+rateText;
   }else combined.textContent='두 계좌 총투자금 '+money(cost)+' · 전체 평가금액 확인 대기';
  }else combined.textContent='전체 합계는 두 계좌의 총투자금·평가액이 확인된 후 표시합니다.';
 }
