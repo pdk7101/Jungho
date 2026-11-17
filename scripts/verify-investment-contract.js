@@ -997,9 +997,15 @@ const closeQuote={kind:'usd-close',amount:56000,usd:40,fxRate:1400};
 fakeWin.ISA_US_KRW.priceKrw=()=>closeQuote;
 fakeWin.ISA_PERSONAL_US.state=()=>({configured:true,fetching:false,error:''});
 cardCtx.renderTestCards();
-truth(fakeCards.innerHTML.includes('직전 확정 종가 2026-11-12 · 장중 시세 미수신·만료')&&
+truth(fakeCards.innerHTML.includes('직전 확정 종가 2026-11-12')&&
+ fakeCards.innerHTML.includes('장중 시세 미수신·만료')&&
+ fakeCards.innerHTML.includes('참고환율 · 현재가 아님')&&
  !fakeCards.innerHTML.includes('Finnhub 장중 체결'),
- 'stale live quotes are never mislabeled as live and are replaced by dated daily close');
+ 'stale live quotes are never mislabeled as live, and the dated FX-converted close is explicitly not current price');
+truth(usDashboardCode.includes('function pendingUSCloseUpdate(x,now=new Date()){')&&
+ usDashboardCode.includes('최근 미국장 종가 갱신 대기')&&
+ usDashboardCode.includes('당일 원화 현재가를 보정할 수 있습니다'),
+ 'after the US close a lagged daily bar warns users and retains their existing broker quote override route');
 fakeWin.ISA_US_KRW.priceKrw=()=>null;
 cardCtx.renderTestCards();
 truth(fakeCards.innerHTML.includes('원화 가격 미확인')&&
