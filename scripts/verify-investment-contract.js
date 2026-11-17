@@ -1173,8 +1173,9 @@ equal(totalData.kiwoom.value,37400,'Kiwoom total comes from 6 domestic ETF calcu
 truth(cards['toss-total-value'].textContent.includes('3,300원')&&
  cards['kiwoom-total-invested'].textContent.includes('36,000원'),
  'top portfolio cards render totals in KRW without USD amounts');
-truth(cards['account-summary-total'].textContent.includes('기준일 다름'),
- 'combined valuation with different dates is explicitly labeled as mixed-date reference');
+truth(cards['account-summary-total'].textContent.includes('기준일 다름')&&
+ cards['account-summary-total'].textContent.includes('평가손익 +1,210원 (+3.06%)'),
+ 'combined mixed-date reference includes signed KRW evaluation gain and percentage');
 accountEl('account-toss-invested').value='5000';
 accountEl('account-toss-value').value='4300';
 handlers['account-total-save:click']();
@@ -1191,5 +1192,23 @@ equal(accountWindow.ISA_ACCOUNT_SUMMARY.getTotals().toss.value,3300,
  'reset falls back to existing dated Toss screenshot automatically');
 truth(usKrwCode.includes("window.dispatchEvent(new Event('isa-us-valuation-refreshed'))"),
  'US holding changes trigger account total rerender without touching payout ledger');
+
+// Mixed-date reference must calculate evaluation P/L from value minus invested
+// without silently adding net distributions, including in a negative-return case.
+aggStore.setItem('isa-account-totals-v1',{
+ toss:{invested:12639416,value:9047721,date:'2026-11-16'},
+ kiwoom:{invested:615842,value:590040,date:'2026-11-17'}
+});
+aggStore.setItem('isa-account-calculation-mode-v1',{toss:'manual',kiwoom:'manual'});
+accountWindow.ISA_ACCOUNT_SUMMARY.refresh();
+const screenshotReference=cards['account-summary-total'].textContent;
+truth(screenshotReference.includes('참고 단순합계 (계좌별 기준일 다름)')&&
+ screenshotReference.includes('총투자금 13,255,258원')&&
+ screenshotReference.includes('평가금액 9,637,761원')&&
+ screenshotReference.includes('평가손익 -3,617,497원 (-27.29%)'),
+ 'reference account total computes signed loss and percentage using invested and value only');
+truth(cards['account-dividend-total'].textContent.includes('2,100원')&&
+ !screenshotReference.includes('배당'),
+ 'account cash payouts remain separate from evaluation P/L without double counting');
 
 console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
