@@ -83,6 +83,9 @@ equal([endOfDay.rows.robot.qty,endOfDay.rows.space.qty,endOfDay.rows.reit.qty],[
  'after close a worker can see next session quantities before placing conditional orders');
 const preOpen=app.nextSessionPlan(new FixedDate('2026-11-02T22:15:00.000Z'));
 equal(preOpen.rows.robot.type,'buy','pre-opening view reuses the last completed close');
+const lateOldClose=app.nextSessionPlan(new FixedDate('2026-11-04T22:15:00.000Z'));
+equal(lateOldClose.rows.robot.type,'wait',
+ 'old bars cannot be reused to advertise BUY when the most recent weekday close is missing');
 equal(app.nextSessionPlan(new FixedDate('2026-11-03T01:00:00.000Z')),null,
  'do not present EOD conditions as a fresh real-time signal during KRX open hours');
 app.settings.capMode='manual';app.settings.robotCap=9000;
