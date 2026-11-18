@@ -571,7 +571,7 @@ truth(txt('portfolio-totals.js').includes("const TD='isa-private-toss-domestic-h
  txt('portfolio-totals.js').includes("if(val===null)delete entry[field];else entry[field]=val;"),
  'unified Toss stock editor preserves existing private holdings keys and old screenshot references');
 // Behaviour test: domestic editor change updates a saved position without altering cost basis.
-const domesticSrc=html.slice(html.indexOf('function renderPositions(){'),html.indexOf('function renderPlan(){'));
+const domesticSrc=html.slice(html.indexOf('function renderPositions(){'),html.indexOf('function renderPlan(prepared){'));
 truth(domesticSrc.startsWith('function renderPositions(){')&&domesticSrc.includes("positions[id]=h;persist();render();"),
  'domestic holdings editor source is separately executable and updates cards');
 const domesticSaved={reit:{qty:42,avg:3886}},domesticInputs=[];
