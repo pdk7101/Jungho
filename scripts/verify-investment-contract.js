@@ -240,6 +240,43 @@ truth(usSignalCode.includes("id==='cony'&&read('isa-cony-autobuy-plan-v1')?.stat
  usSignalCode.includes('현재 자동매수 중단 유지'),
  'CONY graph information cannot automatically restart paused buying');
 
+truth(usDashboardCode.includes('window.ISA_US_SIGNAL?.cardStatus?.(f.id)')&&
+ html.includes('.us-card-signal.state-buy')&&
+ html.includes('.us-card-signal.state-wait')&&
+ html.includes('.us-card-signal.state-stop'),
+ 'US stock cards display one concise signal in buy/wait/stop states without requiring detail expansion');
+const compactStart=usSignalCode.indexOf('function decision(id){');
+const compactEnd=usSignalCode.indexOf('function cardLine(id){',compactStart);
+truth(compactStart>=0&&compactEnd>compactStart&&
+ usSignalCode.includes('cardLine,cardStatus,detailLine'),
+ 'US compact signal is generated from the existing decision API and exported for cards');
+const signalTestCases={
+ schd:{type:'buy',title:'추세 확인 소액매수 검토'},
+ agnc:{type:'wait',title:'추세·배당 확인 대기'},
+ spym:{type:'stop',title:'원화 매수 상한 초과'},
+ cony:{type:'buy',title:'CONY의 자동재개가 허용된 것처럼 보이는 잘못된 신호'}
+};
+const compactSignal=new Function('read','item','chartAssessment','quote','getLimit',
+ 'evaluate','NAMES','esc',usSignalCode.slice(compactStart,compactEnd)+
+ '\nreturn {decision,cardStatus};')(
+ ()=>null,()=>({date:'20261118'}),()=>({note:'확정 일봉 기준'}),
+ id=>id,()=>null,id=>signalTestCases[id],
+ {schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY'},x=>String(x)
+);
+for(const [id,expected,label] of [
+ ['schd','buy','매수 검토'],['agnc','wait','대기'],
+ ['spym','stop','중지'],['cony','stop','중지']]){
+ const outcome=compactSignal.decision(id),card=compactSignal.cardStatus(id);
+ equal(outcome.type,expected,id+' uses the current buy/wait/stop decision state');
+ truth(card.includes('class="us-card-signal state-'+expected+'"')&&
+  card.includes('class="us-card-signal-action">'+label+'</strong>'),
+  id+' compact US card matches its existing decision, without a second rule engine');
+}
+truth(compactSignal.cardStatus('cony').includes('기존 CONY 자동매수 중단 계획 유지')&&
+ !compactSignal.cardStatus('cony').includes('자동재개가 허용'),
+ 'CONY paused plan always appears STOP even if a separate technical BUY would be available');
+
+
 // Moving-average mode: compare each validated intraday price with dynamic cap.
 delete app.manual.robot; // Clear the earlier manual-price test override.
 app.settings.capMode='ma';
