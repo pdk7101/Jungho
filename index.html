@@ -1203,25 +1203,28 @@ function renderPlan(prepared){
  el('plan').innerHTML=message;
 }
 function render(){
-
+ var prepared=nextSessionPlan();
  renderCaps();
- renderPlan();
+ renderPlan(prepared);
  var list=el('funds');
  list.innerHTML=FUNDS.map(function(f){
-  var x=byId[f.id],v=verdict(f),live=freshQuote(f.id),p=hasBars(x)?current(x,f.id):(live?live.price:null),h=p?holding(f.id,p):null,b=hasBars(x)?band(x,p):null;
+  var x=byId[f.id],v=prepared?prepared.rows[f.id]:verdict(f),live=prepared?null:freshQuote(f.id),
+  p=prepared?(valid(v.close)?v.close:null):hasBars(x)?current(x,f.id):(live?live.price:null),
+  h=p?holding(f.id,p):null,b=hasBars(x)&&p?band(x,p):null;
   var tag=b?'<span class="band-tag '+(b.name==='하단 20%'?'band20':'')+'">'+b.name+'</span>':'';
   var avgText=renderHoldingInCard(f.id,p);
-  return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+safe(f.plan)+'</small><strong>'+(p?money(p):'미확인')+'</strong><small>'+(live?'오늘 공개 체결가 ('+(live.method==='published'?'GitHub 게시 · 지연 가능':'네이버 직접 조회')+') · 체결 '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+' · '+Math.max(0,Math.floor((Date.now()-new Date(live.tradeAt).getTime())/60000))+'분 경과':'과거 일봉 종가 · '+(hasBars(x)?day(x.date):'확인 불가'))+'</small>'+
-  (['robot','space','sol'].includes(f.id)?'<small>매수 적용상한 '+(valid(effectiveCap(f.id).value)?money(effectiveCap(f.id).value):'확인 대기')+' · '+safe(effectiveCap(f.id).reason)+'</small>':'')+avgText+renderMa20InCard(f.id)+tag+(window.ISA_KR_DIVIDENDS?.cardLine?.(f.id,p)||'')+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+actionLabel(v.type)+'</div></div>';
+  return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+(prepared?'다음 거래일 주문준비':safe(f.plan))+'</small><strong>'+(p?money(p):'마감 종가 미확인')+'</strong><small>'+(live?'오늘 공개 체결가 ('+(live.method==='published'?'GitHub 게시 · 지연 가능':'네이버 직접 조회')+') · 체결 '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+' · '+Math.max(0,Math.floor((Date.now()-new Date(live.tradeAt).getTime())/60000))+'분 경과':(prepared?'주문준비 참고 종가 · ':'과거 일봉 종가 · ')+(hasBars(x)?day(x.date):'확인 불가'))+'</small>'+
+  (['robot','space','sol'].includes(f.id)?'<small>매수 적용상한 '+(valid(effectiveCap(f.id).value)?money(effectiveCap(f.id).value):'확인 대기')+' · '+safe(effectiveCap(f.id).reason)+'</small>':'')+avgText+renderMa20InCard(f.id)+tag+(window.ISA_KR_DIVIDENDS?.cardLine?.(f.id,p)||'')+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+(prepared&&v.type==='wait'?'보류':actionLabel(v.type))+'</div>'+
+  (prepared?'<small class="eod-reason">'+safe(v.title)+'</small>':'')+'</div>';
  }).join('');
  document.dispatchEvent(new Event('isa-rendered'));
  Array.from(list.querySelectorAll('[data-id]')).forEach(function(node){
   node.onclick=function(){selected=node.dataset.id;el('selection').value=selected;render();};
   node.onkeydown=function(ev){if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selected=node.dataset.id;el('selection').value=selected;render();}};
  });
- var f=FUNDS.find(function(x){return x.id===selected;}),x=byId[f.id],v=verdict(f),d=el('details');
+ var f=FUNDS.find(function(x){return x.id===selected;}),x=byId[f.id],v=prepared?prepared.rows[f.id]:verdict(f),d=el('details');
  if(!hasBars(x)){d.innerHTML='<p class="sub">정확한 일봉이 확인되지 않아 이동평균과 평단 인하 효과를 계산하지 않습니다.</p>';return;}
- var p=current(x,f.id),b=band(x,p),h=holding(f.id,p);
+ var p=prepared&&valid(v.close)?v.close:current(x,f.id),b=band(x,p),h=holding(f.id,p);
  var t=x.trend,low=Number(x.low20),high=Number(x.high20);
  var pos=Math.max(0,Math.min(100,(p-low)/(high-low)*100));
  var ratio=(p/Number(t.ma20)-1)*100;
@@ -1238,7 +1241,7 @@ function render(){
   }
  }else costText='<p class="sub">보유 평단가와 수량을 입력하면 평단 인하 여부 및 예상 매수 후 평단을 계산합니다. 수량 0이면 미보유로 처리합니다.</p>';
  var vol=valid(t.avgVolume20)&&t.avgVolume20>0&&Number.isFinite(t.volumeToday)?(t.volumeToday/t.avgVolume20).toFixed(2)+'배':'미확인';
- d.innerHTML='<div class="divider"></div><div class="flex"><strong>'+money(p)+'</strong><span class="status state-'+v.type+'">'+actionLabel(v.type)+'</span></div>'+
+ d.innerHTML='<div class="divider"></div><div class="flex"><strong>'+money(p)+'</strong><span class="status state-'+v.type+'">'+(prepared&&v.type==='wait'?'보류':actionLabel(v.type))+'</span></div>'+
  '<p class="sub">'+(freshQuote(f.id)?'현재 표시 가격은 비공식 당일 조회가 · 5·20일선 및 박스권은 '+day(x.date)+' 확정 일봉 기준':'게시 일봉 종가 '+day(x.date))+' · 20거래일 '+day(x.rangeStart)+'~'+day(x.rangeEnd)+'</p>'+
  chart(x.bars)+
  '<div class="leg20"><span><i class="legend-dot" style="background:#f87171"></i>종가</span><span><i class="legend-dot" style="background:#24bf9a"></i>5일선</span><span><i class="legend-dot" style="background:#eab308"></i>20일선</span><span><i class="legend-dot" style="background:#6b829f;height:8px;width:5px"></i>거래량</span></div>'+
