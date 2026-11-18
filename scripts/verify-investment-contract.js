@@ -28,7 +28,7 @@ const FixedDate=class extends Date{constructor(...args){super(...(args.length?ar
 const appCode=html.slice(html.indexOf('var FUNDS='),html.indexOf('function chart(bars){'));
 truth(appCode.includes('window.ISA_KR_APP='),'domestic decision module is present');
 const app=new Function('window','localStorage','document','Date',appCode+
- '\nreturn {FUNDS,defaults,settings,positions,byId,manual,verdict,pairPlan,solDailyEntry,effectiveCap,ma20Comparison,current,freshQuote,setQuotes:q=>liveQuotes=q};')(
+ '\nreturn {FUNDS,defaults,settings,positions,byId,manual,verdict,pairPlan,solDailyEntry,effectiveCap,ma20Comparison,current,freshQuote,nextSessionPlan,setCollectedAt:v=>loadTime=v,setQuotes:q=>liveQuotes=q};')(
  win,loc,{getElementById:()=>null},FixedDate);
 equal(app.FUNDS.map(x=>[x.id,x.code]),[
  ['reit','329200'],['sol','0167B0'],['robot','469070'],
@@ -46,8 +46,11 @@ equal(app.defaults.capMode,'ma','moving-average-only is the default buy cap mode
 truth(app.FUNDS.find(f=>f.id==='reit').plan.includes('1·2·3·4주'),
  'REIT card description accurately covers SOL-rejected 4-share fallback');
 truth(html.includes('국내 ETF 매수계획 · 거래일 조건 점검')&&
- html.includes('기본 적립 계획과 미확정 조건을 구분합니다'),
- 'daily buy plan panel differentiates standing schedule and verified live-entry signals');
+ html.includes('function renderPlan(prepared){')&&
+ html.includes('var prepared=nextSessionPlan();')&&
+ html.includes('매수 검토 (')&&
+ html.includes('마감 종가 미확인 종목은 보류합니다.'),
+ 'single plan panel switches between intraday and next-session close-based decisions');
 for(const mode of ['ma','manual','both'])truth(html.includes('value="'+mode+'"'),mode+' appears in mode selector');
 truth(html.indexOf('id="cap-settings"')<html.indexOf('id="summary"'),
  'manual limit controls appear above Korean stock recommendations');
@@ -62,6 +65,30 @@ for(const [id,p] of Object.entries({reit:3805,robot:9300,space:9350,sofr:11500,t
  app.byId[id]=bars(id,p);
 app.positions.robot={avg:9500,qty:3};
 app.positions.space={avg:9600,qty:3};
+// EOD order-prep MUST NOT use an uncompleted 15:20 daily bar even if its date is today.
+app.setCollectedAt('2026-11-02T06:20:00.000Z');
+const unsafeEod=app.nextSessionPlan(new FixedDate('2026-11-02T08:00:00.000Z'));
+equal(unsafeEod.rows.robot.type,'wait','14:xx or 15:xx collection cannot generate next-day BUY');
+app.setCollectedAt('2026-11-02T08:00:00.000Z'); // 17:00 KST published close
+const endOfDay=app.nextSessionPlan(new FixedDate('2026-11-02T08:15:00.000Z'));
+equal(endOfDay.nextDay,'2026-11-03','after-hours order plan identifies the next weekday');
+equal([endOfDay.rows.robot.type,endOfDay.rows.space.type,endOfDay.rows.sol.type,
+ endOfDay.rows.reit.type,endOfDay.rows.sofr.type,endOfDay.rows.tr.type],
+ ['buy','buy','stop','buy','wait','wait'],
+ 'robot/space low-zone BUY and SOL not-needed STOP preserve original REIT/SOFR/TR plan');
+equal([endOfDay.rows.robot.qty,endOfDay.rows.space.qty,endOfDay.rows.reit.qty],[1,1,1],
+ 'after close a worker can see next session quantities before placing conditional orders');
+const preOpen=app.nextSessionPlan(new FixedDate('2026-11-02T22:15:00.000Z'));
+equal(preOpen.rows.robot.type,'buy','pre-opening view reuses the last completed close');
+equal(app.nextSessionPlan(new FixedDate('2026-11-03T01:00:00.000Z')),null,
+ 'do not present EOD conditions as a fresh real-time signal during KRX open hours');
+app.settings.capMode='manual';app.settings.robotCap=9000;
+const limited=app.nextSessionPlan(new FixedDate('2026-11-02T22:15:00.000Z'));
+equal(limited.rows.robot.type,'stop','user-entered KRW ceiling blocks next-day robot buy');
+equal([limited.rows.sol.type,limited.rows.reit.qty],['stop',4],
+ 'SOL technical rejection still triggers original four-REIT fallback');
+app.settings.capMode='ma';app.settings.robotCap=9500;
+
 const trade=p=>({price:p,tradeAt:'2026-11-02T05:00:00.000Z',date:today,method:'published'});
 const verdict=id=>app.verdict(app.FUNDS.find(f=>f.id===id));
 truth(!html.includes('id="ma20-panel"'),
