@@ -877,18 +877,26 @@ function nextWeekday(iso){
  while(d.getUTCDay()===0||d.getUTCDay()===6);
  return d.toISOString().slice(0,10);
 }
+function previousWeekday(iso){
+ var d=new Date(iso+'T12:00:00Z');
+ if(!isFinite(d.getTime()))return null;
+ do{d.setUTCDate(d.getUTCDate()-1);}
+ while(d.getUTCDay()===0||d.getUTCDay()===6);
+ return d.toISOString().slice(0,10).replace(/-/g,'');
+}
 function orderPrepPhase(now){
  var t=kstClock(now),working=!['Sat','Sun'].includes(t.weekday);
  if(working&&t.minute>=540&&t.minute<930)return null;
- return {stage:!working?'주말 휴장':t.minute>=930?'정규장 마감 후':'개장 전',
+ var closedToday=working&&t.minute>=930;
+ return {stage:!working?'주말 휴장':closedToday?'정규장 마감 후':'개장 전',
   asOf:t.date,nextDay:working&&t.minute<540?t.iso:nextWeekday(t.iso),
-  requireToday:working&&t.minute>=930};
+  requireToday:closedToday,expectedDate:closedToday?t.date:previousWeekday(t.iso)};
 }
 function completedClose(id,phase,latestDate){
  var x=byId[id],stamp=loadTime?new Date(loadTime):null;
  if(!verified(id)||!stamp||!isFinite(stamp.getTime()))return null;
  var collected=kstClock(stamp);
- if(x.date!==latestDate||x.date>phase.asOf)return null;
+ if(x.date!==latestDate||x.date>phase.asOf||x.date!==phase.expectedDate)return null;
  if(phase.requireToday&&x.date!==phase.asOf)return null;
  if(!phase.requireToday&&x.date===phase.asOf)return null;
  // A 14:xx collection cannot certify an EOD bar, even if the bar date is today.
