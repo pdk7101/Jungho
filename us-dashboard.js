@@ -190,6 +190,7 @@ function cards(){
    '<span class="us-list-subtitle">'+text(f.type)+'</span>'+
    '<span class="us-price-meaning">'+text(priceMeaning)+'</span>'+
    '<span class="us-list-source '+source.type+'">'+text(source.short)+'</span>'+
+   (window.ISA_US_SIGNAL?.cardStatus?.(f.id)||'<div class="us-card-signal state-wait"><strong class="us-card-signal-action">대기</strong><span class="us-card-signal-note">매수 판단 로딩 중</span></div>')+
    movingAverageCard(x,q)+holdingCard(f.id,px)+
    '<span class="us-list-foot">종목을 누르면 차트·분배금·매수 판단 상세 확인</span>'+
    '</div>';
