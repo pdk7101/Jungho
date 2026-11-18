@@ -158,13 +158,25 @@ function decision(id){
  if(id==='cony'&&read('isa-cony-autobuy-plan-v1')?.status!=='review'){
   // CONY shares the same chart interpretation, but a positive signal NEVER overrides the user's pause.
   const x=item(id),graph=chartAssessment(x);
-  return {type:'wait',title:'CONY 자동매수 일시중단 유지',
+  return {type:'stop',title:'CONY 자동매수 일시중단 유지',
    reason:'11월 1일부터 CONY 일 15,000원 자동매수를 일시 중단하고 그 금액을 현금으로 모으기로 한 최신 계획을 우선합니다. 실시간 COIN·공식 NAV·분배금 포함 총수익률·병합 공시 안정성을 이 앱에서 검증할 수 없으므로 가격 반등만으로 자동매수 재개하지 않습니다.',
    notes:['그래프 매수 보조: '+graph.note+' · 현재 자동매수 중단 유지'],
    qty:0,amountKRW:null,sourceDate:x?.date||null};
  }
  const q=quote(id),cap=getLimit(id);
  return evaluate(id,q,cap);
+}
+function cardStatus(id){
+ const v=decision(id);
+ const kind=['buy','wait','stop'].includes(v.type)?v.type:'wait';
+ const label=kind==='buy'?'매수 검토':kind==='stop'?'중지':'대기';
+ const note=id==='cony'&&kind==='stop'&&v.title==='CONY 자동매수 일시중단 유지'?
+  '기존 CONY 자동매수 중단 계획 유지':v.title;
+ return '<div class="us-card-signal state-'+kind+'" aria-label="'+
+  esc(NAMES[id]||id)+' 매수 판단 '+label+' · '+esc(note)+'">'+
+  '<strong class="us-card-signal-action">'+label+'</strong>'+
+  '<span class="us-card-signal-note">'+esc(note)+'</span>'+
+  '</div>';
 }
 function cardLine(id){
  const v=decision(id),daily=dailyAmount(id);
@@ -232,7 +244,7 @@ function mount(){
  '<p class="us-small" id="us-signal-limits-note"></p></details>';
  const anchor=$('us-krw-panel');
  if(anchor)anchor.insertAdjacentElement('afterend',holder);else $('us-updated').insertAdjacentElement('afterend',holder);
- window.ISA_US_SIGNAL={evaluate,decision,cardLine,detailLine,settings,refreshSummary};
+ window.ISA_US_SIGNAL={evaluate,decision,cardLine,cardStatus,detailLine,settings,refreshSummary};
  updateLimitsUI();
  window.addEventListener('isa-us-quotes-refreshed',render);
  render();
