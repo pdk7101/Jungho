@@ -238,6 +238,24 @@ details[open]>summary{margin-bottom:12px}
 #us-panel .us-price-meaning{display:block;font-size:.7rem;line-height:1.5;color:#d9c6a8;margin-top:3px}
 #us-panel .us-quote-stale{border-left:3px solid #deb177;padding:10px;background:#302d31;border-radius:6px}
 #us-panel .us-list-source.manual{color:#d7c59f}
+/* A single, at-a-glance US stock decision. Separate from broker's actual order status. */
+#us-panel .us-card-signal{
+ display:flex;align-items:center;flex-wrap:wrap;gap:7px 10px;
+ padding:9px 11px;margin-top:10px;border:1px solid #6a809f;
+ background:#192a43;border-radius:9px;font-size:.79rem;line-height:1.5
+}
+#us-panel .us-card-signal-action{
+ flex-shrink:0;display:inline-flex;align-items:center;border-radius:6px;
+ padding:3px 9px;font-size:.79rem;font-weight:850;letter-spacing:.02em;
+ border:1px solid currentColor
+}
+#us-panel .us-card-signal-note{flex:1;min-width:130px;color:#e1eaf7;overflow-wrap:anywhere}
+#us-panel .us-card-signal.state-buy{border-color:#477e9c}
+#us-panel .us-card-signal.state-buy .us-card-signal-action{color:#9fd8ff}
+#us-panel .us-card-signal.state-wait{border-color:#5b6c83}
+#us-panel .us-card-signal.state-wait .us-card-signal-action{color:#d5deea}
+#us-panel .us-card-signal.state-stop{border-color:#a15a68;background:#302739}
+#us-panel .us-card-signal.state-stop .us-card-signal-action{color:#ffaab9}
 #us-panel .us-card-ma20{
  display:block;border:1px solid #4a6a8d;border-radius:12px;
  background:#122942;padding:13px;margin-top:13px
