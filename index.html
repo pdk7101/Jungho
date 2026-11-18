@@ -861,6 +861,128 @@ function verdict(f){
  if(b.low&&!h)return {type:'wait',title:'저가 관심 · 평단 입력',info:b.name+'입니다. 평단가를 입력하면 실제 평단 인하 효과를 확인할 수 있습니다. 5·20일선: '+trend(x),qty:0};
  return {type:'wait',title:b.low?'저가·추세 확인 대기':'추세/가격 조건 대기',info:(h&&!h.canLower?'현재가가 평단보다 높아 평단 인하가 되지 않습니다. ':'')+b.name+' · '+trend(x)+'. 30%·20% 가격대가 아니더라도 상승 전환 시 재검토.',qty:0};
 }
+// Next-session review deliberately uses completed Korean daily bars, NOT intraday quotes.
+function kstClock(now){
+ var p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{
+  timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',
+  hour:'2-digit',minute:'2-digit',weekday:'short',hourCycle:'h23'
+ }).formatToParts(now).map(function(x){return [x.type,x.value];}));
+ return {date:p.year+p.month+p.day,iso:p.year+'-'+p.month+'-'+p.day,
+  minute:Number(p.hour)*60+Number(p.minute),weekday:p.weekday};
+}
+function nextWeekday(iso){
+ var d=new Date(iso+'T12:00:00Z');
+ if(!isFinite(d.getTime()))return '확인 대기';
+ do{d.setUTCDate(d.getUTCDate()+1);}
+ while(d.getUTCDay()===0||d.getUTCDay()===6);
+ return d.toISOString().slice(0,10);
+}
+function orderPrepPhase(now){
+ var t=kstClock(now),working=!['Sat','Sun'].includes(t.weekday);
+ if(working&&t.minute>=540&&t.minute<930)return null;
+ return {stage:!working?'주말 휴장':t.minute>=930?'정규장 마감 후':'개장 전',
+  asOf:t.date,nextDay:working&&t.minute<540?t.iso:nextWeekday(t.iso),
+  requireToday:working&&t.minute>=930};
+}
+function completedClose(id,phase,latestDate){
+ var x=byId[id],stamp=loadTime?new Date(loadTime):null;
+ if(!verified(id)||!stamp||!isFinite(stamp.getTime()))return null;
+ var collected=kstClock(stamp);
+ if(x.date!==latestDate||x.date>phase.asOf)return null;
+ if(phase.requireToday&&x.date!==phase.asOf)return null;
+ if(!phase.requireToday&&x.date===phase.asOf)return null;
+ // A 14:xx collection cannot certify an EOD bar, even if the bar date is today.
+ if(collected.date<x.date||(collected.date===x.date&&collected.minute<990))return null;
+ return x;
+}
+function nextSessionPlan(now){
+ now=now||new Date();
+ var phase=orderPrepPhase(now);if(!phase)return null;
+ var published=FUNDS.map(function(f){var x=byId[f.id];return verified(f.id)?x.date:null;}).filter(Boolean).sort();
+ var latestDate=published.length?published[published.length-1]:null;
+ var checked={};
+ FUNDS.forEach(function(f){checked[f.id]=latestDate?completedClose(f.id,phase,latestDate):null;});
+ var plan={phase:phase,asOf:latestDate,nextDay:phase.nextDay,rows:{},available:0,estimated:0,overBudget:false};
+ function record(type,title,info,qty,price,cap){
+  return {type:type,title:title,info:info,qty:qty||0,close:price??null,cap:cap??null,asOf:latestDate};
+ }
+ function missing(){
+  return record('wait','마감 종가 확인 보류',
+   '15:30 마감 이후 게시된 최신 일봉과 수집 시각이 미확인입니다. 16:30 이후 새로고침해 다음 거래일 주문을 판단하세요. 이전 거래일 가격으로 매수를 권하지 않습니다.',0);
+ }
+ function evaluateClose(id){
+  var x=checked[id];if(!x)return missing();
+  plan.available++;
+  var p=Number(x.close),cap=effectiveCap(id);
+  if(!valid(cap.value))return record('wait','매수상한 확인 보류',cap.reason,0,p);
+  if(p>cap.value)return record('stop','신규매수 중지',
+   '마감 종가 '+money(p)+'이 설정된 매수상한 '+money(cap.value)+'을 초과했습니다.',0,p,cap.value);
+  var graph=chartAssessment(id);
+  if(graph.level==='risk')return record('stop','거래량·약세 위험 중지',graph.note,0,p,cap.value);
+  var bandInfo=band(x,p),h=holding(id,p),t=x.trend,
+   low=bandInfo.low&&(!h||h.canLower),
+   rising=!!(t.ma5Above20&&t.maRising&&p>=Number(t.ma20)*.99&&p<=Number(t.ma20)*1.04);
+  if(low||rising)return record('buy','다음 거래일 1주 매수 검토',
+   (low?bandInfo.name+' 저가 구간'+(h?'·평단 인하 가능':''):'5·20일선 상승 추세')+
+    ' · 적용 상한 내 지정가 주문 참고. 다음 날 시초가가 상한을 넘으면 추격매수하지 않습니다.',
+   1,p,cap.value);
+  return record('stop','매수 조건 미충족 · 중지',
+   '저가 진입 또는 5·20일선 상승 조건이 확인되지 않았습니다.',0,p,cap.value);
+ }
+ plan.rows.robot=evaluateClose('robot');
+ plan.rows.space=evaluateClose('space');
+ var robot=plan.rows.robot,space=plan.rows.space,
+  pairKnown=robot.type!=='wait'&&space.type!=='wait',
+  stopped=(robot.type==='stop'?1:0)+(space.type==='stop'?1:0);
+ var sol=evaluateClose('sol');
+ plan.rows.sol=!pairKnown?
+  record('wait','SOL 연동 조건 보류','로봇·우주 판단 미확인으로 SOL 대체매수 수량도 정하지 않습니다.',0,sol.close,sol.cap):
+  !stopped?record('stop','SOL 대체매수 미발동','로봇·우주 두 종목 모두 매수 조건 충족 · SOL은 0주.',0,sol.close,sol.cap):sol;
+ var reit=checked.reit;
+ if(reit){
+  plan.available++;
+  if(!pairKnown||(stopped&&plan.rows.sol.type==='wait')){
+   plan.rows.reit=record('wait','리츠 증액 보류',
+    '기본 1주 적립 계획은 유지하되 연동 수량 확정 전 2~4주로 증액하지 않습니다.',0,Number(reit.close));
+  }else{
+   var qty=stopped&&plan.rows.sol.type==='stop'?4:stopped+1;
+   plan.rows.reit=record('buy','리츠 '+qty+'주 매수 검토',
+    '기존 연동 적립 규칙. 리츠는 별도 매수상한이 없으니 다음 날 지정가를 키움에서 확인해야 합니다.',
+    qty,Number(reit.close));
+  }
+ }else plan.rows.reit=missing();
+ var sofr=checked.sofr,mon=new Date(phase.nextDay+'T12:00:00Z').getUTCDay()===1;
+ if(sofr){
+  plan.available++;
+  plan.rows.sofr=mon?
+   record('buy','월요일 SOFR 정기적립 1주',
+    '기존 월요일 1주 주식모으기. 휴장일·예약 주문 가능 시간은 키움에서 확인하세요.',1,Number(sofr.close)):
+   record('wait','SOFR 정기 적립일 아님',
+    '다음 평일은 월요일이 아닙니다. 기존 월요일 1주 적립 설정을 해제할 필요는 없습니다.',0,Number(sofr.close));
+ }else plan.rows.sofr=missing();
+ var tr=checked.tr;
+ if(tr){
+  plan.available++;
+  var target=valid(settings.trBase)?round5(Number(settings.trBase)*.95):null;
+  plan.rows.tr=record('wait',valid(target)&&Number(tr.close)<=target?
+   'KODEX 200TR -5% 감시 도달':'KODEX 200TR -5% 감시 유지',
+   valid(target)?'관찰가격 '+money(target)+' · 실제 지정가 주문 및 체결 여부는 별도로 확인하세요.':
+    '감시 기준가가 설정되지 않았습니다.',0,Number(tr.close),target);
+ }else plan.rows.tr=missing();
+ var buys=FUNDS.filter(function(f){return plan.rows[f.id]?.type==='buy';});
+ plan.estimated=buys.reduce(function(sum,f){var d=plan.rows[f.id];return sum+d.qty*d.close;},0);
+ var budget=valid(settings.dailyBudget)?Number(settings.dailyBudget):null;
+ if(budget!==null&&plan.estimated>budget){
+  plan.overBudget=true;
+  buys.forEach(function(f){
+   var v=plan.rows[f.id];
+   v.type='wait';v.title='하루 예산 초과 · 보류';v.qty=0;
+   v.info+=' 매수 계획 합계 '+money(plan.estimated)+'이 하루 예산 '+money(budget)+
+    '을 넘으므로 수량 조정 전 사전 주문 준비 보류.';
+  });
+ }
+ return plan;
+}
 function actionLabel(type){
  return type==='buy'?'매수':type==='stop'?'중지':'대기';
 }
