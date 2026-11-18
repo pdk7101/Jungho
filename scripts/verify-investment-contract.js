@@ -66,6 +66,9 @@ for(const [id,p] of Object.entries({reit:3805,robot:9300,space:9350,sofr:11500,t
 app.positions.robot={avg:9500,qty:3};
 app.positions.space={avg:9600,qty:3};
 // EOD order-prep MUST NOT use an uncompleted 15:20 daily bar even if its date is today.
+// Test a valid user-defined ceiling; default MA ceilings are deliberately stricter.
+app.settings.capMode='manual';app.settings.robotCap=9500;
+app.settings.spaceCap=9700;app.settings.solCap=10000;
 app.setCollectedAt('2026-11-02T06:20:00.000Z');
 const unsafeEod=app.nextSessionPlan(new FixedDate('2026-11-02T08:00:00.000Z'));
 equal(unsafeEod.rows.robot.type,'wait','14:xx or 15:xx collection cannot generate next-day BUY');
