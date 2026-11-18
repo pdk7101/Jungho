@@ -361,7 +361,7 @@ equal([tuesdaySofr.type,tuesdaySofr.qty],['wait',0],
 truth(tuesdaySofr.title.includes('다음 월요일'),
  'SOFR non-Monday is a scheduled weekly buy, not price-data failure');
 const planHost={innerHTML:''};
-const planSrc=html.slice(html.indexOf('function renderPlan(){'),html.indexOf('function render(){'));
+const planSrc=html.slice(html.indexOf('function renderPlan(prepared){'),html.indexOf('function render(){'));
 const planApp=new Function('window','localStorage','document','Date',appCode+'\n'+planSrc+
  '\nreturn {renderPlan};')({ISA_livePriceFetch:{active:()=>false}},loc,
  {getElementById:id=>id==='plan'?planHost:null},FixedDate);
