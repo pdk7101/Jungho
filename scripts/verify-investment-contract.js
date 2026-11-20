@@ -705,12 +705,12 @@ const payoutEntries=[
  {date:'2026-11-13',net:300},
  {date:'2026-11-20',net:125}
 ];
-const simulatePayout=(holding,rows)=>new Function('holdings','distributionStats','day',
+const simulatePayout=(holding,rows,snapshot=null)=>new Function('holdings','distributionStats','day','storage',
  payoutLogic+'\nreturn netDividend;')(
  ()=>({cony:holding}),
  ()=>({rows:[...rows].reverse(),count:rows.length,
   net:rows.reduce((sum,v)=>sum+v.net,0)}),
- ()=> '2026-11-20')('cony');
+ ()=> '2026-11-20',()=>snapshot)('cony');
 const migratedPayout=simulatePayout({krwNet:1000},payoutEntries);
 equal(migratedPayout.amount,1125,
  'old 1000 cumulative amount rolls forward by only the later 125 KRW weekly receipt');
@@ -725,6 +725,9 @@ truth(incompletePayout.unlinked&&incompletePayout.amount===1000,
  'missing earlier receipts do not trigger unsupported automatic addition');
 equal(simulatePayout({krwNet:1000,krwNetAsOf:'2026-11-13'},payoutEntries.slice(2)).amount,1125,
  'user can restore correct totals by setting last included payment date');
+equal(simulatePayout({krwNet:1000},payoutEntries.slice(2),{
+ conyNote:{total:1000},conyNoteDate:'2026-11-14'
+}).amount,1125,'dated snapshot matching old CONY total resolves missing historical weekly payments');
 truth(txt('account-summary.js').includes('window.ISA_US_KRW?.netDividend?.(id)')&&
  usDashboardCode.includes('window.ISA_US_KRW?.netDividend?.(id)')&&
  usKrwCode.includes("data-k=\"krwNetAsOf\""),
