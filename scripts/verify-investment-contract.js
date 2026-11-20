@@ -689,6 +689,44 @@ truth(usKrwCode.includes("kind:'finnhub-private'")&&
  'live USD quote and completed USD close have separate provenance');
 truth(usKrwCode.includes("const LEDGER_KEY='isa-us-distributions-krw-v1'"),
  'existing cumulative net KRW dividend ledger is never deleted');
+// Newly entered CONY weekly receipts must flow through stock card, monthly ledger,
+// top account dividends and net-inclusive returns without adding old receipts twice.
+const payoutStart=usKrwCode.indexOf('function validLedgerDate(v){');
+const payoutEnd=usKrwCode.indexOf('function positionKrw(id,priceUsd){',payoutStart);
+truth(payoutStart>=0&&payoutEnd>payoutStart,
+ 'US payout opening-balance reconciliation functions available');
+const payoutLogic=usKrwCode.slice(payoutStart,payoutEnd);
+const payoutEntries=[
+ {date:'2026-10-30',net:400},
+ {date:'2026-11-06',net:300},
+ {date:'2026-11-13',net:300},
+ {date:'2026-11-20',net:125}
+];
+const simulatePayout=(holding,rows)=>new Function('holdings','distributionStats','day',
+ payoutLogic+'\nreturn netDividend;')(
+ ()=>({cony:holding}),
+ ()=>({rows:[...rows].reverse(),count:rows.length,
+  net:rows.reduce((sum,v)=>sum+v.net,0)}),
+ ()=> '2026-11-20')('cony');
+const migratedPayout=simulatePayout({krwNet:1000},payoutEntries);
+equal(migratedPayout.amount,1125,
+ 'old 1000 cumulative amount rolls forward by only the later 125 KRW weekly receipt');
+equal(migratedPayout.asOf,'2026-11-13',
+ 'opening balance cutoff automatically recovered from exact historical ledger prefix');
+equal(simulatePayout({krwNet:1000,krwNetAsOf:'2026-11-13'},payoutEntries).amount,1125,
+ 'explicit cumulative cutoff includes the next weekly receipt once');
+equal(simulatePayout({krwNet:1125,krwNetAsOf:'2026-11-20'},payoutEntries).amount,1125,
+ 're-entered current cumulative amount never adds the same week twice');
+const incompletePayout=simulatePayout({krwNet:1000},payoutEntries.slice(2));
+truth(incompletePayout.unlinked&&incompletePayout.amount===1000,
+ 'missing earlier receipts do not trigger unsupported automatic addition');
+equal(simulatePayout({krwNet:1000,krwNetAsOf:'2026-11-13'},payoutEntries.slice(2)).amount,1125,
+ 'user can restore correct totals by setting last included payment date');
+truth(txt('account-summary.js').includes('window.ISA_US_KRW?.netDividend?.(id)')&&
+ usDashboardCode.includes('window.ISA_US_KRW?.netDividend?.(id)')&&
+ usKrwCode.includes("data-k=\"krwNetAsOf\""),
+ 'top account total and US card use the same payout resolver with a user-correctable cutoff');
+
 const kStart=usKrwCode.indexOf('function priceKrw(id,priceUsd){');
 const kEnd=usKrwCode.indexOf('/* Private, user-entered Korean-won dividend/distribution ledger.',kStart);
 truth(kStart>=0&&kEnd>kStart,'KRW price conversion function available');
