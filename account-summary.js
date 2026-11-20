@@ -26,6 +26,9 @@ function payoutEntry(v){
  return v&&typeof v==='object'&&finite(v.amount)?{amount:Number(v.amount),date:v.date||null}:null;
 }
 function usPayout(id){
+ // Use the same cumulative + later weekly payouts as the US stock card.
+ const reconciled=window.ISA_US_KRW?.netDividend?.(id);
+ if(reconciled)return reconciled;
  const v=read(US_HOLD)[id]?.krwNet;
  if(finite(v))return {amount:Number(v),kind:'cumulative'};
  const a=readRows(LEDGER).filter(x=>x&&String(x.id).toLowerCase()===id&&finite(x.net)&&/^\d{4}-\d{2}-\d{2}$/.test(String(x.date)));
@@ -36,7 +39,7 @@ function dividendTotals(){
  for(const id of PAYOUT_US){
   const v=usPayout(id);
   if(!v){missing.push(id.toUpperCase());continue;}
-  us+=v.amount;usKnown++;if(v.kind==='ledger')provisional.push(id.toUpperCase());
+  us+=v.amount;usKnown++;if(v.kind==='ledger'||v.unlinked)provisional.push(id.toUpperCase());
  }
  const stored=read(DIV),domesticBase=payoutEntry(stored.tossDomestic),kiwoomBase=payoutEntry(stored.kiwoom);
  // Account-wide Excel/photo totals are opening balances. Only receipts dated later
@@ -65,7 +68,7 @@ function renderDividends(){
  breakdown.textContent='토스 미국 '+x.usKnown+'/4종목 '+money(x.us)+' · 토스 국내 '+
   (x.domestic===null?'미입력':money(x.domestic))+' · 키움 ISA '+(x.kiwoom===null?'미입력':money(x.kiwoom));
  note.textContent=(x.missing.length?'미확인: '+x.missing.join(', ')+'. ':'')+
-  (x.provisional.length?'누적 기준금액이 없는 '+x.provisional.join(', ')+'은 과거 지급내역 누락 가능. ':'')+
+  (x.provisional.length?'누적 기준 지급일 미확인 또는 과거 기록 누락: '+x.provisional.join(', ')+' 확인 필요. ':'')+
   (x.afterBase?.some(x=>x>0)?'계좌 전체 누적액 기준일 이후 종목별 지급기록만 추가 합산. ':'')+
   (x.dates.length?'국내 지급금 입력 기준 '+x.dates.join(' / ')+'. ':'')+
   '실제 세후 수령 누적액이며 주식 평가액에 더하지 않습니다.';
@@ -117,7 +120,10 @@ function applyPrivateDividendPhoto(){
   const h={...read(US_HOLD)},d={...read(DIV)};
   for(const id of PAYOUT_US){
    const original=finite(h[id]?.krwNet)?Number(h[id].krwNet):null;
-   if(original===null||original<v[id])h[id]={...(h[id]||{}),krwNet:v[id]};
+   if(original===null||original<v[id])
+    h[id]={...(h[id]||{}),krwNet:v[id],krwNetAsOf:date};
+   else if(original===v[id]&&!h[id]?.krwNetAsOf)
+    h[id]={...(h[id]||{}),krwNetAsOf:date};
   }
   for(const id of ['tossDomestic','kiwoom']){
    const original=payoutEntry(d[id]);
@@ -133,6 +139,7 @@ function applyPrivateDividendPhoto(){
   if($('account-div-toss-domestic'))$('account-div-toss-domestic').value=d.tossDomestic?.amount??'';
   if($('account-div-kiwoom'))$('account-div-kiwoom').value=d.kiwoom?.amount??'';
   window.ISA_US_APP?.rerender?.();
+  window.dispatchEvent(new Event('isa-us-valuation-refreshed'));
  }catch(e){const msg=$('account-dividend-message');if(msg)msg.textContent='사진 분배금 적용 실패: '+String(e.message||e);}
  finally{try{window.history.replaceState(window.history.state,'',window.location.pathname+window.location.search);}catch(_){}}
 }
