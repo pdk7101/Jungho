@@ -733,6 +733,33 @@ truth(txt('account-summary.js').includes('window.ISA_US_KRW?.netDividend?.(id)')
  usKrwCode.includes("data-k=\"krwNetAsOf\""),
  'top account total and US card use the same payout resolver with a user-correctable cutoff');
 
+
+// Regression: an ordinary NEW receipt must establish the old cumulative cutoff
+// before saving, so the card and top totals change without manual date entry.
+const cutoffStart=usKrwCode.indexOf('function dayBefore(iso){');
+const cutoffEnd=usKrwCode.indexOf('function renderLedger(){',cutoffStart);
+truth(cutoffStart>=0&&cutoffEnd>cutoffStart&&
+ usKrwCode.includes('const anchor=autoAnchorNewReceipt(id,date,entries);'),
+ 'each new US payout uses automatic cutoff anchoring in the saving path');
+const cutoffHelpers=new Function('netDividend','holdings',
+ usKrwCode.slice(cutoffStart,cutoffEnd)+'\nreturn {autoAnchorNewReceipt};')(
+ ()=>({amount:1000,unlinked:true}),()=>({cony:{krwNet:1000,qty:80}}));
+const nextAnchor=cutoffHelpers.autoAnchorNewReceipt('cony','2026-11-20',
+ [{id:'cony',date:'2026-11-13',net:300}]);
+equal(nextAnchor.cutoff,'2026-11-13',
+ 'new 11/20 receipt anchors legacy cumulative at previous 11/13 payment');
+equal(nextAnchor.next.cony.krwNet,1000,
+ 'automatic payout link preserves prior cumulative balance and share ownership');
+equal(nextAnchor.next.cony.krwNetAsOf,'2026-11-13',
+ 'future receipt calculations will add strictly later amounts');
+equal(cutoffHelpers.autoAnchorNewReceipt('cony','2026-11-06',
+ [{id:'cony',date:'2026-11-13',net:300}]),null,
+ 'backdated receipts never silently move the baseline cutoff');
+truth(usKrwCode.includes('data-us-payout-link')&&
+ usKrwCode.includes('기존 누적액과 새 분배금 연결')&&
+ usKrwCode.includes('window.confirm'),
+ 'already saved unlinked payments offer an explicit one-time link without duplicate entry');
+
 const kStart=usKrwCode.indexOf('function priceKrw(id,priceUsd){');
 const kEnd=usKrwCode.indexOf('/* Private, user-entered Korean-won dividend/distribution ledger.',kStart);
 truth(kStart>=0&&kEnd>kStart,'KRW price conversion function available');
