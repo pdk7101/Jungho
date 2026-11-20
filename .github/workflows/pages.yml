@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify established investment rules (fail closed)
-        run: node scripts/verify-investment-contract.js
+        run: node scripts/verify-investment-contract.js && node scripts/verify-payout-entry.js
       - name: Obtain latest published daily bars (unofficial)
         run: node scripts/update-quotes.js
       - name: Publish timestamped Korean intraday prices (unofficial)
