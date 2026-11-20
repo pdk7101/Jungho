@@ -194,7 +194,7 @@ function totalKrw(){
   const id=symbol.toLowerCase(),current=app.getPrice?.(id),p=positionKrw(id,current);
   if(!p)continue;
   count++;principal+=p.principal;value+=p.value;pnl+=p.pnl;
-  if(p.net===null)missing++;else {knownNet+=p.net;if(p.payout?.kind==='ledger')provisional++;}
+  if(p.net===null)missing++;else {knownNet+=p.net;if(p.payout?.kind==='ledger'||p.payout?.unlinked)provisional++;}
  }
  return {count,principal,value,pnl,rate:principal>0?pnl/principal*100:null,
   knownNet,missing,provisional,inclusive:missing===0&&count>0?pnl+knownNet:null,
@@ -209,9 +209,10 @@ function distributionDetail(id){
   html+='<p>손익에 반영하는 누적 세후 분배금 <strong>'+won(net.amount)+'</strong>'+
    ' <span class="us-small">('+clean(net.source)+')</span></p>';
   if(net.kind!=='ledger'&&stats.count){
-   html+='<p>날짜별 기록 합계 '+won(stats.net)+' / 직접 입력 누적금액 '+won(net.amount)+
-     ' · 차액 '+(net.discrepancy>=0?'+':'')+won(net.discrepancy)+'</p>'+
-     '<p class="us-small">기존 누적금액과 날짜별 지급내역은 겹칠 수 있습니다. 기준 지급일 이후의 금액만 추가합니다. 기준일 미확인 시 중복 합산을 방지합니다.</p>';
+   html+='<p class="us-small">기존 직접 입력 누적금 '+won(holdings()[id].krwNet)+
+     (net.asOf?' · 포함 지급일 '+clean(net.asOf):' · 포함 지급일 미확인')+
+     (net.addedCount?' · 이후 '+net.addedCount+'회 추가 '+won(net.added):'')+'</p>'+
+     '<p class="us-small">주별 입력 기록 '+won(stats.net)+'은 기존 누적금액과 겹칠 수 있어, 포함 지급일 이후 내역만 더합니다.</p>';
   }else if(net.kind==='ledger')html+='<p class="us-small">날짜별 지급 기록만 합산했습니다. 과거 기록이 누락됐다면 실제 총수령액보다 적을 수 있습니다.</p>';
  }else html+='<p class="us-small">입력된 세후 분배금이 없어 분배금 포함 총손익을 확정 계산하지 않습니다.</p>';
  if(stats.count){
