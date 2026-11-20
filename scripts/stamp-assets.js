@@ -13,6 +13,13 @@ for(const name of names){
  html=html.replace(previous,()=>{found++;return 'src="./'+name+'?v='+version+'"';});
  if(found!==1)throw Error('스크립트 태그 누락/중복: '+name+' ('+found+')');
 }
+const payoutFile=file.replace(/index\.html$/, 'us-krw.js');
+if(payoutFile===file)throw Error('분배금 버전 표기: 사이트 index 경로가 아닙니다');
+let payout=fs.readFileSync(payoutFile,'utf8');
+const payoutPlaceholder='PAYOUT_BUILD_PLACEHOLDER';
+if(payout.split(payoutPlaceholder).length!==2)throw Error('분배금 화면 버전 치환 대상 누락/중복');
+payout=payout.replace(payoutPlaceholder,version);
+fs.writeFileSync(payoutFile,payout,'utf8');
 html=html.replace('<!-- US_BUILD_VERSION -->','<small class="sub" id="us-ui-version">미국주식 화면 버전 '+version+'</small>');
 fs.writeFileSync(file,html,'utf8');
 console.log('Versioned '+names.length+' JS assets for GitHub Pages: '+version);
