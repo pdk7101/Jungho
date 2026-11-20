@@ -416,42 +416,62 @@ function renderLedger(){
   render();
  }));
 }
+// The Toss-app amount often arrives as "16,681원" or "₩16,681".
+// Number inputs can reject comma-pasted text before JavaScript sees it.
+function parsePayoutWonText(raw,required){
+ const text=String(raw??'').trim();
+ if(!text)return required?NaN:null;
+ const cleaned=text.replace(/\s/g,'').replace(/^₩/,'').replace(/원$/,'');
+ if(!/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(cleaned))return NaN;
+ const value=Number(cleaned.replace(/,/g,''));
+ return Number.isFinite(value)&&value>=0&&value<=1000000000?value:NaN;
+}
 function addDistribution(){
  const id=$('us-distribution-ticker')?.value,date=$('us-distribution-date')?.value;
- const readField=(key,required)=>{
-  const el=$(key),raw=el?.value.trim()||'';
-  if(!raw)return required?NaN:null;
-  const value=Number(raw.replace(/,/g,''));
-  return Number.isFinite(value)&&value>=0?value:NaN;
- };
+ const readField=(key,required)=>parsePayoutWonText($(key)?.value,required);
  const net=readField('us-dist-net',true),gross=readField('us-dist-gross',false),
   tax=readField('us-dist-tax',false),reinvest=readField('us-dist-reinvest',false);
  const message=$('us-dist-message');
- if(!ITEMS.includes(String(id||'').toUpperCase())||!date||!/^20\d{2}-\d{2}-\d{2}$/.test(date)||
-  date>day()||![net,gross,tax,reinvest].every(v=>v===null||(Number.isFinite(v)&&v>=0))){
-  message.textContent='종목, 실제 지급일, 세후 실수령액(0원 이상)을 확인해 주세요. 미래 지급일이나 잘못된 금액은 등록할 수 없습니다.';return;
+ const report=(text,success=false)=>{
+  if(!message)return;
+  message.textContent=text;
+  if(message.dataset)message.dataset.result=success?'success':'error';
+  message.setAttribute?.('role',success?'status':'alert');
+  if(!success)message.scrollIntoView?.({block:'nearest'});
+ };
+ if(!ITEMS.includes(String(id||'').toUpperCase())){
+  report('저장 실패: 종목을 선택해 주세요.');return;
+ }
+ if(!validLedgerDate(date)){
+  report('저장 실패: 실제 지급일을 확인해 주세요. 오늘 이후 날짜는 저장할 수 없습니다.');return;
+ }
+ if(!Number.isFinite(net)||net<0){
+  report('저장 실패: 필수 세후 실수령액을 입력해 주세요. 예: 16681 또는 16,681원.');return;
+ }
+ if([gross,tax,reinvest].some(v=>v!==null&&(!Number.isFinite(v)||v<0))){
+  report('저장 실패: 세전 지급액·세금·재투자액은 빈칸이거나 올바른 원화 금액이어야 합니다.');return;
  }
  if(gross!==null&&tax!==null&&(tax>gross||Math.abs(gross-tax-net)>2)){
-  message.textContent='세전 지급금 − 세금이 세후 지급액과 일치하지 않습니다. 토스 입금내역을 확인해 주세요.';return;
+  report('세전 지급금 − 세금이 세후 지급액과 일치하지 않습니다. 토스 입금내역을 확인해 주세요.');return;
  }
  if(reinvest!==null&&reinvest>net){
-  message.textContent='재투자한 지급금은 해당 지급일의 세후 실수령액 이하로 입력해 주세요.';return;
+  report('재투자한 지급금은 해당 지급일의 세후 실수령액 이하로 입력해 주세요.');return;
  }
  const entries=ledgerEntries();
  const rawEntries=storage(LEDGER_KEY);
  if(rawEntries!==null&&(!Array.isArray(rawEntries)||rawEntries.length!==entries.length)){
-  message.textContent='현재 저장된 기록 중 확인이 필요한 항목이 있습니다. 기존 내역 보존을 위해 추가 저장을 중단했습니다.';return;
+  report('현재 저장된 기록 중 확인이 필요한 항목이 있습니다. 기존 내역 보존을 위해 추가 저장을 중단했습니다.');return;
  }
  const sameDate=entries.filter(r=>r.id===id&&r.date===date);
- if(sameDate.length){message.textContent=sameDate.length===1&&Math.abs(sameDate[0].net-net)<.005?
+ if(sameDate.length){report(sameDate.length===1&&Math.abs(sameDate[0].net-net)<.005?
   '해당 종목·지급일·세후 금액은 이미 저장되어 있습니다. 중복 저장하지 않았습니다.':
-  '해당 종목·지급일에 다른 기록이 있습니다. 기존 금액을 덮어쓰거나 중복 저장하지 않았습니다.';return;}
- if(entries.length>=500){message.textContent='기록 500건 한도에 도달했습니다. 오래된 기록을 정리해 주세요.';return;}
+  '해당 종목·지급일에 다른 기록이 있습니다. 기존 금액을 덮어쓰거나 중복 저장하지 않았습니다.');return;}
+ if(entries.length>=500){report('기록 500건 한도에 도달했습니다. 오래된 기록을 정리해 주세요.');return;}
  const anchor=autoAnchorNewReceipt(id,date,entries);
  const originalHold=anchor?localStorage.getItem('isa-us-holdings-v1'):null;
  const originalLedger=localStorage.getItem(LEDGER_KEY);
  if(anchor&&!write('isa-us-holdings-v1',anchor.next)){
-  message.textContent='기존 누적금액 기준일 저장 실패 · 분배금 지급내역은 변경하지 않았습니다.';return;
+  report('기존 누적금액 기준일 저장 실패 · 분배금 지급내역은 변경하지 않았습니다.');return;
  }
  const unique='d'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
  entries.push({key:unique,id,date,net,gross,tax,reinvest});
@@ -466,14 +486,14 @@ function addDistribution(){
     else localStorage.setItem('isa-us-holdings-v1',originalHold);
    }
   }catch(_){}
-  message.textContent='지급금 저장 검증 실패 · 기존 기록 복원을 시도했습니다. 입력내역을 확인해 주세요.';return;
+  report('지급금 저장 검증 실패 · 기존 기록 복원을 시도했습니다. 입력내역을 확인해 주세요.');return;
  }
  if(anchor&&$('holdings-settings')?.open)renderForm();
  ['us-dist-net','us-dist-gross','us-dist-tax','us-dist-reinvest'].forEach(k=>{const el=$(k);if(el)el.value='';});
  const payout=netDividend(id);
- message.textContent=clean(id.toUpperCase())+' '+date+' 세후 '+won(net)+' 저장 · 누적 세후 지급금 '+
+ report(clean(id.toUpperCase())+' '+date+' 세후 '+won(net)+' 저장 · 누적 세후 지급금 '+
   (payout?won(payout.amount):'미확인')+
-  (payout?.unlinked?' · 기존 누적 기준 지급일 입력 후 카드와 전체 합계에 반영됩니다.':' · 카드·상단 총분배금·분배금 포함 손익 갱신');
+  (payout?.unlinked?' · 기존 누적 기준 지급일을 확인해야 총액에 추가됩니다.':' · 카드·상단 총분배금·분배금 포함 손익 갱신'),true);
  render();
 }
 // Restore user-owned dated receipts without putting private investment data in the public repo.
