@@ -208,10 +208,10 @@ function distributionDetail(id){
  if(net){
   html+='<p>손익에 반영하는 누적 세후 분배금 <strong>'+won(net.amount)+'</strong>'+
    ' <span class="us-small">('+clean(net.source)+')</span></p>';
-  if(net.kind==='cumulative'&&stats.count){
+  if(net.kind!=='ledger'&&stats.count){
    html+='<p>날짜별 기록 합계 '+won(stats.net)+' / 직접 입력 누적금액 '+won(net.amount)+
      ' · 차액 '+(net.discrepancy>=0?'+':'')+won(net.discrepancy)+'</p>'+
-     '<p class="us-small">차액은 과거 지급내역 누락 또는 입력 차이일 수 있습니다. 두 금액을 더하지 않고 직접 입력 누적금액만 손익에 반영합니다.</p>';
+     '<p class="us-small">기존 누적금액과 날짜별 지급내역은 겹칠 수 있습니다. 기준 지급일 이후의 금액만 추가합니다. 기준일 미확인 시 중복 합산을 방지합니다.</p>';
   }else if(net.kind==='ledger')html+='<p class="us-small">날짜별 지급 기록만 합산했습니다. 과거 기록이 누락됐다면 실제 총수령액보다 적을 수 있습니다.</p>';
  }else html+='<p class="us-small">입력된 세후 분배금이 없어 분배금 포함 총손익을 확정 계산하지 않습니다.</p>';
  if(stats.count){
@@ -268,8 +268,12 @@ function renderLedger(){
   '<div>원화 재투자 기록<strong>'+(stats.reinvestCount===stats.count?won(stats.reinvest):'일부만 입력')+'</strong></div></div>';
   if(id==='cony')html+='<p class="us-small">매주 입력한 지급금을 월별로 합산합니다. 월을 누르면 날짜별 기록과 삭제 버튼을 확인할 수 있습니다.</p>';
   else html+='<p class="us-small">월별 입력 내역: '+stats.months.slice(0,6).map(([m,v])=>clean(m)+' '+won(v)).join(' · ')+'</p>';
-  if(net&&net.kind==='cumulative'&&net.discrepancy!==null)html+='<p class="us-small">별도 누적 세후 수령액 '+won(net.amount)+' / 날짜별 기록 '+won(stats.net)+
-    ' / 차이 '+signed(net.discrepancy)+'. 손익에는 누적 수령액만 반영하며 합산하지 않습니다.</p>';
+  if(net&&net.kind!=='ledger'){
+   html+='<p class="us-small">손익 반영 누적 세후 지급금 <b>'+won(net.amount)+'</b>'+
+    ' · 지급일 기록 합계 '+won(stats.net)+
+    (net.asOf?' · 누적 기준 지급일 '+clean(net.asOf)+' · 이후 '+(net.addedCount||0)+'회 '+won(net.added):'')+'</p>';
+   if(net.unlinked)html+='<p class="us-small" role="status">기존 누적액에 포함된 마지막 지급일이 불분명합니다. 상단 보유정보에서 해당 종목의 누적금액 기준 지급일을 입력하면 새 지급액이 카드와 상단 합계에 자동 반영됩니다.</p>';
+  }
   if(id==='cony')html+=conyMonthlyView(stats,true);
   else html+='<div class="us-dist-records">'+stats.rows.map(r=>
    '<div class="us-dist-record"><div><b>'+clean(r.date)+'</b> · 세후 '+won(r.net)+
@@ -328,7 +332,10 @@ function addDistribution(){
   message.textContent='저장 후 확인에 실패했습니다. 브라우저 저장소를 확인해 주세요.';return;
  }
  ['us-dist-net','us-dist-gross','us-dist-tax','us-dist-reinvest'].forEach(k=>{const el=$(k);if(el)el.value='';});
- message.textContent=clean(id.toUpperCase())+' '+date+' 세후 '+won(net)+' 지급기록을 이 기기에 저장했습니다.';
+ const payout=netDividend(id);
+ message.textContent=clean(id.toUpperCase())+' '+date+' 세후 '+won(net)+' 저장 · 누적 세후 지급금 '+
+  (payout?won(payout.amount):'미확인')+
+  (payout?.unlinked?' · 기존 누적 기준 지급일 입력 후 카드와 전체 합계에 반영됩니다.':' · 카드·상단 총분배금·분배금 포함 손익 갱신');
  render();
 }
 // Restore user-owned dated receipts without putting private investment data in the public repo.
@@ -389,15 +396,19 @@ function renderForm(){
    '<details class="us-krw-optional"><summary>선택: 당일 현재가 보정 · 누적 세후 분배금</summary>'+
    '<div class="us-krw-optional-fields">'+
    '<label>토스 원화 현재가 직접 보정 (원 · 오늘만)<input data-krw-id="'+id+'" data-k="krwCurrent" type="number" min="0" step="0.01" placeholder="기본은 자동 시세" value="'+(p.krwDay===day()?fmt(p.krwCurrent):'')+'"></label>'+
-   '<label>누적 세후 배당·분배금 (원)<input data-krw-id="'+id+'" data-k="krwNet" type="number" min="0" step="0.01" placeholder="실수령 누적액" value="'+fmt(p.krwNet)+'"></label>'+
+   '<label>기존 누적 세후 분배금 (원)<input data-krw-id="'+id+'" data-k="krwNet" type="number" min="0" step="0.01" placeholder="기준일까지 누적액" value="'+fmt(p.krwNet)+'"></label>'+
+   '<label>누적금액 기준 지급일 (마지막 포함 지급일)<input data-krw-id="'+id+'" data-k="krwNetAsOf" type="date" value="'+(validLedgerDate(p.krwNetAsOf)?p.krwNetAsOf:'')+'"></label>'+
+   '<p class="us-small">기존 누적액에 포함된 마지막 지급일을 입력하면 이후 주별 입금액만 자동 추가합니다.</p>'+
    '</div></details></div>';
  }).join('');
  area.querySelectorAll('input[data-krw-id]').forEach(input=>input.addEventListener('change',()=>{
   const id=input.dataset.krwId,k=input.dataset.k;
-  const h=holdings(),p={...(h[id]||{})},raw=input.value.trim(),value=raw===''?null:Number(raw);
-  const invalid=value!==null&&(!Number.isFinite(value)||value<0||
-   (k==='krwAvg'&&value===0)||(k==='krwCurrent'&&value===0)||
-   (k==='qty'&&Math.abs(value-Math.round(value*1000000)/1000000)>1e-10));
+  const h=holdings(),p={...(h[id]||{})},raw=input.value.trim(),
+   isDate=k==='krwNetAsOf',value=raw===''?null:isDate?raw:Number(raw);
+  const invalid=isDate?(value!==null&&!validLedgerDate(value)):
+   value!==null&&(!Number.isFinite(value)||value<0||
+    (k==='krwAvg'&&value===0)||(k==='krwCurrent'&&value===0)||
+    (k==='qty'&&Math.abs(value-Math.round(value*1000000)/1000000)>1e-10));
   const topMsg=$('us-holding-message');
   if(invalid){
    input.value=p[k]===null||p[k]===undefined?'':String(p[k]);
@@ -408,13 +419,23 @@ function renderForm(){
   else p[k]=value;
   if(k==='krwCurrent')p.krwDay=finitePositive(p.krwCurrent)?day():'';
   if(k==='qty'||k==='krwAvg')p.krwSnapshotDate=day();
+  if(k==='krwNet'){
+   if(value===null)delete p.krwNetAsOf;
+   else if(!validLedgerDate(p.krwNetAsOf)){
+    p.krwNetAsOf=day();
+    const inputDate=area.querySelector('input[data-krw-id="'+id+'"][data-k="krwNetAsOf"]');
+    if(inputDate)inputDate.value=p.krwNetAsOf;
+   }
+  }
   h[id]=p;
   if(!write('isa-us-holdings-v1',h)){
    if(topMsg)topMsg.textContent='브라우저 저장에 실패했습니다. 저장공간과 브라우저 설정을 확인해 주세요.';
    return;
   }
   if((k==='qty'||k==='krwAvg')&&typeof window!=='undefined')window.ISA_PORTFOLIO_TOTALS?.markAuto?.('toss');
-  const message=id.toUpperCase()+' 원화 보유정보 저장 완료 · 미국 주식 카드·투자원가·상단 합계에 반영했습니다.';
+  const payout=netDividend(id);
+  const message=id.toUpperCase()+' 저장 · 누적 세후 분배금 '+(payout?won(payout.amount):'미확인')+
+   (payout?.unlinked?' · 기존 누적 기준 지급일 확인 필요':' · 종목 카드·상단 분배금·총손익 갱신');
   if(topMsg)topMsg.textContent=message;
   render();
  }));
