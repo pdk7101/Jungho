@@ -213,45 +213,12 @@ function totalKrw(){
 }
 const signed=v=>(v>=0?'+':'')+won(v);
 const signedPercent=v=>(v>=0?'+':'')+v.toFixed(2)+'%';
-function distributionDetail(id){
- const stats=distributionStats(id),net=netDividend(id);
- let html='<div class="us-dist-detail"><b>원화 분배금·배당금 상세</b>';
- if(net){
-  html+='<p>손익에 반영하는 누적 세후 분배금 <strong>'+won(net.amount)+'</strong>'+
-   ' <span class="us-small">('+clean(net.source)+')</span></p>';
-  if(net.kind!=='ledger'&&stats.count){
-   html+='<p class="us-small">기존 직접 입력 누적금 '+won(holdings()[id].krwNet)+
-     (net.asOf?' · 포함 지급일 '+clean(net.asOf):' · 포함 지급일 미확인')+
-     (net.addedCount?' · 이후 '+net.addedCount+'회 추가 '+won(net.added):'')+'</p>'+
-     '<p class="us-small">주별 입력 기록 '+won(stats.net)+'은 기존 누적금액과 겹칠 수 있어, 포함 지급일 이후 내역만 더합니다.</p>';
-  }else if(net.kind==='ledger')html+='<p class="us-small">날짜별 지급 기록만 합산했습니다. 과거 기록이 누락됐다면 실제 총수령액보다 적을 수 있습니다.</p>';
- }else html+='<p class="us-small">입력된 세후 분배금이 없어 분배금 포함 총손익을 확정 계산하지 않습니다.</p>';
- if(stats.count){
-  const moneyPart=(label,amount,count)=>count===stats.count?'<p>'+label+' 합계 '+won(amount)+'</p>':
-   '<p class="us-small">'+label+' 일부 입력 '+count+'/'+stats.count+'건 · 입력된 금액 합계 '+won(amount)+' (미입력액 제외)</p>';
-  html+='<p class="us-small">현재 브라우저 최근 저장 지급일: '+clean(stats.rows[0].date)+' · 브라우저를 바꾸면 지급기록이 자동으로 공유되지 않습니다.</p>';
-  html+='<p>입력된 지급 횟수 '+stats.count+'건 · 세후 실수령 기록 합계 '+won(stats.net)+'</p>'+
-   moneyPart('세전 지급금',stats.gross,stats.grossCount)+moneyPart('원천징수·세금',stats.tax,stats.taxCount)+
-   moneyPart('재투자한 지급금',stats.reinvest,stats.reinvestCount);
-  if(id==='cony'){
-   html+='<p class="us-small">월별 세후 지급금만 표시합니다. 해당 월을 누르면 주별 입금 내역을 볼 수 있습니다.</p>'+
-    conyMonthlyView(stats,false);
-  }else{
-   html+='<p class="us-small">월별 실제 입력 기록: '+stats.months.slice(0,4).map(([month,total])=>clean(month)+' '+won(total)).join(' · ')+'</p>';
-   html+='<div class="us-dist-recent">'+stats.rows.slice(0,6).map(r=>
-    '<div class="us-dist-row"><span>'+clean(r.date)+'</span><span>세후 '+won(r.net)+
-    '<small>'+(r.gross!==null?'세전 '+won(r.gross)+' · ':'')+(r.tax!==null?'세금 '+won(r.tax)+' · ':'')+
-    (r.reinvest!==null?'재투자 '+won(r.reinvest):'')+'</small></span></div>').join('')+'</div>';
-  }
- }
- return html+'</div>';
-}
 function detailLine(id,priceUsd){
- const q=priceKrw(id,priceUsd),p=positionKrw(id,priceUsd),dist=distributionDetail(id);
+ const q=priceKrw(id,priceUsd),p=positionKrw(id,priceUsd);
  const header='<div class="us-ledger"><b>원화 기준 평가손익 상세</b>';
- if(!q)return header+'<p class="us-small">토스 현재가 또는 USD 종가×참고환율이 없어 원화 평가손익을 계산하지 않습니다.</p></div>'+dist;
+ if(!q)return header+'<p class="us-small">토스 현재가 또는 USD 종가×참고환율이 없어 원화 평가손익을 계산하지 않습니다.</p></div>';
  let html=header+'<p>원화 현재가격 <b>'+won(q.amount,2)+'</b> · '+clean(q.source)+'</p>';
- if(!p)return html+'<p class="us-small">보유수량과 토스 원화 평단을 입력하면 원화 투자원금과 평가손익을 계산합니다.</p></div>'+dist;
+ if(!p)return html+'<p class="us-small">보유수량과 토스 원화 평단을 입력하면 원화 투자원금과 평가손익을 계산합니다.</p></div>';
  html+='<div class="us-fin-grid">'+
   '<div>현재 보유수량<strong>'+p.qty.toLocaleString('ko-KR',{maximumFractionDigits:6})+'주</strong></div>'+
   '<div>원화 평균매수가<strong>'+won(p.avg)+'</strong></div>'+
@@ -264,7 +231,7 @@ function detailLine(id,priceUsd){
   (p.postOne<p.avg?'평단 인하 가능':'평단 인하 효과 없음')+')</p>';
  html+='<p class="us-small">평가손익 = 평가금액 − 매수 누적원가 / 분배금 포함 총손익 = 평가손익 + 누적 세후 지급금. 재투자 분배금은 누적 지급금에서 빼지 않으며, 재투자로 매수한 주식의 수량·매입원가는 이미 보유정보에 반영해야 합니다. 동일 지급금을 두 번 합산하지 않습니다.</p>'+
  '<p class="us-small">매수 누적원가는 현재 보유수량×평단가로 추정한 금액이며 계좌 외부에서 납입한 순원금과 다를 수 있습니다. 환율·시세 시점·수수료로 인해 토스 실제 손익과 오차가 발생할 수 있습니다.</p></div>';
- return html+dist;
+ return html;
 }
 
 // Keep the old cumulative number as the opening balance on a NEW dated payout.
@@ -691,10 +658,11 @@ function mount(){
  '<label>종목<select id="us-distribution-ticker"><option value="schd">SCHD</option><option value="agnc">AGNC</option><option value="spym">SPYM</option><option value="cony" selected>CONY</option></select></label>'+
  '<label>실제 지급일<input type="date" id="us-distribution-date" max="'+day()+'"></label>'+
  '<label>세후 실수령액 (원, 필수)<input type="text" inputmode="decimal" autocomplete="off" id="us-dist-net" placeholder="예: 16,681원"></label>'+
+ '</div><details class="us-krw-optional"><summary>세전·세금·재투자 상세 입력 (선택)</summary><div class="us-dist-form">'+
  '<label>세전 지급액 (원, 선택)<input type="text" inputmode="decimal" autocomplete="off" id="us-dist-gross" placeholder="확인 시 입력"></label>'+
  '<label>원천징수·세금 (원, 선택)<input type="text" inputmode="decimal" autocomplete="off" id="us-dist-tax" placeholder="확인 시 입력"></label>'+
  '<label>지급금 중 재투자액 (원, 선택)<input type="text" inputmode="decimal" autocomplete="off" id="us-dist-reinvest" placeholder="지급금 내 재투자"></label>'+
- '</div><button type="button" class="us-header-button" id="us-dist-add">입금액 저장 · 전체 합계 재계산</button>'+
+ '</div></details><button type="button" class="us-header-button" id="us-dist-add">입금액 저장 · 전체 합계 재계산</button>'+
  '<p id="us-dist-message" class="us-small" role="status" aria-live="assertive"></p>'+
  '<div id="us-distribution-ledger"></div>'+
  '<details class="us-krw-optional"><summary>엑셀의 날짜별 세후 분배금 복원 (선택)</summary>'+
