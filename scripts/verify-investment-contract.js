@@ -622,13 +622,16 @@ const usInput={dataset:{krwId:'schd',k:'qty'},value:'25.330226',
 const usAvg={dataset:{krwId:'schd',k:'krwAvg'},value:'48000',
  addEventListener:(_name,cb)=>usAvg.change=cb};
 usInputs.push(usInput,usAvg);
-const usFn=new Function('$','ITEMS','holdings','day','finitePositive','write','render',
+const usFn=new Function('$','ITEMS','holdings','day','finitePositive','write','render','validLedgerDate','netDividend','won',
  usFormSrc+'\nreturn renderForm;')(
  id=>id==='us-krw-editor'?usHost:id==='us-holding-message'?usMsg:usAltMsg,
  ['SCHD','AGNC','SPYM','CONY'],()=>usSaved,()=> '2026-11-14',
  v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0,
  (key,value)=>{if(key!=='isa-us-holdings-v1')throw Error('unexpected storage key');usSaved=value;return true;},
- ()=>{usRenders++}
+ ()=>{usRenders++},
+ date=>/^\d{4}-\d{2}-\d{2}$/.test(String(date||'')),
+ id=>({amount:usSaved[id]?.krwNet??0}),
+ v=>Number(v).toLocaleString('ko-KR')+'원'
 );
 usFn();
 truth(usHost.innerHTML.includes('data-k="qty"')&&
