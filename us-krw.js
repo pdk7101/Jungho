@@ -88,15 +88,47 @@ function conyMonthlyView(stats,editable){
   ).join('')+'</div></details>'
  ).join('')+'</div>';
 }
+function validLedgerDate(v){
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(String(v||'')))return false;
+ const d=new Date(v+'T00:00:00Z');
+ return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===v&&v<=day();
+}
 function netDividend(id){
- const h=holdings()[id]||{},v=h.krwNet;
- const manual=v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>=0?Number(v):null;
+ const h=holdings()[id]||{},raw=h.krwNet;
+ const manual=raw!==null&&raw!==undefined&&String(raw).trim()!==''&&
+  Number.isFinite(Number(raw))&&Number(raw)>=0?Number(raw):null;
  const logged=distributionStats(id);
- if(manual!==null)return {amount:manual,source:'직접 입력 누적 세후 분배금',kind:'cumulative',recorded:logged.net,
-  discrepancy:logged.count?manual-logged.net:null,count:logged.count};
- if(logged.count)return {amount:logged.net,source:'날짜별 기록된 세후 분배금 합계 (누락 가능)',kind:'ledger',recorded:logged.net,
-  discrepancy:null,count:logged.count};
- return null;
+ if(manual===null){
+  return logged.count?{amount:logged.net,source:'날짜별 기록 세후 분배금 합계 (과거 누락 가능)',
+   kind:'ledger',recorded:logged.net,discrepancy:null,count:logged.count,added:logged.count}:null;
+ }
+ // A manually entered cumulative value is an opening balance, NOT a permanent override.
+ // Include strictly later dated receipts, never overlapping history a second time.
+ let asOf=validLedgerDate(h.krwNetAsOf)?h.krwNetAsOf:null,inferred=false;
+ if(!asOf&&manual===0)asOf='2000-01-01';
+ if(!asOf&&logged.count){
+  // Migration of older browsers: if the historical weekly prefix exactly equals the
+  // prior cumulative amount, its latest payment date is a provable opening-balance date.
+  const ascending=[...logged.rows].sort((a,b)=>a.date.localeCompare(b.date));
+  let cumulative=0;
+  for(const row of ascending){
+   cumulative+=row.net;
+   if(Math.abs(cumulative-manual)<.005){asOf=row.date;inferred=true;}
+  }
+ }
+ if(asOf){
+  const additions=logged.rows.filter(row=>row.date>asOf),
+   added=additions.reduce((sum,row)=>sum+row.net,0);
+  return {amount:manual+added,source:'기존 누적 세후 분배금 + 기준일 이후 실제 지급액',
+   kind:added?'cumulative-extended':'cumulative',
+   recorded:logged.net,discrepancy:logged.count?manual+added-logged.net:null,
+   count:logged.count,asOf,added:added,addedCount:additions.length,inferred};
+ }
+ // No reliably supported historical boundary: do not silently count receipts twice.
+ return {amount:manual,source:'직접 입력 누적 세후 분배금 · 지급액 자동 합산 기준일 확인 필요',
+  kind:'cumulative-unlinked',recorded:logged.net,
+  discrepancy:logged.count?manual-logged.net:null,count:logged.count,
+  unlinked:true,added:0};
 }
 function positionKrw(id,priceUsd){
  const p=holdings()[id]||{},q=priceKrw(id,priceUsd);
