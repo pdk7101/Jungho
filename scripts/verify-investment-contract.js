@@ -763,12 +763,12 @@ truth(usKrwCode.includes('data-us-payout-link')&&
 // Show the exact proof in the current browser, not a generic "saved" banner.
 // This distinguishes a receipt missing in THIS localStorage from an unlinked
 // cumulative balance. Never infer the user's financial records from GitHub.
-const diagStart=usKrwCode.indexOf('function payoutStorageDiagnostic(id){');
-const diagEnd=usKrwCode.indexOf('function renderLedger(){',diagStart);
-truth(diagStart>=0&&diagEnd>diagStart,'payout diagnostic functions exist');
+const payoutDiagStart=usKrwCode.indexOf('function payoutStorageDiagnostic(id){');
+const payoutDiagEnd=usKrwCode.indexOf('function renderLedger(){',payoutDiagStart);
+truth(payoutDiagStart>=0&&payoutDiagEnd>payoutDiagStart,'payout diagnostic functions exist');
 const diag= new Function('storage','ledgerEntries','distributionStats','netDividend',
  'holdings','day','won','PAYOUT_BUILD_VERSION',
- usKrwCode.slice(diagStart,diagEnd)+'\nreturn {payoutStorageDiagnostic,payoutDiagnosticText};')(
+ usKrwCode.slice(payoutDiagStart,payoutDiagEnd)+'\nreturn {payoutStorageDiagnostic,payoutDiagnosticText};')(
   ()=>[{id:'cony',key:'11-20',date:'2026-11-20',net:125}],
   ()=>[{id:'cony',key:'11-20',date:'2026-11-20',net:125}],
   ()=>({rows:[{id:'cony',date:'2026-11-20',net:125}],count:1,net:125}),
