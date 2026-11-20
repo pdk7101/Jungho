@@ -767,14 +767,14 @@ const payoutDiagStart=usKrwCode.indexOf('function payoutStorageDiagnostic(id){')
 const payoutDiagEnd=usKrwCode.indexOf('function renderLedger(){',payoutDiagStart);
 truth(payoutDiagStart>=0&&payoutDiagEnd>payoutDiagStart,'payout diagnostic functions exist');
 const diag= new Function('storage','ledgerEntries','distributionStats','netDividend',
- 'holdings','day','won','PAYOUT_BUILD_VERSION',
+ 'holdings','day','won','PAYOUT_BUILD_VERSION','LEDGER_KEY',
  usKrwCode.slice(payoutDiagStart,payoutDiagEnd)+'\nreturn {payoutStorageDiagnostic,payoutDiagnosticText};')(
   ()=>[{id:'cony',key:'11-20',date:'2026-11-20',net:125}],
   ()=>[{id:'cony',key:'11-20',date:'2026-11-20',net:125}],
   ()=>({rows:[{id:'cony',date:'2026-11-20',net:125}],count:1,net:125}),
   ()=>({amount:1000,unlinked:true}),
   ()=>({cony:{krwNet:1000}}),()=> '2026-11-20',
-  v=>Number(v).toLocaleString('ko-KR')+'원','DIAGNOSTIC-TEST'
+  v=>Number(v).toLocaleString('ko-KR')+'원','DIAGNOSTIC-TEST','isa-us-distributions-krw-v1'
  );
 const diagValue=diag.payoutStorageDiagnostic('cony');
 equal([diagValue.todayCount,diagValue.todayNet,diagValue.calculated],[1,125,1000],
