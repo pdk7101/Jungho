@@ -787,6 +787,683 @@ truth(usDashboardCode.includes("payoutStorageDiagnostic?.(id)")&&
  txt('scripts/stamp-assets.js').includes("const payoutPlaceholder='PAYOUT_BUILD_PLACEHOLDER'"),
  'CONY card and existing monthly ledger display local receipt proof and deployment build');
 
+
+// End-to-end payout entry contract for the mobile Korean-money input.
+// It exercises the real save routine with a formatted amount, a legacy cumulative
+// baseline and an incomplete historical ledger. Older records are never overwritten.
+const wonParseStart=usKrwCode.indexOf('function parsePayoutWonText(raw,required){');
+const wonSaveEnd=usKrwCode.indexOf('// Restore user-owned dated receipts',wonParseStart);
+const wonCoreStart=usKrwCode.indexOf("const LEDGER_KEY='isa-us-distributions-krw-v1'");
+const wonCoreEnd=usKrwCode.indexOf('function positionKrw(id,priceUsd){',wonCoreStart);
+const wonAnchorStart=usKrwCode.indexOf('function dayBefore(iso){');
+const wonAnchorEnd=usKrwCode.indexOf('function payoutStorageDiagnostic(id){',wonAnchorStart);
+truth(wonParseStart>=0&&wonSaveEnd>wonParseStart&&wonCoreStart>=0&&
+ wonCoreEnd>wonCoreStart&&wonAnchorStart>=0&&wonAnchorEnd>wonAnchorStart,
+ 'US payout form, ledger and automatic legacy-date linker available for integration test');
+const payoutSaveHarness=new Function('
+const kEnd=usKrwCode.indexOf('/* Private, user-entered Korean-won dividend/distribution ledger.',kStart);
+truth(kStart>=0&&kEnd>kStart,'KRW price conversion function available');
+const convert=new Function('holdings','finitePositive','day','fx','window',
+ usKrwCode.slice(kStart,kEnd)+'\nreturn priceKrw;');
+const validPositive=v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0;
+const priceFromClose=convert(()=>({}),validPositive,()=> '2026-11-13',
+ ()=>({rate:1400,source:'test FX'}),{ISA_PERSONAL_US:{quote:()=>null}});
+equal(priceFromClose('schd',39).amount,54600,'unavailable live USD quote falls back to 39 USD daily close');
+const directToss=convert(()=>({schd:{krwCurrent:61000,krwDay:'2026-11-13'}}),validPositive,
+ ()=> '2026-11-13',()=>({rate:1400,source:'test FX'}),
+ {ISA_PERSONAL_US:{quote:()=>({usd:42,tradeAt:'2026-11-13T10:00:00Z'})}});
+equal(directToss('schd',39).amount,61000,'verified same-day Toss KRW manual override is preserved');
+truth(usDashboardCode.includes("const f=FUNDS.find(f=>f.id===selected),x=market(f),px=x?Number(x.close):null"),
+ 'trend detail consumes completed EOD bars rather than streaming live trades');
+
+// Optional private personal-US feed: API keys remain in Cloudflare Secrets, never in GitHub.
+const feedCode=txt('personal-us-live.js'),workerCode=txt('private-us-quotes-worker.js');
+const stampCode=txt('scripts/stamp-assets.js');
+truth(stampCode.includes("'personal-us-live.js','us-dashboard.js'"),
+ 'personal quote connector asset MUST be cache-busted on each site deployment');
+const pagesWorkflow=txt('.github/workflows/pages.yml');
+truth(/cp index\.html[^\n]*\bpersonal-us-live\.js\b[^\n]*\bsite\//.test(pagesWorkflow),
+ 'GitHub Pages deploy MUST copy personal quote connector script before reporting success');
+truth(!!new vm.Script(feedCode,{filename:'personal-us-live.js'}),
+ 'mobile personal feed is valid browser-side JavaScript');
+truth(!!new vm.Script(workerCode.replace('export default {','const worker = {'),
+   {filename:'private-us-quotes-worker.js'}),
+ 'free Worker bridge is valid JavaScript');
+truth(html.includes('src="./personal-us-live.js')&&
+ html.includes('src="./us-dashboard.js')&&
+ html.indexOf('src="./personal-us-live.js')<
+ html.indexOf('src="./us-dashboard.js'),
+ 'private source is available before US valuation dashboard, regardless of cache-version query');
+truth(html.includes('id="us-live-url"')&&html.includes('id="us-live-secret"')&&
+ html.includes('id="us-live-connect"')&&html.includes('id="us-live-badge"'),
+ 'mobile dashboard can configure private personal endpoint');
+truth(workerCode.includes("const ALLOWED_ORIGIN='https://pdk7101.github.io'")&&
+ workerCode.includes("request.headers.get('Authorization')")&&
+ workerCode.includes('env.FINNHUB_API_KEY')&&workerCode.includes('env.VIEW_TOKEN'),
+ 'Worker must require explicit authentication and private provider key');
+truth(workerCode.includes("request.method!=='GET'||url.pathname!=='/quotes'"),
+ 'Worker exposes read-only quote path, not orders/account access');
+truth(workerCode.includes('X-Finnhub-Token')&&
+ workerCode.includes("Cache-Control':'private, no-store"),
+ 'provider key sent only to Finnhub; personal response is not publicly cached');
+truth(feedCode.includes("setInterval(refresh,120000)")&&
+ feedCode.includes("sessionStorage.setItem(VIEW_KEY,access)"),
+ 'free bridge polls at most once every two minutes with session-only viewer token');
+truth(feedCode.includes("Worker 주소 형식 오류:")&&
+ feedCode.includes("개인 접근 암호 길이 부족: 현재 ")&&
+ feedCode.includes("access.length<20"),
+ 'mobile connection separately identifies malformed Worker address and short VIEW_TOKEN without exposing its value');
+truth(html.includes('id="us-live-secret-hint"')&&
+ feedCode.includes('function accessHint(){')&&
+ feedCode.includes("accessHint();"),
+ 'the mobile UI explains same-tab secret reuse without displaying the credential');
+truth(feedCode.includes("url&&url===endpoint&&password.length>=20?password")&&
+ feedCode.includes("url&&url===cachedUrl&&cachedAccess.length>=20?cachedAccess"),
+ 'blank token input reuses only a previously saved token for exactly the same Worker URL');
+truth(feedCode.includes("$('us-live-secret').value=''; // Never leave secret readable")&&
+ !feedCode.includes("localStorage.setItem(VIEW_KEY"),
+ 'input is cleared; non-opt-in session token is not written to durable localStorage');
+truth(html.includes('id="us-live-remember"')&&
+ feedCode.includes("if($('us-live-remember')?.checked)")&&
+ feedCode.includes('elapsed>REMEMBER_MAX_MS')&&
+ feedCode.includes('saved.url===url'),
+ 'on-device token persistence is opt-in, 30-day-limited, and scoped to its original Worker');
+truth(feedCode.includes('개인 시세 서버 응답 성공 · 유효한 최근 체결 0/4'),
+ 'authenticated quote response with outdated trades is distinguished from a connection failure');
+truth(feedCode.includes('now-t>TRADE_TTL')&&feedCode.includes('now-f>RESPONSE_TTL'),
+ 'client rejects expired trade and stale API response');
+truth(usKrwCode.includes("kind:'finnhub-private'")&&
+ usKrwCode.includes("isa-personal-us-quote-refreshed"),
+ 'private US live price is used in KRW valuation and refreshes on new quote');
+truth(feedCode.includes("state:connectionState")&&
+ feedCode.includes("configured:Boolean(endpoint&&password)")&&
+ feedCode.includes("error:lastError?'시세 서버 조회 실패':''"),
+ 'card connection state is read-only, secret-free and never exposes VIEW_TOKEN');
+truth(feedCode.includes("window.addEventListener('pageshow',refreshOnReturn)")&&
+ feedCode.includes("window.addEventListener('focus',refreshOnReturn)")&&
+ feedCode.includes("Date.now()-lastRequestAt<15000"),
+ 'mobile return to a tab retries verified intraday quotes with throttling');
+truth(usDashboardCode.includes("kind==='finnhub-private'"),
+ 'private price appears with distinct source/date, not as an official Toss quote');
+
+const feedStart=feedCode.indexOf('function quote(id){'),feedEnd=feedCode.indexOf('function signal(){',feedStart);
+truth(feedStart>=0&&feedEnd>feedStart,'client intraday quote validation function accessible');
+const currentTrade=new Date(Date.now()-2*60000).toISOString();
+const feedContext=vm.createContext({
+ IDS:['schd','agnc','spym','cony'],
+ quotes:{schd:{usd:42,tradeAt:currentTrade}},
+ fetchedAt:new Date().toISOString(),
+ TRADE_TTL:45*60000,RESPONSE_TTL:5*60000,
+ Date,Number
+});
+vm.runInContext(feedCode.slice(feedStart,feedEnd)+'\nthis.getQuote=quote;',feedContext);
+equal(feedContext.getQuote('schd').usd,42,'recent private confirmed trade accepted');
+feedContext.quotes.schd.tradeAt=new Date(Date.now()-46*60000).toISOString();
+equal(feedContext.getQuote('schd'),null,'trade older than 45 min is not used as fresh');
+feedContext.quotes.schd.tradeAt=currentTrade;
+feedContext.fetchedAt=new Date(Date.now()-6*60000).toISOString();
+equal(feedContext.getQuote('schd'),null,'stale server response not used as fresh');
+
+const personal=convert(()=>({}),validPositive,()=> '2026-11-13',
+ ()=>({rate:1400,source:'test FX'}),
+ {ISA_PERSONAL_US:{quote:()=>({usd:42,tradeAt:'2026-11-13T10:00:00Z'})}});
+equal(personal('schd',39).amount,58800,'private quote 42 USD × 1400 KRW converts automatically');
+equal(personal('schd',39).kind,'finnhub-private','private price source kept distinct');
+const overridePersonal=convert(()=>({schd:{krwCurrent:61000,krwDay:'2026-11-13'}}),
+ validPositive,()=> '2026-11-13',()=>({rate:1400,source:'test FX'}),
+ {ISA_PERSONAL_US:{quote:()=>({usd:42,tradeAt:'2026-11-13T10:00:00Z'})}});
+equal(overridePersonal('schd',39).amount,61000,
+ 'manually confirmed Toss price takes priority over personal intraday quote');
+
+// Behavioral browser mocks: double-click, reload, optional on-device store, scoped token
+// and disconnect. No real credentials, market feeds, or broker orders used.
+function fakeStorage(backing=new Map()){
+ return {
+  getItem:key=>backing.get(key)??null,
+  setItem:(key,value)=>backing.set(key,String(value)),
+  removeItem:key=>backing.delete(key),
+  backing
+ };
+}
+function runFeed(local,session){
+ const nodes={};
+ const el=id=>{
+  if(!nodes[id]){
+   const hooks={};
+   nodes[id]={
+    value:'',checked:false,placeholder:'',textContent:'',
+    addEventListener:(type,fn)=>{hooks[type]=fn;},
+    invoke:type=>{if(!hooks[type])throw Error(id+' lacks '+type);return hooks[type]();}
+   };
+  }
+  return nodes[id];
+ };
+ const dom={hidden:true,getElementById:el,addEventListener:()=>{}};
+ const ctx={
+  localStorage:local,sessionStorage:session,document:dom,
+  window:{dispatchEvent:()=>{},addEventListener:()=>{}},Event:class{constructor(name){this.type=name;}},
+  setInterval:()=>0,URL,Date,Number,JSON
+ };
+ vm.runInNewContext(feedCode,ctx,{filename:'personal-us-live.js'});
+ return {el,ctx};
+}
+const url='https://shy-moon-ff5b.pdk7101.workers.dev';
+const sampleToken='SYNTHETIC_PRIVATE_TOKEN_32_TEST_ONLY';
+const localFake=fakeStorage(),sessionFake=fakeStorage();
+const appOne=runFeed(localFake,sessionFake);
+appOne.el('us-live-url').value=url;
+appOne.el('us-live-secret').value=sampleToken;
+appOne.el('us-live-connect').invoke('click');
+equal(appOne.el('us-live-secret').value,'','token input cleared after successful same-tab connect');
+truth(sessionFake.getItem('isa-us-private-worker-access-session-v1')===sampleToken,
+ 'VIEW_TOKEN remembered in sessionStorage for a same-tab click');
+truth(!localFake.getItem('isa-us-private-worker-remembered-v1'),
+ 'without consent, VIEW_TOKEN is not stored persistently');
+appOne.el('us-live-connect').invoke('click');
+truth(appOne.el('us-personal-status').textContent.includes('저장된 암호로 다시 조회합니다'),
+ 'repeated connect click reuses in-memory/session secret without asking again');
+
+const reloaded=runFeed(localFake,sessionFake);
+reloaded.el('us-live-connect').invoke('click');
+truth(reloaded.el('us-personal-status').textContent.includes('저장된 암호로 다시 조회합니다'),
+ 'reload in the same browser tab reuses session token');
+
+const freshTab=runFeed(localFake,fakeStorage());
+freshTab.el('us-live-connect').invoke('click');
+truth(freshTab.el('us-personal-status').textContent.includes('개인 접근 암호가 비어 있습니다'),
+ 'without opt-in, opening a fresh tab does not silently persist a secret');
+
+appOne.el('us-live-remember').checked=true;
+appOne.el('us-live-remember').invoke('change');
+truth(JSON.parse(localFake.getItem('isa-us-private-worker-remembered-v1')).access===sampleToken,
+ 'explicit remember selection stores token only on personal device');
+const persistedTab=runFeed(localFake,fakeStorage());
+equal(persistedTab.el('us-live-remember').checked,true,
+ 'opted-in personal device remembers the setting in a new tab');
+persistedTab.el('us-live-connect').invoke('click');
+truth(persistedTab.el('us-personal-status').textContent.includes('저장된 암호로 다시 조회합니다'),
+ 'opted-in personal device connects in a new tab without retyping');
+
+persistedTab.el('us-live-url').value='https://different-user.other-account.workers.dev';
+persistedTab.el('us-live-connect').invoke('click');
+truth(persistedTab.el('us-personal-status').textContent.includes('개인 접근 암호가 비어 있습니다'),
+ 'remembered VIEW_TOKEN is never reused for a different Worker address');
+
+persistedTab.el('us-live-disconnect').invoke('click');
+equal(localFake.getItem('isa-us-private-worker-remembered-v1'),null,
+ 'disconnect deletes persistent remembered access token');
+
+const expiredLocal=fakeStorage(new Map([
+ ['isa-us-private-worker-url-v1',url],
+ ['isa-us-private-worker-remembered-v1',
+  JSON.stringify({url,access:sampleToken,savedAt:Date.now()-31*86400000})]
+]));
+const expired=runFeed(expiredLocal,fakeStorage());
+expired.el('us-live-connect').invoke('click');
+truth(expired.el('us-personal-status').textContent.includes('개인 접근 암호가 비어 있습니다'),
+ '30-day-old persisted VIEW_TOKEN is rejected');
+equal(expiredLocal.getItem('isa-us-private-worker-remembered-v1'),null,
+ 'expired on-device secret is purged');
+// Diagnose unavailable Finnhub quotes without assuming the US market is closed.
+truth(html.includes('id="us-quote-debug"')&&html.includes('id="us-quote-debug-text"'),
+ 'personal mobile page shows per-symbol non-secret API response diagnostics');
+truth(feedCode.includes('diagnostics=details')&&
+ feedCode.includes('details[id]=quoteDiagnosis(v,now)'),
+ 'when zero quotes validate, the client preserves safe per-symbol failure reasons');
+const diagStart=feedCode.indexOf('function quoteDiagnosis(item,now){');
+const diagEnd=feedCode.indexOf('function renderDiagnostics(){',diagStart);
+truth(diagStart>=0&&diagEnd>diagStart,'non-secret quote diagnosis function available');
+const diagCtx=vm.createContext({TRADE_TTL:45*60000,Date,Number,Math});
+vm.runInContext(feedCode.slice(diagStart,diagEnd)+'\nthis.diagnose=quoteDiagnosis;',diagCtx);
+const diagNow=Date.now();
+truth(diagCtx.diagnose({error:'upstream_status_403'},diagNow).includes('403'),
+ 'Finnhub 403 is identified as provider access denial, not market closure');
+truth(diagCtx.diagnose({error:'upstream_status_429'},diagNow).includes('429'),
+ 'provider rate limit is identified without exposing any API key');
+truth(diagCtx.diagnose({error:'invalid_or_outdated_trade'},diagNow).includes('유효한 가격'),
+ 'missing or outdated trade is identified as data not usable for valuation');
+truth(diagCtx.diagnose({usd:42,tradeAt:new Date(diagNow-50*60000).toISOString()},diagNow).includes('45분 초과'),
+ 'old trade timestamp is distinguished from an API failure');
+truth(diagCtx.diagnose({usd:42,tradeAt:new Date(diagNow-3*60000).toISOString()},diagNow)==='최근 체결가격 사용 가능',
+ 'recent valid trade is clearly distinguished from provider errors');
+// Regression: Workers runtime rejects redirect:'error' before any Finnhub network request.
+// The Worker must use the supported manual mode and reject actual redirects explicitly.
+truth(workerCode.includes("redirect:'manual'")&&!workerCode.includes("},redirect:'error'"),
+ 'Cloudflare Worker does not use unsupported redirect:error for Finnhub subrequests');
+truth(workerCode.includes("if(response.status>=300&&response.status<400)")&&
+ workerCode.includes("upstream_redirect_blocked"),
+ 'unexpected Finnhub redirects are rejected without leaking a key to another URL');
+const collectFrom=workerCode.indexOf('async function collect(env){');
+const collectTo=workerCode.indexOf('export default {',collectFrom);
+truth(collectFrom>=0&&collectTo>collectFrom,
+ 'Finnhub subrequest worker function can be executed against mock Cloudflare fetch');
+function mockFinnhub(responseStatus){
+ const calls=[];
+ const sandbox=vm.createContext({
+  SYMBOLS:{schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY'},
+  WORKER_VERSION:'20261114-quote-transport-2',
+  URL,Date,Number,Math,Promise,Object,AbortSignal,
+  fetch:async(u,options)=>{
+   // Match documented Cloudflare Worker input shape: URL strings or Request objects.
+   if(typeof u!=='string')throw new TypeError('Cloudflare fetch expected a URL string');
+   calls.push({url:u,redirect:options.redirect,
+    auth:options.headers['X-Finnhub-Token']});
+   // Simulate Cloudflare's documented incompatibility: error redirects reject before request.
+   if(options.redirect==='error')throw new TypeError('Unsupported redirect mode');
+   return {status:responseStatus,ok:responseStatus===200,
+    json:async()=>({c:42.5,t:Math.floor(Date.now()/1000),pc:40})};
+  }
+ });
+ vm.runInContext(workerCode.slice(collectFrom,collectTo)+'\nthis.collectForTest=collect;',sandbox);
+ return {collect:sandbox.collectForTest,calls};
+}
+const liveMock=mockFinnhub(200),testFeed=await liveMock.collect({FINNHUB_API_KEY:'FAKE_TEST_ONLY'});
+truth(Object.values(testFeed.quotes).every(q=>q.usd===42.5),
+ 'Worker collects all four finite Finnhub quote prices with Cloudflare-compatible fetch');
+truth(liveMock.calls.length===4&&liveMock.calls.every(c=>c.redirect==='manual'&&c.auth==='FAKE_TEST_ONLY'),
+ 'four upstream calls use manual redirect policy and server-side token header');
+truth(workerCode.includes("fetch(u.toString(),")&&
+ liveMock.calls.every(c=>c.url.startsWith('https://finnhub.io/api/v1/quote?symbol=')),
+ 'Finnhub fetch always passes a canonical URL string to Cloudflare');
+truth(testFeed.workerVersion==='20261114-quote-transport-2',
+ 'worker includes public non-secret version in authenticated quote reply');
+truth(feedCode.includes("버전 표기 없음(구버전 Worker 가능)")&&
+ feedCode.includes("workerVersion=/^20261114-quote-transport-2$/.test"),
+ 'mobile diagnosis can distinguish redeployed Cloudflare code from old runtime');
+const redirectMock=mockFinnhub(302),blocked=await redirectMock.collect({FINNHUB_API_KEY:'FAKE_TEST_ONLY'});
+truth(Object.values(blocked.quotes).every(q=>q.error==='upstream_redirect_blocked'),
+ 'Worker refuses upstream redirects rather than following them with a secret');
+truth(diagCtx.diagnose({error:'upstream_redirect_blocked'},Date.now()).includes('차단'),
+ 'mobile diagnostic identifies Worker redirect refusal separately from network failure');
+truth(diagCtx.diagnose({error:'upstream_type_error'},Date.now()).includes('TypeError'),
+ 'mobile diagnosis safely distinguishes Cloudflare runtime TypeError');
+truth(diagCtx.diagnose({error:'upstream_timeout'},Date.now()).includes('시간 초과'),
+ 'mobile diagnosis safely distinguishes Finnhub timeout');
+const typeCtx=vm.createContext({
+ SYMBOLS:{schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY'},
+ WORKER_VERSION:'20261114-quote-transport-2',
+ URL,Date,Number,Math,Promise,Object,AbortSignal,
+ fetch:async()=>{throw new TypeError('synthetic unsafe internal detail');}
+});
+vm.runInContext(workerCode.slice(collectFrom,collectTo)+'\nthis.collectForTest=collect;',typeCtx);
+const exceptionFeed=await typeCtx.collectForTest({FINNHUB_API_KEY:'FAKE_TEST_ONLY'});
+truth(Object.values(exceptionFeed.quotes).every(q=>q.error==='upstream_type_error'),
+ 'private worker safely reports request TypeError without leaking exception message');
+truth(!JSON.stringify(exceptionFeed).includes('synthetic unsafe internal detail'),
+ 'upstream exception messages do not enter the client quote feed');
+// USD/KRW discrepancy check: never present Finnhub USD × dated reference FX as Toss KRW.
+truth(usDashboardCode.includes('function conversionLine(q){')&&
+ usDashboardCode.includes("const calculation=conversionLine(chosenQuote)")&&
+ usDashboardCode.includes("host.innerHTML=section;")&&
+ !html.includes('#us-panel .us-list-fx{')&&
+ !usDashboardCode.includes('fxText?'),
+ 'repeated per-ticker FX equation removed while the selected ticker keeps one complete conversion explanation');
+truth(usDashboardCode.includes('function movingAverageCard(x,wonQuote){')&&
+ usDashboardCode.includes('movingAverageCard(x,q)+holdingCard(f.id,px)')&&
+ html.includes('#us-panel .us-card-ma20{'),
+ 'each US card matches domestic ETF layout with a central MA20 panel and holdings below');
+truth(usKrwCode.includes("usd:Number(privateQuote.usd),fxRate:rate.rate,fxAt:rate.when")&&
+ usKrwCode.includes("fxSource:rate.source,fxManual:rate.manual"),
+ 'personal Finnhub quote preserves calculation inputs and FX reference provenance');
+const convStart=usDashboardCode.indexOf('function conversionLine(q){');
+const convEnd=usDashboardCode.indexOf('function cards(){',convStart);
+truth(convStart>=0&&convEnd>convStart,'unit-testable USD/KRW conversion explanation is available');
+const convSandbox=vm.createContext({Number,Date});
+vm.runInContext(usDashboardCode.slice(convStart,convEnd)+'\nthis.conversionLineForTest=conversionLine;',convSandbox);
+const conv=convSandbox.conversionLineForTest({
+ usd:35.92,fxRate:1336.26,amount:35.92*1336.26,fxManual:true,fxAt:'수동 입력'
+});
+truth(conv.includes('35.92 USD × 1,336.26원/USD')&&
+ conv.includes('약 47,998원')&&conv.includes('토스 적용환율'),
+ 'shown USD price × FX yields numerically correct rounded KRW and distinguishes Toss source');
+truth(convSandbox.conversionLineForTest({amount:48000})==='',
+ 'manual Toss KRW override is never mislabeled as a Finnhub USD×FX conversion');
+const oldFx=convSandbox.conversionLineForTest({
+ usd:8.21,fxRate:1336.26,amount:8.21*1336.26,
+ fxManual:false,fxAt:new Date(Date.now()-3*86400000).toISOString()
+});
+truth(oldFx.includes('환율 기준 24시간 이상 경과'),
+ 'dated reference FX older than 24 hours is flagged rather than implied to be realtime');
+
+const usCardStart=usDashboardCode.indexOf('function wonAmount(n,decimals=0){');
+const usCardEnd=usDashboardCode.indexOf('function details(){',usCardStart);
+truth(usCardStart>=0&&usCardEnd>usCardStart,
+ 'complete US card renderer and MA20 helper can be tested without broker connections');
+const fakeCards={innerHTML:'',querySelectorAll:()=>[]};
+const nowRecent=new Date(Date.now()-2*60000).toISOString();
+const testUs={kind:'finnhub-private',usd:42,fxRate:1400,amount:58800,
+ stamp:nowRecent};
+const fakePosition={schd:{qty:24.330226,krwAvg:47864}};
+const testItem={id:'schd',ticker:'SCHD',type:'미국 배당 ETF'};
+const testBar={date:'20261112',close:40,trend:{ma20:40,ma5:41}};
+const fakeWin={
+ ISA_PERSONAL_US:{state:()=>({configured:true,fetching:false,error:''})},
+ ISA_US_KRW:{
+  fx:()=>({rate:1400}),
+  priceKrw:()=>testUs,
+  basisKrw:()=>({pnl:2800,rate:5,net:1000,inclusive:3800,inclusiveRate:6.78}),
+  netDividend:()=>({amount:1000,kind:'cumulative'})
+ }
+};
+const cardCtx=vm.createContext({
+ FUNDS:[testItem],selected:'schd',window:fakeWin,document:{getElementById:()=>fakeCards},
+ $:()=>fakeCards,
+ read:()=>fakePosition,market:()=>testBar,price:()=>42,date:s=>s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6),
+ valid:v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0,
+ text:s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+ Intl,Number,Date,Math
+});
+vm.runInContext(usDashboardCode.slice(usCardStart,usCardEnd)+'\nthis.renderTestCards=cards;',cardCtx);
+cardCtx.renderTestCards();
+truth(fakeCards.innerHTML.includes('58,800원')&&
+ fakeCards.innerHTML.includes('20일 이동평균선')&&
+ fakeCards.innerHTML.includes('56,000.00원'),
+ 'US live card renders KRW current reference and converted MA20 like Korean ETF');
+truth(fakeCards.innerHTML.includes('2,800원 (+5.00%)')&&
+ fakeCards.innerHTML.includes('5일선 57,400.00원'),
+ 'US MA20 box renders price difference in KRW and percent plus MA5');
+truth(fakeCards.innerHTML.includes('보유 24.330226주 · 평단 47,864.00원')&&
+ fakeCards.innerHTML.includes('평가손익 +2,800원 (+5.00%)'),
+ 'US card shows local share count, KRW average price and evaluation return');
+truth(fakeCards.innerHTML.includes('누적 세후 배당·분배금 <b>1,000원</b>')&&
+ fakeCards.innerHTML.includes('분배금 포함 총손익 +3,800원 (+6.78%)'),
+ 'US card keeps actual received dividends separate from dividend-inclusive total P/L');
+truth(fakeCards.innerHTML.includes('Finnhub 장중 체결')&&
+ !fakeCards.innerHTML.includes('직전 확정 종가'),
+ 'valid intraday quote is distinctly labeled without suggesting a completed close');
+truth(fakeCards.innerHTML.includes('role="button" tabindex="0"')&&
+ fakeCards.innerHTML.includes('aria-pressed="true"'),
+ 'new structured US card can be operated from keyboard and announces selected state');
+const closeQuote={kind:'usd-close',amount:56000,usd:40,fxRate:1400};
+fakeWin.ISA_US_KRW.priceKrw=()=>closeQuote;
+fakeWin.ISA_PERSONAL_US.state=()=>({configured:true,fetching:false,error:''});
+cardCtx.renderTestCards();
+truth(fakeCards.innerHTML.includes('직전 확정 종가 2026-11-12')&&
+ fakeCards.innerHTML.includes('장중 시세 미수신·만료')&&
+ fakeCards.innerHTML.includes('참고환율 · 현재가 아님')&&
+ !fakeCards.innerHTML.includes('Finnhub 장중 체결'),
+ 'stale live quotes are never mislabeled as live, and the dated FX-converted close is explicitly not current price');
+truth(usDashboardCode.includes('function pendingUSCloseUpdate(x,now=new Date()){')&&
+ usDashboardCode.includes('최근 미국장 종가 갱신 대기')&&
+ usDashboardCode.includes('당일 원화 현재가를 보정할 수 있습니다'),
+ 'after the US close a lagged daily bar warns users and retains their existing broker quote override route');
+fakeWin.ISA_US_KRW.priceKrw=()=>null;
+cardCtx.renderTestCards();
+truth(fakeCards.innerHTML.includes('원화 가격 미확인')&&
+ fakeCards.innerHTML.includes('20일 이동평균선 · 확인 대기'),
+ 'missing FX/price never creates fabricated US current price or moving average');
+truth(usDashboardCode.includes("const calculation=conversionLine(chosenQuote)")&&
+ usDashboardCode.includes("host.innerHTML=section;"),
+ 'selected US ticker details include complete FX provenance and render visible content');
+
+
+// Top account cards: never embed personal amounts or pretend four tracked US
+// prices cover Toss's 5 US and 9 Korean positions.
+const accountCode=txt('account-summary.js');
+truth(!!new vm.Script(accountCode,{filename:'account-summary.js'}),
+ 'separate private account summary script is syntactically valid');
+truth(html.includes('id="account-summary"')&&
+ html.includes('id="toss-total-invested"')&&html.includes('id="toss-total-value"')&&
+ html.includes('id="kiwoom-total-invested"')&&html.includes('id="kiwoom-total-value"'),
+ 'both Toss/Kiwoom total-invested and valuation amounts sit at the top of the program');
+truth(html.indexOf('id="account-summary"')<html.indexOf('한국 ETF 장중 공개 시세 자동 갱신')&&
+ html.indexOf('id="account-toss-invested"')>html.indexOf('id="holdings-settings"'),
+ 'account overview is above live quotes while editing remains inside existing holdings settings');
+truth(accountCode.includes("const US=['schd','spym','cony','agnc','spacex']")&&
+ accountCode.includes("const TD=['tsofr','treit','ttr','biotech','tspace','media','trobot','hongah','sensor']"),
+ 'Toss total includes all 14 held symbols, not solely four US quotes');
+truth(!accountCode.includes("91.820669")&&!accountCode.includes('8975'),
+ 'no personal positions or prices are hardcoded into public account totals code');
+truth(html.includes('src="./account-summary.js"')&&
+ txt('scripts/stamp-assets.js').includes("'account-summary.js'")&&
+ txt('.github/workflows/pages.yml').includes('portfolio-totals.js account-summary.js kr-dividends.js quotes.json')&&
+  txt('scripts/stamp-assets.js').includes("'portfolio-totals.js'")&&
+  html.includes('src="./portfolio-totals.js"')&&
+  txt('scripts/stamp-assets.js').includes("'kr-dividends.js'")&&
+  html.includes('src="./kr-dividends.js"'),
+ 'new account totals script is published and deployment-cache-versioned');
+
+// New complete Toss 14-position cost basis must recalculate without losing manual totals,
+// confusing dated screenshot quotes with real-time prices or changing distribution records.
+const portfolioTotalsCode=txt('portfolio-totals.js');
+truth(!!new vm.Script(portfolioTotalsCode,{filename:'portfolio-totals.js'}),
+ '14-stock auto-totals module is valid client JavaScript');
+const autoTestTD=['tsofr','treit','ttr','biotech','tspace','media','trobot','hongah','sensor'];
+const autoTestUS=['schd','spym','cony','agnc','spacex'];
+const autoTestSnapshot={usDate:'2026-11-14',tdDate:'2026-11-14',us:{},tossDomestic:{}};
+for(const id of autoTestUS)autoTestSnapshot.us[id]={qty:10,value:1100,pnl:100};
+for(const id of autoTestTD)autoTestSnapshot.tossDomestic[id]={qty:2,value:240,pnl:40};
+const autoTestLocalStore=storage({
+ 'isa-user-portfolio-snapshot-v1':autoTestSnapshot,
+ 'isa-account-totals-v1':{toss:{invested:9999,value:8888,date:'2026-11-14'}}
+});
+const autoTestDocument={getElementById:()=>null,dispatchEvent:()=>{}};
+const autoTestWindow={
+ addEventListener:()=>{},
+ ISA_US_APP:{getPrice:()=>110},
+ ISA_US_KRW:{priceKrw:()=>({amount:110,source:'synthetic confirmed close',stamp:'2026-11-14'})},
+ ISA_KR_APP:{decisions:()=>[],accountTotals:()=>({
+  principal:3000,value:3120,missingHoldings:[],missingPrice:[],
+  intraday:0,close:6,dates:['2026-11-14']
+ })}
+};
+vm.runInNewContext(portfolioTotalsCode,{window:autoTestWindow,document:autoTestDocument,
+ localStorage:autoTestLocalStore,Date,Intl,Number,JSON,Object,Array,Math,String,Map,Set,Event:class {}},
+ {filename:'portfolio-totals.js'});
+const autoTestInitial=autoTestWindow.ISA_PORTFOLIO_TOTALS.totals();
+equal([autoTestInitial.invested,autoTestInitial.value,autoTestInitial.count,autoTestInitial.knownCount],
+ [6800,7660,14,14],'Toss 5 US and 9 Korea quantities and KRW averages combine in one cost basis');
+truth(autoTestInitial.prices.photo>0&&autoTestInitial.source.includes('과거 사진 가격')&&
+ !autoTestInitial.source.includes('실시간 장중 시세'),
+ 'dated broker photo prices are never misrepresented as live quotes');
+vm.runInNewContext(accountCode,{window:autoTestWindow,document:autoTestDocument,localStorage:autoTestLocalStore,
+ Date,Intl,Number,JSON,Object,Array,Math,String},
+ {filename:'account-summary-autotest.js'});
+equal(autoTestWindow.ISA_ACCOUNT_SUMMARY.getTotals().toss.invested,9999,
+ 'existing manually saved broker total remains visible until an actual auto edit');
+autoTestLocalStore.setItem('isa-private-toss-domestic-holdings-v1',
+ JSON.stringify({biotech:{qty:3,avg:90}}));
+autoTestWindow.ISA_PORTFOLIO_TOTALS.markAuto('toss');
+const autoTestChanged=autoTestWindow.ISA_PORTFOLIO_TOTALS.totals();
+equal([autoTestChanged.invested,autoTestChanged.value],[6870,7780],
+ 'changing one Toss domestic holding recalculates its cost and dated valuation');
+equal(autoTestWindow.ISA_ACCOUNT_SUMMARY.getTotals().toss.invested,6870,
+ 'updated Toss total immediately supersedes stale manually entered account total');
+equal(autoTestLocalStore.read('isa-account-totals-v1').toss.invested,9999,
+ 'old user-entered account reference is not erased when automatic mode takes over');
+autoTestWindow.ISA_PORTFOLIO_TOTALS.markAuto('kiwoom');
+equal(autoTestWindow.ISA_ACCOUNT_SUMMARY.getTotals().kiwoom.invested,3000,
+ 'after Kiwoom holding edit its six-position cost basis appears automatically');
+autoTestLocalStore.setItem('isa-private-toss-domestic-holdings-v1',
+ JSON.stringify({biotech:{qty:3,avg:90},sensor:{qty:7}}));
+equal(autoTestWindow.ISA_PORTFOLIO_TOTALS.totals().invested,7370,
+ 'Toss other domestic holding quantity changes also contribute to portfolio totals');
+
+// Isolated Kiwoom summary calculation: 6 positions and last-confirmed price,
+// without Toss equities or fabricated values when data are missing.
+const calcStart=html.indexOf('function accountTotals(){');
+const calcEnd=html.indexOf('window.ISA_KR_APP={',calcStart);
+truth(calcStart>=0&&calcEnd>calcStart,'domestic account aggregation function is accessible to local tests');
+const makeISA=(ps,prices,available={})=>{
+ const funds=['reit','sol','robot','space','sofr','tr'].map(id=>({id}));
+ const fn=new Function('FUNDS','positions','qtyValid','valid','freshQuote','verified','byId','day',
+  html.slice(calcStart,calcEnd)+'\nreturn accountTotals;')(
+  funds,ps,
+  v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isInteger(Number(v))&&Number(v)>=0,
+  v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0,
+  id=>available[id]?{price:available[id]}:null,
+  id=>id in prices,Object.fromEntries(Object.entries(prices).map(([id,close])=>[id,{close,date:'20261113'}])),
+  s=>s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6)
+ );
+ return fn();
+};
+const six=Object.fromEntries(['reit','sol','robot','space','sofr','tr'].map(id=>[id,{qty:2,avg:3000}]));
+const sixClose=Object.fromEntries(Object.keys(six).map(id=>[id,3100]));
+const isaTotals=makeISA(six,sixClose,{reit:3200});
+equal(isaTotals.principal,36000,'Kiwoom 6 ETFs cost basis sums quantity times KRW average');
+equal(isaTotals.value,37400,'Kiwoom valuation mixes one confirmed intraday quote and five dated closes');
+equal(isaTotals.intraday,1,'Kiwoom summary tracks intraday versus completed daily prices');
+const missingISA=makeISA({...six,space:{avg:3000}},sixClose);
+equal(missingISA.principal,null,'Kiwoom missing quantity forbids a deceptively partial whole-account cost');
+equal(missingISA.value,null,'Kiwoom missing quantity forbids a deceptively partial whole-account valuation');
+const staleISA=makeISA(six,{reit:3100});
+equal(staleISA.value,null,'Kiwoom missing prices forbid a fabricated complete total');
+
+const snapUS=['schd','spym','cony','agnc','spacex'];
+const snapTD=['tsofr','treit','ttr','biotech','tspace','media','trobot','hongah','sensor'];
+const aggStore=storage({
+ 'isa-user-portfolio-snapshot-v1':{
+  us:Object.fromEntries(snapUS.map(id=>[id,{value:300,pnl:-20}])),
+  tossDomestic:Object.fromEntries(snapTD.map(id=>[id,{value:200,pnl:-10}])),
+  usDate:'2026-11-14',tdDate:'2026-11-14',
+  tossTotal:{amount:2500,pnl:-500},tossTotalDate:'2026-11-12'
+ },
+ 'isa-us-holdings-v1':{schd:{krwNet:100},spym:{krwNet:200},cony:{krwNet:300},agnc:{krwNet:400}},
+ 'isa-account-dividend-totals-v1':{
+  tossDomestic:{amount:500,date:'2026-11-14'},
+  kiwoom:{amount:600,date:'2026-11-14'}}
+});
+const cards={};
+const handlers={};
+function accountEl(id){
+ if(!cards[id])cards[id]={textContent:'',value:'',
+   addEventListener:(event,cb)=>{handlers[id+':'+event]=cb;}};
+ return cards[id];
+}
+const krOne={principal:36000,value:37400,missingHoldings:[],missingPrice:[],
+ intraday:1,close:5,dates:['2026-11-13'],count:6};
+const accountWindow={
+ ISA_KR_APP:{accountTotals:()=>krOne},
+ addEventListener:()=>{}
+};
+const accountDocument={getElementById:accountEl,addEventListener:()=>{}};
+vm.runInNewContext(accountCode,{
+ window:accountWindow,document:accountDocument,localStorage:aggStore,
+ Date,Intl,Number,JSON,Object,Array,Math,String
+},{filename:'account-summary.js'});
+const totalData=accountWindow.ISA_ACCOUNT_SUMMARY.getTotals();
+const payoutData=accountWindow.ISA_ACCOUNT_SUMMARY.getDividends();
+equal(payoutData.us,1000,'four verified US after-tax dividends total without adding total P/L');
+equal(payoutData.toss,1500,'Toss domestic-only dividends are added once to the US dividend total');
+equal(payoutData.all,2100,'Toss and Kiwoom actual after-tax dividends combine without duplicating US payouts');
+truth(payoutData.complete&&cards['account-dividend-total'].textContent.includes('2,100원'),
+ 'top account card displays a complete dividend sum from local records');
+equal(totalData.toss.value,3300,'newer 14-position Toss snapshot wins over older broker account record');
+equal(totalData.toss.invested,3490,'Toss total cost sums valuation less P/L across all 14 positions');
+equal(totalData.kiwoom.value,37400,'Kiwoom total comes from 6 domestic ETF calculations');
+truth(cards['toss-total-value'].textContent.includes('3,300원')&&
+ cards['kiwoom-total-invested'].textContent.includes('36,000원'),
+ 'top portfolio cards render totals in KRW without USD amounts');
+truth(cards['account-summary-total'].textContent.includes('기준일 다름')&&
+ cards['account-summary-total'].textContent.includes('평가손익 +1,210원 (+3.06%)'),
+ 'combined mixed-date reference includes signed KRW evaluation gain and percentage');
+accountEl('account-toss-invested').value='5000';
+accountEl('account-toss-value').value='4300';
+handlers['account-total-save:click']();
+equal(aggStore.read('isa-account-totals-v1').toss.invested,5000,
+ 'explicit user-entered Toss whole-account total is saved only to the browser');
+equal(accountWindow.ISA_ACCOUNT_SUMMARY.getTotals().toss.value,4300,
+ 'manual Toss total overrides older screenshots without modifying any stock holdings');
+truth(cards['toss-total-source'].textContent.includes('사용자 직접 입력'),
+ 'manually entered account value is labeled with its source');
+handlers['account-total-reset:click']();
+equal(aggStore.read('isa-account-totals-v1'),null,
+ 'reset clears only account total overrides, leaving position histories untouched');
+equal(accountWindow.ISA_ACCOUNT_SUMMARY.getTotals().toss.value,3300,
+ 'reset falls back to existing dated Toss screenshot automatically');
+truth(usKrwCode.includes("window.dispatchEvent(new Event('isa-us-valuation-refreshed'))"),
+ 'US holding changes trigger account total rerender without touching payout ledger');
+
+// Mixed-date reference must calculate evaluation P/L from value minus invested
+// without silently adding net distributions, including in a negative-return case.
+aggStore.setItem('isa-account-totals-v1',JSON.stringify({
+ toss:{invested:12639416,value:9047721,date:'2026-11-16'},
+ kiwoom:{invested:615842,value:590040,date:'2026-11-17'}
+}));
+aggStore.setItem('isa-account-calculation-mode-v1',JSON.stringify({toss:'manual',kiwoom:'manual'}));
+accountWindow.ISA_ACCOUNT_SUMMARY.refresh();
+const screenshotReference=cards['account-summary-total'].textContent;
+truth(screenshotReference.includes('참고 단순합계 (계좌별 기준일 다름)')&&
+ screenshotReference.includes('총투자금 13,255,258원')&&
+ screenshotReference.includes('평가금액 9,637,761원')&&
+ screenshotReference.includes('평가손익 -3,617,497원 (-27.29%)'),
+ 'reference account total computes signed loss and percentage using invested and value only');
+truth(cards['account-dividend-total'].textContent.includes('2,100원')&&
+ !screenshotReference.includes('배당'),
+ 'account cash payouts remain separate from evaluation P/L without double counting');
+
+console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
+,'ITEMS','storage','write','holdings','day','localStorage',
+ 'renderForm','render','won','clean','window','Date','Math',
+ usKrwCode.slice(wonCoreStart,wonCoreEnd)+'\n'+
+ usKrwCode.slice(wonAnchorStart,wonAnchorEnd)+'\n'+
+ usKrwCode.slice(wonParseStart,wonSaveEnd)+
+ '\nreturn {addDistribution,ledgerEntries,netDividend,parsePayoutWonText};');
+const baseReceipt={key:'old',id:'cony',date:'2026-11-13',net:16681,
+ gross:null,tax:null,reinvest:null};
+const winPayoutKey='isa-us-distributions-krw-v1',winHoldKey='isa-us-holdings-v1';
+const payoutMap=new Map([
+ [winPayoutKey,JSON.stringify([baseReceipt])],
+ [winHoldKey,JSON.stringify({cony:{krwNet:100972,qty:80,krwAvg:24000}})]
+]);
+const payoutStorage={
+ getItem:key=>payoutMap.get(key)??null,
+ setItem:(key,value)=>payoutMap.set(key,String(value)),
+ removeItem:key=>payoutMap.delete(key)
+};
+const readPayoutStorage=key=>JSON.parse(payoutStorage.getItem(key)||'null');
+const payoutFields={
+ 'us-distribution-ticker':{value:'cony'},
+ 'us-distribution-date':{value:'2026-11-20'},
+ 'us-dist-net':{value:'17,000원'},
+ 'us-dist-gross':{value:''},
+ 'us-dist-tax':{value:''},
+ 'us-dist-reinvest':{value:''},
+ 'us-dist-message':{textContent:'',dataset:{},setAttribute:()=>{},scrollIntoView:()=>{}}
+};
+let payoutRefreshCount=0;
+const livePayoutHarness=payoutSaveHarness(id=>payoutFields[id]??null,
+ ['SCHD','AGNC','SPYM','CONY'],readPayoutStorage,
+ (key,value)=>{payoutStorage.setItem(key,JSON.stringify(value));return true;},
+ ()=>readPayoutStorage(winHoldKey)||{},()=> '2026-11-20',
+ payoutStorage,()=>{},()=>{payoutRefreshCount++;},
+ value=>Number(value).toLocaleString('ko-KR')+'원',String,{},Date,Math);
+equal(livePayoutHarness.parsePayoutWonText('16,681원',true),16681,
+ 'mobile won input accepts pasted comma and Korean currency unit');
+equal(livePayoutHarness.parsePayoutWonText('₩16,681',true),16681,
+ 'mobile won input accepts pasted won sign');
+truth(Number.isNaN(livePayoutHarness.parsePayoutWonText('16,68원',true)),
+ 'malformed grouping rejected rather than converted to a different dividend');
+truth(livePayoutHarness.netDividend('cony').unlinked,
+ 'missing prior weekly records are detected before new payment');
+livePayoutHarness.addDistribution();
+equal(livePayoutHarness.ledgerEntries().length,2,
+ '17,000 won mobile payment actually saved to browser ledger');
+equal(livePayoutHarness.ledgerEntries()[1].net,17000,
+ 'formatted Korean currency saved as numeric 17000, not empty');
+equal(readPayoutStorage(winHoldKey).cony.krwNetAsOf,'2026-11-13',
+ 'legacy cumulative opening amount anchored to last recorded payment');
+equal(livePayoutHarness.netDividend('cony').amount,117972,
+ 'old cumulative 100972 plus new 17000 reconciled exactly once');
+equal(payoutRefreshCount,1,
+ 'new payment triggers immediate card and account recalculation');
+truth(payoutFields['us-dist-message'].dataset.result==='success'&&
+ payoutFields['us-dist-message'].textContent.includes('117,972원'),
+ 'save confirmation reports exactly the new cumulative amount');
+payoutFields['us-dist-net'].value='17,000원';
+livePayoutHarness.addDistribution();
+equal(livePayoutHarness.ledgerEntries().length,2,
+ 'retrying the same date cannot duplicate an already saved receipt');
+truth(payoutFields['us-dist-message'].dataset.result==='error',
+ 'duplicate payout attempt explicitly displays non-save result');
+payoutFields['us-dist-net'].value='17,00원';
+livePayoutHarness.addDistribution();
+equal(livePayoutHarness.ledgerEntries().length,2,
+ 'invalid formatted payment never silently mutates browser ledger');
+truth(usKrwCode.includes('input type="text" inputmode="decimal"')&&
+ usKrwCode.includes('id="us-dist-message" class="us-small" role="status" aria-live="assertive"'),
+ 'existing payment form supports Korean formatted text and visible success/error status');
+
 const kStart=usKrwCode.indexOf('function priceKrw(id,priceUsd){');
 const kEnd=usKrwCode.indexOf('/* Private, user-entered Korean-won dividend/distribution ledger.',kStart);
 truth(kStart>=0&&kEnd>kStart,'KRW price conversion function available');
