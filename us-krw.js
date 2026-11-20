@@ -265,6 +265,26 @@ function detailLine(id,priceUsd){
  return html+dist;
 }
 
+// Keep the old cumulative number as the opening balance on a NEW dated payout.
+// Use the previous recorded payment date (or the prior calendar day if none).
+// Never retroactively assign a cutoff to historical bulk imports.
+function dayBefore(iso){
+ const d=new Date(iso+'T00:00:00Z');
+ d.setUTCDate(d.getUTCDate()-1);
+ return d.toISOString().slice(0,10);
+}
+function autoAnchorNewReceipt(id,receiptDate,priorEntries){
+ const before=netDividend(id);
+ if(!before?.unlinked)return null;
+ const existing=priorEntries.filter(x=>x.id===id);
+ if(existing.some(x=>x.date>=receiptDate))return null;
+ const cutoff=existing.length?
+  [...existing].sort((a,b)=>b.date.localeCompare(a.date))[0].date:
+  dayBefore(receiptDate);
+ const snapshot=holdings(),p=snapshot[id];
+ if(!p||!Number.isFinite(Number(p.krwNet)))return null;
+ return {cutoff,next:{...snapshot,[id]:{...p,krwNetAsOf:cutoff}}};
+}
 function renderLedger(){
  const area=$('us-distribution-ledger'),select=$('us-distribution-ticker');if(!area||!select)return;
  const id=select.value||ledgerSelected;
@@ -335,12 +355,28 @@ function addDistribution(){
   '해당 종목·지급일·세후 금액은 이미 저장되어 있습니다. 중복 저장하지 않았습니다.':
   '해당 종목·지급일에 다른 기록이 있습니다. 기존 금액을 덮어쓰거나 중복 저장하지 않았습니다.';return;}
  if(entries.length>=500){message.textContent='기록 500건 한도에 도달했습니다. 오래된 기록을 정리해 주세요.';return;}
+ const anchor=autoAnchorNewReceipt(id,date,entries);
+ const originalHold=anchor?localStorage.getItem('isa-us-holdings-v1'):null;
+ const originalLedger=localStorage.getItem(LEDGER_KEY);
+ if(anchor&&!write('isa-us-holdings-v1',anchor.next)){
+  message.textContent='기존 누적금액 기준일 저장 실패 · 분배금 지급내역은 변경하지 않았습니다.';return;
+ }
  const unique='d'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
  entries.push({key:unique,id,date,net,gross,tax,reinvest});
- if(!write(LEDGER_KEY,entries)){message.textContent='기기 저장소 저장 실패 · 지급금 기록을 저장하지 못했습니다.';return;}
- if(!ledgerEntries().some(r=>r.key===unique&&r.id===id&&r.date===date&&Math.abs(r.net-net)<.005)){
-  message.textContent='저장 후 확인에 실패했습니다. 브라우저 저장소를 확인해 주세요.';return;
+ const saved=write(LEDGER_KEY,entries)&&
+  ledgerEntries().some(r=>r.key===unique&&r.id===id&&r.date===date&&Math.abs(r.net-net)<.005);
+ if(!saved){
+  try{
+   if(originalLedger===null)localStorage.removeItem(LEDGER_KEY);
+   else localStorage.setItem(LEDGER_KEY,originalLedger);
+   if(anchor){
+    if(originalHold===null)localStorage.removeItem('isa-us-holdings-v1');
+    else localStorage.setItem('isa-us-holdings-v1',originalHold);
+   }
+  }catch(_){}
+  message.textContent='지급금 저장 검증 실패 · 기존 기록 복원을 시도했습니다. 입력내역을 확인해 주세요.';return;
  }
+ if(anchor&&$('holdings-settings')?.open)renderForm();
  ['us-dist-net','us-dist-gross','us-dist-tax','us-dist-reinvest'].forEach(k=>{const el=$(k);if(el)el.value='';});
  const payout=netDividend(id);
  message.textContent=clean(id.toUpperCase())+' '+date+' 세후 '+won(net)+' 저장 · 누적 세후 지급금 '+
