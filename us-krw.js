@@ -302,7 +302,15 @@ function renderLedger(){
    html+='<p class="us-small">손익 반영 누적 세후 지급금 <b>'+won(net.amount)+'</b>'+
     ' · 지급일 기록 합계 '+won(stats.net)+
     (net.asOf?' · 누적 기준 지급일 '+clean(net.asOf)+' · 이후 '+(net.addedCount||0)+'회 '+won(net.added):'')+'</p>';
-   if(net.unlinked)html+='<p class="us-small" role="status">기존 누적액에 포함된 마지막 지급일이 불분명합니다. 상단 보유정보에서 해당 종목의 누적금액 기준 지급일을 입력하면 새 지급액이 카드와 상단 합계에 자동 반영됩니다.</p>';
+   if(net.unlinked){
+    const latest=stats.rows[0],earlier=stats.rows.filter(x=>x.date<latest.date),
+     cutoff=earlier.length?earlier[0].date:dayBefore(latest.date);
+    html+='<p class="us-small" role="status">기존 누적액의 마지막 포함 지급일이 확인되지 않아 최근 지급분이 총분배금에 아직 반영되지 않았습니다. 이미 저장된 지급기록은 유지됩니다.</p>'+
+     '<p class="us-small">기존 누적액에 '+clean(cutoff)+' 지급분까지 포함돼 있고, '+clean(latest.date)+
+     ' 지급분은 포함되지 않았다면 아래 버튼으로 연결할 수 있습니다. 이후 입금액은 자동 계산됩니다.</p>'+
+     '<button type="button" class="us-header-button" data-us-payout-link="'+clean(id)+
+     '" data-us-payout-cutoff="'+clean(cutoff)+'">기존 누적액과 새 분배금 연결</button>';
+   }
   }
   if(id==='cony')html+=conyMonthlyView(stats,true);
   else html+='<div class="us-dist-records">'+stats.rows.map(r=>
@@ -314,6 +322,26 @@ function renderLedger(){
   ).join('')+'</div>';
  }
  area.innerHTML=html;
+ area.querySelectorAll('button[data-us-payout-link]').forEach(btn=>btn.addEventListener('click',()=>{
+  const id=btn.getAttribute('data-us-payout-link'),cutoff=btn.getAttribute('data-us-payout-cutoff');
+  const previous=netDividend(id);
+  if(!previous?.unlinked||!validLedgerDate(cutoff))return;
+  const newRows=distributionStats(id).rows.filter(row=>row.date>cutoff);
+  const increment=newRows.reduce((sum,row)=>sum+row.net,0);
+  if(!newRows.length)return;
+  if(typeof window.confirm==='function'&&!window.confirm(
+   id.toUpperCase()+' 누적금액 '+won(previous.amount)+'에는 '+cutoff+
+   ' 지급분까지 포함되고, 이후 '+newRows.length+'건 '+won(increment)+
+   '은 포함되지 않았습니까? 확인하면 새 입금분만 추가해 모든 합계를 다시 계산합니다.'))return;
+  const all=holdings();
+  if(!write('isa-us-holdings-v1',{...all,[id]:{...(all[id]||{}),krwNetAsOf:cutoff}})){
+   const msg=$('us-dist-message');if(msg)msg.textContent='기준일 저장 실패 · 기록은 변경하지 않았습니다.';return;
+  }
+  if($('holdings-settings')?.open)renderForm();
+  const msg=$('us-dist-message');
+  if(msg)msg.textContent=id.toUpperCase()+' 누적액 연결 완료 · 총 세후 분배금 '+won(netDividend(id)?.amount??previous.amount);
+  render();
+ }));
  area.querySelectorAll('button[data-ledger-key]').forEach(btn=>btn.addEventListener('click',()=>{
   const key=btn.getAttribute('data-ledger-key');
   if(typeof window.confirm==='function'&&!window.confirm('선택한 세후 분배금 지급 기록을 삭제할까요?'))return;
