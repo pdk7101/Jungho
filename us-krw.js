@@ -2,6 +2,8 @@
 (function(){
 'use strict';
 const ITEMS=['SCHD','AGNC','SPYM','CONY'];
+// Replaced at deployment, so the user can tell whether the latest payout code loaded.
+const PAYOUT_BUILD_VERSION='PAYOUT_BUILD_PLACEHOLDER';
 const $=id=>document.getElementById(id);
 const xnum=v=>v===null||v===undefined||String(v).trim()===''?null:Number(v);
 const finitePositive=v=>Number.isFinite(xnum(v))&&xnum(v)>0;
@@ -285,11 +287,55 @@ function autoAnchorNewReceipt(id,receiptDate,priorEntries){
  if(!p||!Number.isFinite(Number(p.krwNet)))return null;
  return {cutoff,next:{...snapshot,[id]:{...p,krwNetAsOf:cutoff}}};
 }
+function payoutStorageDiagnostic(id){
+ const raw=storage(LEDGER_KEY),recognized=ledgerEntries(),
+  rows=recognized.filter(row=>row.id===id).sort((a,b)=>b.date.localeCompare(a.date)),
+  today=day(),todayRows=rows.filter(row=>row.date===today),
+  current=netDividend(id),hold=holdings()[id]||{},
+  newest=rows[0]||null;
+ return {id:id.toUpperCase(),today,version:PAYOUT_BUILD_VERSION,
+  records:rows.length,unrecognized:Array.isArray(raw)?raw.length-recognized.length:
+   raw===null?0:-1,
+  todayCount:todayRows.length,todayNet:todayRows.reduce((total,row)=>total+row.net,0),
+  latestDate:newest?.date||null,latestNet:newest?.net??null,
+  savedTotal:rows.reduce((sum,row)=>sum+row.net,0),
+  oldCumulative:hold.krwNet??null,
+  oldCutoff:current?.asOf||null,
+  calculated:current?.amount??null,
+  status:current?.unlinked?'기존 누적액 기준 지급일 미확인':current?.kind==='ledger'?'지급기록 합계 (과거 누락 가능)':
+   current?'기존 누적액과 날짜별 기록 연결됨':'입력 기록 없음',
+  storageType:Array.isArray(raw)?'records':raw===null?'empty':'invalid'};
+}
+function payoutDiagnosticText(id){
+ const r=payoutStorageDiagnostic(id);
+ return [r.id+' 지급금 화면 진단 / 프로그램 '+r.version,
+  '이 브라우저 확인일: '+r.today,
+  '저장소: '+r.storageType+' / 인식된 지급기록 '+r.records+'건'+
+   (r.unrecognized?' / 형식 확인 필요 '+r.unrecognized+'건':''),
+  '오늘 저장: '+r.todayCount+'건 / 세후 '+won(r.todayNet),
+  '마지막 기록: '+(r.latestDate||'없음')+' / '+(r.latestNet===null?'없음':won(r.latestNet)),
+  '지급기록 합계: '+won(r.savedTotal),
+  '기존 직접입력 누적액: '+(r.oldCumulative===null?'없음':won(r.oldCumulative)),
+  '마지막 포함 지급일: '+(r.oldCutoff||'미확인'),
+  '손익 및 상단 계산 금액: '+(r.calculated===null?'미확인':won(r.calculated)),
+  '현재 상태: '+r.status,
+  '개인 분배금 데이터는 이 브라우저에만 저장됩니다. 다른 브라우저와 자동 공유하지 않습니다.'].join('\n');
+}
 function renderLedger(){
  const area=$('us-distribution-ledger'),select=$('us-distribution-ticker');if(!area||!select)return;
  const id=select.value||ledgerSelected;
  const stats=distributionStats(id),net=netDividend(id);
- let html='<p><b>'+clean(id.toUpperCase())+(id==='cony'?' · 월별 세후 분배금':' · 날짜별 세후 분배금 내역')+'</b></p>';
+ const diag=payoutStorageDiagnostic(id),latestLine=diag.latestDate?
+  '마지막 '+clean(diag.latestDate)+' '+won(diag.latestNet):
+  '이 브라우저에는 지급기록 없음';
+ let html='<p><b>'+clean(id.toUpperCase())+(id==='cony'?' · 월별 세후 분배금':' · 날짜별 세후 분배금 내역')+'</b></p>'+
+  '<p class="us-small" role="status"><b>현재 브라우저 저장 확인:</b> 오늘 '+(diag.todayCount?
+   won(diag.todayNet)+' · '+diag.todayCount+'건 저장됨':'지급기록 없음')+
+   ' · '+latestLine+' · 손익 반영 '+(diag.calculated===null?'미확인':won(diag.calculated))+
+   (diag.unrecognized?' · 읽지 못한 기록 '+diag.unrecognized+'건':'')+
+   (diag.status?' · '+clean(diag.status):'')+'</p>'+
+  '<p class="us-small">지급 내역은 브라우저별로 별도 저장됩니다. 화면 버전 '+clean(diag.version)+
+  ' · <button type="button" class="us-header-button outline" data-payout-diagnose="true">저장 상태 복사</button></p>';
  if(!stats.count){
   html+='<p class="us-small">아직 입력된 지급내역이 없습니다. 실제 토스 입금내역의 원화 세후 금액을 등록해 주세요.</p>';
  }else{
@@ -322,6 +368,24 @@ function renderLedger(){
   ).join('')+'</div>';
  }
  area.innerHTML=html;
+ const diagnose=area.querySelector('button[data-payout-diagnose]');
+ if(diagnose)diagnose.addEventListener('click',async()=>{
+  const report=payoutDiagnosticText(id),message=$('us-dist-message');
+  try{
+   if(!navigator.clipboard?.writeText)throw Error('no clipboard');
+   await navigator.clipboard.writeText(report);
+   if(message)message.textContent='저장 상태 진단을 복사했습니다. 내용에 비밀번호나 계좌번호는 없습니다.';
+  }catch(_){
+   if(message)message.textContent='복사 권한이 없어 진단내용을 아래에 표시했습니다.';
+   const output=area.querySelector('[data-payout-diagnostic-text]');
+   if(output)output.textContent=report;
+   else{
+    const p=document.createElement('pre');
+    p.dataset.payoutDiagnosticText='true';p.style.whiteSpace='pre-wrap';
+    p.style.overflowWrap='anywhere';p.textContent=report;area.appendChild(p);
+   }
+  }
+ });
  area.querySelectorAll('button[data-us-payout-link]').forEach(btn=>btn.addEventListener('click',()=>{
   const id=btn.getAttribute('data-us-payout-link'),cutoff=btn.getAttribute('data-us-payout-cutoff');
   const previous=netDividend(id);
@@ -627,7 +691,7 @@ function mount(){
  const d=$('holdings-settings');if(d)d.addEventListener('toggle',()=>{if(d.open)renderForm();});
  renderForm();
  applyPersonalLink();
- window.ISA_US_KRW={cardLine,compactLine,primaryPrice,metricPrice,dividendPrice,detailLine,basisKrw:positionKrw,fx,priceKrw,totalKrw,distributionStats,netDividend};
+ window.ISA_US_KRW={cardLine,compactLine,primaryPrice,metricPrice,dividendPrice,detailLine,basisKrw:positionKrw,fx,priceKrw,totalKrw,distributionStats,netDividend,payoutStorageDiagnostic,payoutDiagnosticText};
  showRate();
  window.addEventListener('isa-us-quotes-refreshed',()=>render());
  window.addEventListener('isa-personal-us-quote-refreshed',()=>render());
