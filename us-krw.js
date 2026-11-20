@@ -105,6 +105,15 @@ function netDividend(id){
  // A manually entered cumulative value is an opening balance, NOT a permanent override.
  // Include strictly later dated receipts, never overlapping history a second time.
  let asOf=validLedgerDate(h.krwNetAsOf)?h.krwNetAsOf:null,inferred=false;
+ // Older personal portfolio imports can prove the date of an opening balance
+ // even when the weekly receipt history is incomplete. Never use a different amount.
+ if(!asOf&&id==='cony'){
+  const snapshot=storage('isa-user-portfolio-snapshot-v1');
+  const datedTotal=snapshot?.conyNote?.total,dated=snapshot?.conyNoteDate;
+  if(Number.isFinite(Number(datedTotal))&&Number(datedTotal)===manual&&validLedgerDate(dated)){
+   asOf=dated;inferred=true;
+  }
+ }
  if(!asOf&&manual===0)asOf='2000-01-01';
  if(!asOf&&logged.count){
   // Migration of older browsers: if the historical weekly prefix exactly equals the
