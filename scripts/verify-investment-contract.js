@@ -760,6 +760,33 @@ truth(usKrwCode.includes('data-us-payout-link')&&
  usKrwCode.includes('window.confirm'),
  'already saved unlinked payments offer an explicit one-time link without duplicate entry');
 
+// Show the exact proof in the current browser, not a generic "saved" banner.
+// This distinguishes a receipt missing in THIS localStorage from an unlinked
+// cumulative balance. Never infer the user's financial records from GitHub.
+const diagStart=usKrwCode.indexOf('function payoutStorageDiagnostic(id){');
+const diagEnd=usKrwCode.indexOf('function renderLedger(){',diagStart);
+truth(diagStart>=0&&diagEnd>diagStart,'payout diagnostic functions exist');
+const diag= new Function('storage','ledgerEntries','distributionStats','netDividend',
+ 'holdings','day','won','PAYOUT_BUILD_VERSION',
+ usKrwCode.slice(diagStart,diagEnd)+'\nreturn {payoutStorageDiagnostic,payoutDiagnosticText};')(
+  ()=>[{id:'cony',key:'11-20',date:'2026-11-20',net:125}],
+  ()=>[{id:'cony',key:'11-20',date:'2026-11-20',net:125}],
+  ()=>({rows:[{id:'cony',date:'2026-11-20',net:125}],count:1,net:125}),
+  ()=>({amount:1000,unlinked:true}),
+  ()=>({cony:{krwNet:1000}}),()=> '2026-11-20',
+  v=>Number(v).toLocaleString('ko-KR')+'원','DIAGNOSTIC-TEST'
+ );
+const diagValue=diag.payoutStorageDiagnostic('cony');
+equal([diagValue.todayCount,diagValue.todayNet,diagValue.calculated],[1,125,1000],
+ 'diagnostic separates new saved receipt from stale applied cumulative amount');
+truth(diag.payoutDiagnosticText('cony').includes('오늘 저장: 1건')&&
+ diag.payoutDiagnosticText('cony').includes('마지막 포함 지급일: 미확인'),
+ 'copyable diagnostic exposes exact record found and missing cutoff');
+truth(usDashboardCode.includes("payoutStorageDiagnostic?.(id)")&&
+ usKrwCode.includes('data-payout-diagnose')&&
+ txt('scripts/stamp-assets.js').includes("const payoutPlaceholder='PAYOUT_BUILD_PLACEHOLDER'"),
+ 'CONY card and existing monthly ledger display local receipt proof and deployment build');
+
 const kStart=usKrwCode.indexOf('function priceKrw(id,priceUsd){');
 const kEnd=usKrwCode.indexOf('/* Private, user-entered Korean-won dividend/distribution ledger.',kStart);
 truth(kStart>=0&&kEnd>kStart,'KRW price conversion function available');
