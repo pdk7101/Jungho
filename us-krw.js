@@ -686,16 +686,16 @@ function mount(){
  holder.innerHTML='<div id="us-krw-rate-status" class="us-small">자동 참고환율 확인 중…</div>'+
  '<p id="us-krw-applied" class="us-small" aria-live="polite"></p>'+
  '<details id="us-distribution-details"><summary>세후 배당·분배금 원화 지급내역 상세 등록</summary>'+
- '<p class="us-small">실제 토스 입금내역의 날짜와 원화 금액을 입력하세요. 세전 지급금·세금·재투자액은 선택사항입니다. 과거 지급내역이 누락되어 있다면 별도의 누적 실수령액을 우선 사용하며 두 값을 합산하지 않습니다.</p>'+
+ '<p class="us-small"><b>새 입금액은 이곳의 ‘세후 실수령액’에 입력하고 아래 저장 버튼을 눌러야 기록됩니다.</b> 숫자, 쉼표, 원 단위를 입력해도 됩니다. 세전·세금·재투자는 선택입니다. 기존 누적금액과 같은 입금을 중복 합산하지 않습니다.</p>'+
  '<div class="us-dist-form">'+
  '<label>종목<select id="us-distribution-ticker"><option value="schd">SCHD</option><option value="agnc">AGNC</option><option value="spym">SPYM</option><option value="cony" selected>CONY</option></select></label>'+
- '<label>실제 지급일<input type="date" id="us-distribution-date"></label>'+
- '<label>세후 실수령액 (원, 필수)<input type="number" min="0" step="0.01" id="us-dist-net" placeholder="토스 입금 원화"></label>'+
- '<label>세전 지급액 (원, 선택)<input type="number" min="0" step="0.01" id="us-dist-gross" placeholder="확인 시 입력"></label>'+
- '<label>원천징수·세금 (원, 선택)<input type="number" min="0" step="0.01" id="us-dist-tax" placeholder="확인 시 입력"></label>'+
- '<label>지급금 중 재투자액 (원, 선택)<input type="number" min="0" step="0.01" id="us-dist-reinvest" placeholder="지급금 내 재투자"></label>'+
- '</div><button type="button" class="us-header-button" id="us-dist-add">세후 지급내역 저장</button>'+
- '<p id="us-dist-message" class="us-small" aria-live="polite"></p>'+
+ '<label>실제 지급일<input type="date" id="us-distribution-date" max="'+day()+'"></label>'+
+ '<label>세후 실수령액 (원, 필수)<input type="text" inputmode="decimal" autocomplete="off" id="us-dist-net" placeholder="예: 16,681원"></label>'+
+ '<label>세전 지급액 (원, 선택)<input type="text" inputmode="decimal" autocomplete="off" id="us-dist-gross" placeholder="확인 시 입력"></label>'+
+ '<label>원천징수·세금 (원, 선택)<input type="text" inputmode="decimal" autocomplete="off" id="us-dist-tax" placeholder="확인 시 입력"></label>'+
+ '<label>지급금 중 재투자액 (원, 선택)<input type="text" inputmode="decimal" autocomplete="off" id="us-dist-reinvest" placeholder="지급금 내 재투자"></label>'+
+ '</div><button type="button" class="us-header-button" id="us-dist-add">입금액 저장 · 전체 합계 재계산</button>'+
+ '<p id="us-dist-message" class="us-small" role="status" aria-live="assertive"></p>'+
  '<div id="us-distribution-ledger"></div>'+
  '<details class="us-krw-optional"><summary>엑셀의 날짜별 세후 분배금 복원 (선택)</summary>'+
  '<p class="us-small">현재 선택한 종목의 지급일과 세후 원화금액을 한 줄씩 붙여넣으세요. 기존 동일 날짜·금액은 중복 제외하며 서로 다른 금액은 자동 덮어쓰지 않습니다. 업로드 없이 이 브라우저에만 저장됩니다.</p>'+
@@ -704,6 +704,10 @@ function mount(){
  '<p id="us-dist-bulk-message" class="us-small" role="status"></p></details></details>';
  head.insertAdjacentElement('afterend',holder);
  $('us-dist-add').onclick=addDistribution;
+ // Keyboard Enter on the required net field is a real save, not an ignored edit.
+ $('us-dist-net').addEventListener('keydown',event=>{
+  if(event.key==='Enter'){event.preventDefault();addDistribution();}
+ });
  $('us-dist-bulk-add').onclick=importDatedReceipts;
  $('us-distribution-date').value=day();
  $('us-distribution-ticker').value=ledgerSelected;
