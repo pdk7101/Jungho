@@ -150,7 +150,9 @@ function holdingCard(id,usdPx){
  // Render it independently, even if a live quote or average cost is missing.
  const receiptLine=receipt&&Number.isFinite(Number(receipt.amount))&&Number(receipt.amount)>=0?
    '<div class="us-card-dividend">누적 세후 배당·분배금 <b>'+wonAmount(receipt.amount)+'</b>'+
-   '<small> · '+(receipt.kind==='ledger'?'날짜별 입력 합계(과거 누락 가능)':'직접 입력 누적액')+'</small></div>':
+   '<small> · '+(receipt.kind==='ledger'?'날짜별 입력 합계(과거 누락 가능)':
+    receipt.kind==='cumulative-extended'?'기존 누적액 + 기준일 이후 주별 지급분':
+    receipt.unlinked?'기존 누적 기준 지급일 확인 필요':'기준일까지 직접 입력 누적액')+'</small></div>':
    '<div class="us-card-dividend">누적 세후 배당·분배금 미확인 · 입력값 필요</div>';
  const holdings='보유 '+(qty===null?'미입력':fmtQty(qty))+
   ' · 평단 '+(avg===null?'미입력':wonAmount(avg,2));
