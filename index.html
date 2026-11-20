@@ -347,7 +347,7 @@ details[open]>summary{margin-bottom:12px}
 .kr-toss-dividend-card{background:#142841;border:1px solid #405b7b;border-radius:9px;padding:10px;min-width:0;font-size:.78rem}
 .kr-toss-dividend-card .kr-div-card-line{margin-top:8px}.kr-div-note{color:#b4c5db;font-size:.78rem;line-height:1.6}
 .kr-div-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
-.kr-div-form label{font-size:.77rem;min-width:0}.kr-div-form input,.kr-div-form select{width:100%;min-width:0;box-sizing:border-box;padding:9px;font-size:.86rem}
+.kr-div-optional{margin:10px 0}.kr-div-optional>summary{cursor:pointer;font-size:.85rem;color:#d5e4fa}.kr-div-form label{font-size:.77rem;min-width:0}.kr-div-form input,.kr-div-form select{width:100%;min-width:0;box-sizing:border-box;padding:9px;font-size:.86rem}
 .kr-div-form .kr-div-wide{grid-column:1/-1}.kr-div-status{color:#add5fe;font-size:.8rem}
 .kr-dist-months{display:grid;gap:8px;margin:12px 0}.kr-dist-month{border:1px solid #46627e;border-radius:10px;background:#162b43;overflow:hidden}
 .kr-dist-month summary{display:flex;justify-content:space-between;gap:9px;padding:12px;cursor:pointer}
@@ -391,7 +391,6 @@ details[open]>summary{margin-bottom:12px}
   <div class="account-dividend-breakdown" id="account-dividend-breakdown">토스·키움 분배금 확인 중</div>
   <p class="account-dividend-source" id="account-dividend-source"></p>
  </div>
- <p class="account-summary-foot">보유주식 매수원금과 평가금액 기준 · 배당·분배금은 평가금액에 가산하지 않습니다. 사진·사용자 입력값과 현재 시세는 기준일이 다를 수 있습니다.</p>
 </section>
 <section class="panel flex"><div><b>한국 ETF 장중 공개 시세 자동 갱신 · 약 60초 간격 (페이지 열린 동안)</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">당일 시세 조회 전 · 비공식 시세 출처에 접속해 확인합니다.</div></div><button id="reload">↻ 지금 가격 조회</button></section>
 <div id="alert">공개 일봉 종가와 당일 비공식 조회 가격은 다릅니다. 마지막 체결 시각을 확인하지 못하면 최신 가격으로 표시하지 않습니다.</div>
@@ -475,10 +474,12 @@ details[open]>summary{margin-bottom:12px}
   <label class="kr-div-wide">계좌·종목<select id="kr-div-symbol"></select></label>
   <label>실제 지급일<input type="date" id="kr-div-date"></label>
   <label>세후 실제 입금액 (원 · 필수)<input type="number" min="0" step="0.01" id="kr-div-net" placeholder="원화 실수령액"></label>
+</div>
+ <details class="kr-div-optional"><summary>세전·세금·재투자 상세 입력 (선택)</summary><div class="kr-div-form">
   <label>세전 지급금 (원 · 선택)<input type="number" min="0" step="0.01" id="kr-div-gross"></label>
   <label>원천징수·세금 (원 · 선택)<input type="number" min="0" step="0.01" id="kr-div-tax"></label>
   <label>재투자액 (원 · 선택)<input type="number" min="0" step="0.01" id="kr-div-reinvest"></label>
- </div>
+ </div></details>
  <button type="button" id="kr-div-save">주별·월별 지급기록 저장</button>
  <p id="kr-div-status" class="kr-div-status" role="status"></p>
  <div id="kr-div-records"></div>
@@ -526,13 +527,13 @@ details[open]>summary{margin-bottom:12px}
  <div class="us-cards" id="us-cards"></div>
  <div class="us-detail" id="us-details"></div>
 </section>
-<section class="panel" id="etf-flow-panel">
- <h2>ETF 규모 · 유동성 · NAV 보조지표</h2>
+<details class="panel" id="etf-flow-panel">
+ <summary><b>ETF 규모 · 유동성 · NAV 보조지표 (선택)</b></summary>
  <p class="fieldset-note">시가총액은 순자산총액(AUM)과 다릅니다. 아래 '추정 AUM'과 '추정 좌수'는 비공식 시가총액 및 NAV를 이용한 근삿값입니다. 공식 발행좌수·정확한 AUM으로 오인하지 마세요. 단순 규모 증감은 순유입·순유출을 확정하지 못합니다.</p>
  <div id="etf-flow-status" class="context">규모·NAV 데이터 확인 중</div>
  <div id="etf-flow-list" class="funds"></div>
  <p class="fieldset-note">5일·20일 증감은 이 앱이 저장한 실제 거래일별 스냅샷이 6개·21개 쌓인 후에만 표시합니다. 시장가격과 NAV의 기준 시점이 다를 수 있으며, 해외자산 ETF는 괴리율 해석에 특히 주의가 필요합니다. 괴리율·유동성 경고는 보조 확인 신호이며 기존 매수 상한과 수량을 자동 변경하지 않습니다.</p>
-</section>
+</details>
 <section class="detail" id="detail">
   <h2>종목별 차트 · 종가 / 5일선 / 20일선</h2>
   <select id="selection"></select>
