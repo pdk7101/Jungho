@@ -421,7 +421,10 @@ function renderForm(){
   if(k==='qty'||k==='krwAvg')p.krwSnapshotDate=day();
   if(k==='krwNet'){
    if(value===null)delete p.krwNetAsOf;
-   else if(!validLedgerDate(p.krwNetAsOf)){
+   else{
+    // Re-entering a cumulative total generally means it already includes receipts
+    // up to today. Reset its cutoff so previously entered weekly payouts aren't added twice.
+    // Users can set a historical "last included payment" date immediately afterward.
     p.krwNetAsOf=day();
     const inputDate=area.querySelector('input[data-krw-id="'+id+'"][data-k="krwNetAsOf"]');
     if(inputDate)inputDate.value=p.krwNetAsOf;
