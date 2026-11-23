@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "source": "KRX Open API ETF 일별매매정보",
+  "byId": {
+    "reit": [],
+    "robot": [],
+    "space": [],
+    "sofr": [],
+    "tr": [],
+    "sol": []
+  }
+}
