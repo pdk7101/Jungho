@@ -1,5 +1,5 @@
-/* Public KR quotes: best-effort intraday browser fetch, validated GitHub snapshot fallback.
- * No brokerage API, no trade submission, no claim of official exchange realtime feed. */
+/* KRX official-only runtime: never fetch unofficial Korean intraday quotes.
+ * Historical parsers remain solely for backward-compatibility regression tests. */
 (function(){
 'use strict';
 const n=v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(String(v).replace(/,/g,'')))&&Number(String(v).replace(/,/g,''))>0?Number(String(v).replace(/,/g,'')):null;
@@ -68,27 +68,8 @@ function parsePublished(payload,funds,now=new Date()){
  return result;
 }
 async function lookup(funds){
- const now=new Date(),codes=funds.map(f=>f.code).join(',');
- const base='https://polling.finance.naver.com';
- const candidates=[
-  {name:'직접',url:base+'/api/realtime/domestic/stock/'+codes,timeout:4000},
-  {name:'직접 통합',url:base+'/api/realtime?query='+encodeURIComponent('SERVICE_ITEM:'+codes),timeout:3500},
-  {name:'공개 프록시',url:'https://proxy.cors.dev/'+base+'/api/realtime/domestic/stock/'+codes,timeout:6000}
- ];
- const fail=[],quotes={};
- for(const c of candidates){
-  try{
-   Object.assign(quotes,parseResponse(await json(c.url,c.timeout),funds,now));
-   if(Object.keys(quotes).length===funds.length)return {ok:true,quotes,via:c.name,partial:false};
-  }catch(e){fail.push(c.name+': '+String(e.message||e));}
- }
- try{
-  const published=parsePublished(await json('./intraday-quotes.json?nocache='+Date.now(),4800),funds,new Date());
-  for(const [id,q] of Object.entries(published))if(!quotes[id])quotes[id]=q;
- }catch(e){fail.push('GitHub 게시 시세: '+String(e.message||e));}
- const count=Object.keys(quotes).length;
- return count?{ok:true,quotes,via:Object.values(quotes).some(q=>q.method==='published')?'공개 게시 보조 시세':'직접 비공식',partial:count!==funds.length,reason:fail.join(' / ')}:
- {ok:false,quotes:{},reason:fail.join(' / ')};
+ // Official-only price policy. No direct Naver/CORS-proxy data may trigger buy signals.
+ return {ok:false,quotes:{},reason:'공식 장중 시세 미연결 · KRX 확정 일봉 기준으로 다음 거래일 판단 (실시간 거래가격 아님)'};
 }
 window.ISA_livePriceFetch={lookup,parseResponse,parsePublished,tradeTime,active};
 })();
