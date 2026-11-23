@@ -9,8 +9,7 @@ on:
   schedule:
     - cron: '25 08 * * 1-5'
     - cron: '15 09 * * 1-5'
-    # KST market 09:00-15:59: best-effort public quote snapshot every ~5 minutes (scheduled jobs may be delayed).
-    - cron: '*/5 0-6 * * 1-5'
+    # KRX official completed daily bars are fetched on the existing 17:25 / 18:15 KST runs.
     # New York 16:00 close (both daylight saving and standard time): next day Korea morning.
     - cron: '35 22 * * 1-5'
     - cron: '15 23 * * 1-5'
@@ -33,7 +32,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify established investment rules (fail closed)
-        run: node scripts/verify-investment-contract.js && node scripts/verify-payout-entry.js
+        run: node scripts/verify-investment-contract.js && node scripts/verify-payout-entry.js && node scripts/verify-krx-official.js
       - name: Obtain official KRX ETF completed daily bars
         env:
           KRX_AUTH_KEY: ${{ secrets.KRX_AUTH_KEY }}
