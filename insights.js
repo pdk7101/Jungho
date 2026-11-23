@@ -7,7 +7,6 @@ const FUND=[
 ];
 const NAMES=Object.fromEntries(FUND);
 const DOC_URL='https://www.soletf.co.kr/ko/fund/etf/211107?tabIndex=1';
-const DIST_URL='https://wolbae.com/etf/0167B0/';
 let quotes=null,metrics=null,metricHistory=null,distEntries=[],simShares=null,loaded=false;
 const $=(id)=>document.getElementById(id);
 const num=(v)=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))?Number(v):null;
@@ -90,7 +89,7 @@ function signalsFor(id,bars,rules,hold){
  return results;
 }
 function metricSignals(){
- if(!metrics||!metricHistory||!metricHistory.byId)return [];
+ if(!metrics||!String(metrics.source||'').startsWith('KRX')||!metricHistory||!metricHistory.byId)return [];
  const out=[];
  for(const x of metrics.items||[]){
   if(!x.ok||!x.date)continue;
@@ -98,10 +97,10 @@ function metricSignals(){
   const old=records.filter(y=>y.date<x.date).at(-1);
   if(!old)continue;
   const nowRisk=Math.abs(Number(x.divergencePct))>=1.5,oldRisk=Math.abs(Number(old.divergencePct))>=1.5;
-  if(nowRisk!==oldRisk)out.push(event(x.id,x.date,nowRisk?'risk':'normal',nowRisk?'NAV 괴리율 주의구간 신규 진입':'NAV 괴리율 주의구간 이탈',pct(Number(old.divergencePct))+' → '+pct(Number(x.divergencePct))+' · 비공식 비교'));
+  if(nowRisk!==oldRisk)out.push(event(x.id,x.date,nowRisk?'risk':'normal',nowRisk?'NAV 괴리율 주의구간 신규 진입':'NAV 괴리율 주의구간 이탈',pct(Number(old.divergencePct))+' → '+pct(Number(x.divergencePct))+' · KRX 공식 확정 자료'));
   if(num(x.tradingValueKRW)!==null&&num(old.tradingValueKRW)!==null){
    const low=Number(x.tradingValueKRW)<5e7,was=Number(old.tradingValueKRW)<5e7;
-   if(low!==was)out.push(event(x.id,x.date,low?'risk':'normal',low?'거래대금 5천만원 미만':'거래대금 5천만원 이상 회복','해당 거래일 비공식 거래대금'));
+   if(low!==was)out.push(event(x.id,x.date,low?'risk':'normal',low?'거래대금 5천만원 미만':'거래대금 5천만원 이상 회복','해당 거래일 KRX 공식 거래대금'));
   }
   if(num(old.marketCapKRW)>0&&num(x.marketCapKRW)>0){
    const changed=(Number(x.marketCapKRW)/Number(old.marketCapKRW)-1)*100;
@@ -121,7 +120,7 @@ function metricSignals(){
  return out;
 }
 function allSignals(){
- if(!quotes||!Array.isArray(quotes.items))return [];
+ if(!quotes||quotes.officialConfirmed!==true||!String(quotes.source||'').startsWith('KRX')||!Array.isArray(quotes.items))return [];
  const r=vars(),h=holdings(),out=[];
  for(const x of quotes.items)if(x.ok&&Array.isArray(x.bars))out.push(...signalsFor(x.id,x.bars,r,h));
  out.push(...metricSignals());
@@ -142,44 +141,36 @@ function alertLabel(s){
  return '<span class="change-item change-'+s.level+'"><b>'+safe(s.title)+'</b> · '+safe(s.text)+'<small>'+safe(day(s.date))+(s.sub?' · '+safe(s.sub):'')+'</small></span>';
 }
 function updateAlerts(){
- const area=$('important-changes'),history=$('signal-history');
- if(!area||!history)return;
- const latest=quotes?.items?.filter(x=>x.ok).map(x=>x.date).sort().at(-1)||null;
- const all=latest?allSignals():[];
- const fresh=latest?all.filter(x=>x.date===latest):[];
- const prior=all.filter(x=>x.date!==latest).slice(0,20);
- const meta='<p class="fieldset-note">마지막 확인된 일봉 '+safe(day(latest))+
-  ' · 아래는 실제로 새로 생긴 가격·추세 변화이며, 단독으로 매수를 지시하지 않습니다.</p>';
- area.innerHTML=meta+(fresh.length?'<div class="change-feed">'+fresh.map(alertLabel).join('')+'</div>':
-  '<p class="sub">'+(latest?'이번 확정 일봉에서 새로 바뀐 중요 조건이 없습니다.':'일봉 자료 확인 중 · 새 변화를 판단하지 않습니다.')+
-  ' 종목별 매수·중지·대기 이유는 각 카드의 「새 변화·판단 이유」에서 확인하세요.</p>');
- history.innerHTML=prior.length?'<div class="change-feed">'+prior.map(alertLabel).join('')+'</div>':
- '<p class="sub">분석 가능한 과거 변화 기록이 없습니다.</p>';
- // Always show the CURRENT decision reason even when no price event happened.
- // An observed price threshold/box crossing is NOT equivalent to permission to buy.
- document.querySelectorAll('#funds [data-id]').forEach(card=>{
-  let spot=card.querySelector('.change-mini');
-  if(!spot){spot=document.createElement('div');spot.className='change-mini';card.appendChild(spot);}
-  const id=card.getAttribute('data-id');
-  const decision=card.querySelector('.status[data-reason]');
-  const label=decision?.textContent?.trim()||'대기',basis=decision?.getAttribute('data-basis')||'자료 확인 대기',
-   reason=decision?.getAttribute('data-reason')||'현재 판단 조건을 확인할 수 없습니다.';
-  const observed=fresh.filter(x=>x.id===id);
-  const events=observed.length?
-   '<div class="change-mini-events"><b>새 변화 (확정 일봉):</b> '+
-   observed.slice(0,2).map(x=>safe(x.text)).join(' · ')+(observed.length>2?' 외 '+(observed.length-2)+'건':'')+'</div>':
-   '<div class="change-mini-events">새 변화: '+(latest?'이번 확정 일봉의 중요 변화 없음':'자료 확인 중')+'</div>';
-  spot.innerHTML='<div class="change-mini-title">새 변화 · 매수판단 이유</div>'+
-   '<div class="change-mini-reason"><b class="state-'+
-   (label==='매수'?'buy':label==='중지'?'stop':'wait')+'">'+safe(label)+'</b> · '+
-   safe(basis)+' — '+safe(reason)+'</div>'+events;
- });
+ const area=$('important-changes');
+ if(!area)return;
+ const verified=quotes?.officialConfirmed===true&&String(quotes.source||'').startsWith('KRX');
+ const latest=verified?quotes.items.filter(x=>x.ok).map(x=>x.date).sort().at(-1):null;
+ let recent=false;
+ if(latest&&/^\d{8}$/.test(latest)){
+  const kst=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'})
+    .formatToParts(new Date());
+  const today=Object.fromEntries(kst.map(x=>[x.type,x.value]));
+  const base=new Date(today.year+'-'+today.month+'-'+today.day+'T12:00:00Z');
+  const dated=new Date(latest.slice(0,4)+'-'+latest.slice(4,6)+'-'+latest.slice(6,8)+'T12:00:00Z');
+  const age=(base-dated)/86400000;
+  recent=age>=0&&age<=7;
+ }
+ const allowed=recent?allSignals().filter(x=>x.date===latest&&
+  (x.level==='risk'||x.level==='opportunity'||/급등/.test(x.text))):[];
+ const seen=new Set(),perId={};
+ const important=allowed.filter(x=>{
+  const key=x.id+'|'+x.text;
+  if(seen.has(key)||(perId[x.id]||0)>=2)return false;
+  seen.add(key);perId[x.id]=(perId[x.id]||0)+1;return true;
+ }).slice(0,6);
+ area.innerHTML='<p class="fieldset-note">공식 출처: <a href="https://openapi.krx.co.kr/contents/OPP/USES/service/OPPUSES003_S2.cmd?BO_ID=nrEpCLaZpoLCTzPUMxuF" target="_blank" rel="noopener noreferrer">한국거래소(KRX) ETF 일별매매정보</a> · 기준일 '+safe(day(latest))+' · 최근 확정 거래일의 새로운 중요 변화만 표시합니다.</p>'+
+  (important.length?'<div class="change-feed">'+important.map(alertLabel).join('')+'</div>':
+   '<p class="sub">'+(recent?'이번 확정 일봉에서 새로 발생한 중요 변화가 없습니다.':
+    '최신 공식 확정 일봉이 없어 중요 변화를 판단할 수 없습니다.')+'</p>');
+ // Decision reason is already available in each domestic card detail; do not duplicate it.
+ document.querySelectorAll('#funds .change-mini').forEach(node=>node.remove());
 }
-const publicDists=[
-{month:'2026-07',amount:150,source:'공개 분배금 이력'},
-{month:'2026-08',amount:168,source:'공개 분배금 이력'},
-{month:'2026-09',amount:170,source:'공개 분배금 이력'}
-];
+const publicDists=[]; // Do not prefill unverified third-party historical payouts.
 function getDists(){
  const v=getSaved('isa-sol-distributions-v1');
  if(v===null)return publicDists.map(x=>({...x}));
@@ -257,15 +248,15 @@ function mount(){
  const panel=document.createElement('section');
  panel.className='panel';panel.id='changes-panel';
  panel.innerHTML='<h2>중요 변화 · 이번 일봉에서 새로 발생한 신호</h2><div id="important-changes">시세 확인 중</div>'+
- '<details><summary>최근 매수판단 변화 이력 보기</summary><p class="fieldset-note">최근 40거래일 일봉에서 계산 가능한 범위의 변화만 복원했습니다. 개인 평단가가 바뀌면 과거 비교도 현재 입력 기준으로 다시 계산됩니다. 이전 실제 주문 이력과는 다릅니다.</p><div id="signal-history"></div></details>';
+ '';
  root.parentNode.insertBefore(panel,root);
  const sol=document.createElement('section');sol.className='panel';sol.id='sol-panel';
  sol.innerHTML='<h2>SOL 200타겟위클리커버드콜 · 분배금 및 NAV</h2>'+
- '<p class="fieldset-note">월 분배금 목표: 세전 30만~50만원 · ETF 실제 분배금·NAV·옵션 운용정보는 <a href="'+DOC_URL+'" target="_blank" rel="noopener noreferrer">운용사 SOL ETF 공식 안내</a>에서 확인하세요. 지급내역 교차 확인: <a href="'+DIST_URL+'" target="_blank" rel="noopener noreferrer">과거 분배금 이력</a>.</p>'+
+ '<p class="fieldset-note">월 분배금 목표: 세전 30만~50만원 · ETF 실제 분배금·NAV·옵션 운용정보는 <a href="'+DOC_URL+'" target="_blank" rel="noopener noreferrer">운용사 SOL ETF 공식 안내</a>에서 확인하세요. 지급내역은 운용사 공식 공시에서 확인하세요.</p>'+
  '<label class="sol-input-label">목표 계산용 가정 수량 (주) <input id="sol-sim-shares" type="number" min="0" step="1" placeholder="내 보유수량 또는 가정 수량"></label>'+
  '<div id="sol-summary"></div>'+
  '<details><summary>주당 월 분배금 기록 추가·수정</summary>'+
- '<p class="fieldset-note">처음 표시된 2026년 7~9월 분배금은 공개 지급 이력의 과거 확인치이며, 현재 월 금액을 자동으로 추정하지 않습니다. 이후 공식 공시를 확인한 값만 입력하세요.</p>'+
+ '<p class="fieldset-note">공식 운용사 공시에서 확인한 지급 금액만 입력하세요. 기존에 직접 저장한 분배금 기록은 유지됩니다.</p>'+
  '<div class="sol-inputs"><label>지급 기준 월<input type="month" id="sol-dist-month" min="2026-03"></label><label>확인된 주당 분배금 (원)<input type="number" id="sol-dist-amount" min="0" step="0.01" placeholder="공식 확인 금액"></label></div>'+
  '<button id="sol-dist-save" type="button">분배금 기록 저장</button><p id="sol-msg" class="fieldset-note"></p><div id="sol-records"></div></details>';
  const detail=$('detail');detail.parentNode.insertBefore(sol,detail);
