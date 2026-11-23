@@ -1318,6 +1318,13 @@ async function refresh(){
   el('updated').textContent='마지막 자동 수집: '+fetchedTime+' · 최신 일봉: '+lastDay;
   el('checked').textContent='화면 확인: '+checkedTime+' · '+(priceChanged?'새 가격 반영':collectionChanged?'재수집 확인':'새 가격 없음');
   el('alert').textContent=(first?'최초 게시 자료 확인.':priceChanged?'새로운 일봉 자료를 반영했습니다.':collectionChanged?'자료 수집 시각만 바뀌고 종가·이평선은 동일합니다.':'게시된 종가·이평선은 이전 확인과 동일합니다.')+' 시세 재확인은 실시간 조회가 아닙니다. '+(6-count)+'종목이 미확인/오래된 상태입니다. '+(Array.isArray(data.errors)&&data.errors.length?'수집 진단: '+data.errors.slice(0,2).join(' / ')+'. ':'')+'실제 주문 전 키움증권과 대조하세요.';
+  if(count===0){
+   var guide=document.createElement('a');
+   guide.href='https://github.com/pdk7101/Jungho/blob/main/KRX_SETUP.md';
+   guide.target='_blank';guide.rel='noopener noreferrer';
+   guide.textContent=' · KRX 공식 시세 연결 안내';
+   el('alert').appendChild(guide);
+  }
   manual={};render();
  }catch(err){
   el('signal').textContent='자료 확인 실패';
