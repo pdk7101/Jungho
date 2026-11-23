@@ -34,6 +34,7 @@ const existing=oldHistory?.version===1&&oldHistory.byId&&typeof oldHistory.byId=
 for(const [id] of funds)if(!Array.isArray(existing.byId[id]))existing.byId[id]=[];
 const previous=await readJson(quotePath,null);
 const errors=[];
+let latestDayVerified=false;
 const byCode=new Map(funds.map(([id,code])=>[code,id]));
 function parseRows(payload,date){
  if(!Array.isArray(payload?.OutBlock_1))throw Error('KRX 응답 OutBlock_1 형식 오류 또는 승인되지 않은 서비스');
@@ -109,6 +110,7 @@ if(key){
  for(const date of dates){
   try{
    const got=await getDate(date,key);
+   if(date===target&&got.length>0)latestDayVerified=true;
    for(const bar of got){
     const list=existing.byId[bar.id];
     const at=list.findIndex(x=>x.date===date);
@@ -136,8 +138,9 @@ const items=funds.map(([id,code])=>{
 const good=items.filter(x=>x.ok).length;
 // Preserve the last actually fetched timestamp if the KRX service is not connected.
 // This must NOT make previously collected prices appear fresh.
-const received=Boolean(key&&errors.length===0);
-const fetchedAt=received?stamp.toISOString():(previous?.officialConfirmed?previous.fetchedAt:null);
+// A collection timestamp advances only after the requested completed day is
+// actually returned by KRX. A successful but empty holiday response is not a new close.
+const fetchedAt=latestDayVerified?stamp.toISOString():(previous?.officialConfirmed?previous.fetchedAt:null);
 const snapshot={fetchedAt,source:sourceName,sourceUrl,officialConfirmed:true,
   status:good===6?'ok':good?'partial':'unavailable',errors:errors.slice(0,6),items};
 if(!key&&!good)console.warn('KRX 공식 API 키 미설정: 매수 신호 보류. 기존 시세를 임의로 채우지 않습니다.');
