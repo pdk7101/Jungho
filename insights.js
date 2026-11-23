@@ -89,7 +89,7 @@ function signalsFor(id,bars,rules,hold){
  return results;
 }
 function metricSignals(){
- if(!metrics||!String(metrics.source||'').startsWith('KRX')||!metricHistory||!metricHistory.byId)return [];
+ if(!metrics||!String(metrics.source||'').startsWith('KRX')||metricHistory?.source!=='KRX OPEN API'||!metricHistory.byId)return [];
  const out=[];
  for(const x of metrics.items||[]){
   if(!x.ok||!x.date)continue;
@@ -212,7 +212,7 @@ function updateSol(){
  let words='<p class="fieldset-note"><b>분배금은 공개 지급 이력 또는 직접 확인해 입력한 금액</b>입니다. 분배금 자동 확정 조회는 연결돼 있지 않습니다. 계산은 세전 가정이며 지급을 보장하지 않습니다.</p>';
  if(m){
   words+='<p class="sol-data">NAV <b>'+money(m.nav)+'</b> · 괴리율 <b>'+pct(Number(m.divergencePct))+'</b> · 시가총액 '+Number(m.marketCap100m).toLocaleString('ko-KR')+'억원</p>';
-  const hist=(metricHistory?.byId?.sol||[]).filter(x=>num(x.nav)>0).sort((a,b)=>a.date.localeCompare(b.date));
+  const hist=(metricHistory?.source==='KRX OPEN API'?metricHistory?.byId?.sol:[]||[]).filter(x=>num(x.nav)>0).sort((a,b)=>a.date.localeCompare(b.date));
   if(hist.length>=2){
    const oldest=hist[0],last=hist[hist.length-1],change=(Number(last.nav)/Number(oldest.nav)-1)*100;
    words+='<p class="sol-data">기록 기간 NAV 변화: '+pct(change)+' ('+day(oldest.date)+'~'+day(last.date)+') · 분배금 미반영</p>';
