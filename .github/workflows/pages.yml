@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths-ignore:
       - 'data/metric-history.json'
+      - 'data/krx-history.json'
   workflow_dispatch:
   schedule:
     - cron: '25 08 * * 1-5'
@@ -33,21 +34,23 @@ jobs:
           node-version: '22'
       - name: Verify established investment rules (fail closed)
         run: node scripts/verify-investment-contract.js && node scripts/verify-payout-entry.js
-      - name: Obtain latest published daily bars (unofficial)
+      - name: Obtain official KRX ETF completed daily bars
+        env:
+          KRX_AUTH_KEY: ${{ secrets.KRX_AUTH_KEY }}
         run: node scripts/update-quotes.js
-      - name: Publish timestamped Korean intraday prices (unofficial)
+      - name: Flag unconnected official Korean intraday prices
         run: node scripts/update-intraday.js
-      - name: Collect ETF market cap, NAV and trade metrics
+      - name: Collect official KRX ETF market cap and NAV metrics
         run: node scripts/update-metrics.js
       - name: Collect US market completed daily bars and dividend/split events
         run: node scripts/update-us.js
-      - name: Save dated ETF metric snapshots to repository
+      - name: Save official KRX daily history and verified metrics
         run: |
-          if ! git diff --quiet -- data/metric-history.json; then
+          if ! git diff --quiet -- data/metric-history.json data/krx-history.json; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add data/metric-history.json
-            git commit -m "data: capture ETF market-cap and NAV snapshot"
+            git add data/metric-history.json data/krx-history.json
+            git commit -m "data: refresh verified KRX ETF trading history"
             git push origin HEAD:main || echo "Warning: historic metric snapshot push failed; retry on next run"
           fi
       - name: Prepare static site
