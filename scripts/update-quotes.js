@@ -39,8 +39,13 @@ function parseRows(payload,date){
  if(!Array.isArray(payload?.OutBlock_1))throw Error('KRX 응답 OutBlock_1 형식 오류 또는 승인되지 않은 서비스');
  const rows=[];
  for(const rec of payload.OutBlock_1){
-  const code=String(rec.ISU_CD??rec.ISU_SRT_CD??'').trim().replace(/^A(?=[0-9A-Z]{6}$)/,'');
-  const id=byCode.get(code);if(!id)continue;
+  // KRX responses can carry both a full ISIN and a 6-character exchange ticker.
+  // Prefer an explicitly supplied short ticker; never mistake an ISIN for our symbol.
+  const candidates=[rec.ISU_SRT_CD,rec.ISU_CD,rec.ISU_SHORT_CD,rec.SRT_CD]
+   .filter(v=>v!==null&&v!==undefined)
+   .map(v=>String(v).trim().toUpperCase().replace(/^A(?=[0-9A-Z]{6}$)/,''));
+  const code=candidates.find(v=>byCode.has(v));
+  const id=code?byCode.get(code):null;if(!id)continue;
   if(rec.BAS_DD&&String(rec.BAS_DD).replace(/-/g,'')!==date)continue;
   const open=positive(rec.TDD_OPNPRC),high=positive(rec.TDD_HGPRC),
     low=positive(rec.TDD_LWPRC),close=positive(rec.TDD_CLSPRC),volume=positiveOrZero(rec.ACC_TRDVOL);
@@ -57,7 +62,7 @@ async function getDate(date,key){
  const request=endpoint+'?basDd='+date;
  const res=await fetch(request,{headers:{AUTH_KEY:key,Accept:'application/json'},
    signal:AbortSignal.timeout(15000)});
- if(!res.ok)throw Error('KRX HTTP '+res.status);
+ if(!res.ok)throw Error('KRX HTTP '+res.status+(res.status===401||res.status===403?' · 인증키 또는 ETF API 이용 승인 확인 필요':''));
  return parseRows(await res.json(),date);
 }
 function compute(id,code,bars){
@@ -109,7 +114,11 @@ if(key){
     const at=list.findIndex(x=>x.date===date);
     if(at>=0)list[at]=bar;else list.push(bar);
    }
-  }catch(e){errors.push(date+': '+String(e.message||e));}
+  }catch(e){
+   const message=String(e.message||e);errors.push(date+': '+message);
+   // Do not issue dozens of retries when credentials, approval, or API format is invalid.
+   if(/KRX HTTP (401|403|429)\b|OutBlock_1 형식 오류|승인되지 않은 서비스/.test(message))break;
+  }
   await new Promise(resolve=>setTimeout(resolve,130));
  }
 }else errors.push('KRX_AUTH_KEY GitHub Actions Secret 미설정 또는 ETF 일별매매정보 승인 대기');
