@@ -15,9 +15,9 @@ const rate=(list,days,prop)=>{
  return {value:(r.at(-1)[prop]/r.at(-1-days)[prop]-1)*100,
  count:r.length,needed:days+1,from:r.at(-1-days).date,to:r.at(-1).date};
 };
-let hist={version:1,byId:{}};
+let hist={version:1,source:'KRX OPEN API',byId:{}};
 try{const prior=JSON.parse(await fs.readFile(historyPath,'utf8'));
- if(prior?.version===1&&prior.byId)hist=prior;
+ if(prior?.version===1&&prior.source==='KRX OPEN API'&&prior.byId)hist=prior;
 }catch(_){}
 const data={fetchedAt:quotes.fetchedAt||null,observationDate:null,
  source:'KRX OPEN API · ETF 일별매매정보 (공식)',sourceUrl:quotes.sourceUrl||null,
