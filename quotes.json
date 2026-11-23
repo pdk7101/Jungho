@@ -1,7 +1,12 @@
 {
   "fetchedAt": null,
-  "source": "네이버 금융 일봉 (비공식)",
-  "officialConfirmed": false,
+  "source": "KRX OPEN API · ETF 일별매매정보 (공식 확정 일봉)",
+  "sourceUrl": "https://openapi.krx.co.kr/contents/OPP/USES/service/OPPUSES003_S2.cmd?BO_ID=nrEpCLaZpoLCTzPUMxuF",
+  "officialConfirmed": true,
+  "status": "unavailable",
+  "errors": [
+    "KRX 인증 서비스 연결 후 첫 확정 일봉 수집 대기"
+  ],
   "items": [
     {
       "id": "reit",
@@ -9,10 +14,8 @@
       "ok": false,
       "date": null,
       "close": null,
-      "low20": null,
-      "high20": null,
       "bars": [],
-      "error": "첫 시세 수집 대기"
+      "error": "KRX 확정 종가 미확인 · 인증 서비스 연결 필요"
     },
     {
       "id": "robot",
@@ -20,10 +23,8 @@
       "ok": false,
       "date": null,
       "close": null,
-      "low20": null,
-      "high20": null,
       "bars": [],
-      "error": "첫 시세 수집 대기"
+      "error": "KRX 확정 종가 미확인 · 인증 서비스 연결 필요"
     },
     {
       "id": "space",
@@ -31,10 +32,8 @@
       "ok": false,
       "date": null,
       "close": null,
-      "low20": null,
-      "high20": null,
       "bars": [],
-      "error": "첫 시세 수집 대기"
+      "error": "KRX 확정 종가 미확인 · 인증 서비스 연결 필요"
     },
     {
       "id": "sofr",
@@ -42,10 +41,8 @@
       "ok": false,
       "date": null,
       "close": null,
-      "low20": null,
-      "high20": null,
       "bars": [],
-      "error": "첫 시세 수집 대기"
+      "error": "KRX 확정 종가 미확인 · 인증 서비스 연결 필요"
     },
     {
       "id": "tr",
@@ -53,10 +50,8 @@
       "ok": false,
       "date": null,
       "close": null,
-      "low20": null,
-      "high20": null,
       "bars": [],
-      "error": "첫 시세 수집 대기"
+      "error": "KRX 확정 종가 미확인 · 인증 서비스 연결 필요"
     },
     {
       "id": "sol",
@@ -64,10 +59,8 @@
       "ok": false,
       "date": null,
       "close": null,
-      "low20": null,
-      "high20": null,
       "bars": [],
-      "error": "첫 시세 수집 대기"
+      "error": "KRX 확정 종가 미확인 · 인증 서비스 연결 필요"
     }
   ]
 }
