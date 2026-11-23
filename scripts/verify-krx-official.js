@@ -68,7 +68,7 @@ assert.throws(()=>compute('space','0131V0',bars.slice(0,39)),
  /40거래일/,'insufficient historical data cannot create buy signal');
 assert.ok(source.includes("if(date===target&&got.length>0)latestDayVerified=true"),
  'no empty response is stamped as latest close');
-assert.ok(intraday.includes('Official-only')&&
+assert.ok(intraday.includes('official-only')&&
  intraday.includes("return {ok:false,quotes:{}"),
  'unapproved intraday feeds stay disabled');
 assert.ok(insights.includes("metricHistory?.source!=='KRX OPEN API'")&&
