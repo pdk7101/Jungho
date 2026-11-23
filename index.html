@@ -919,12 +919,14 @@ function nextSessionPlan(now){
  function record(type,title,info,qty,price,cap){
   return {type:type,title:title,info:info,qty:qty||0,close:price??null,cap:cap??null,asOf:latestDate};
  }
- function missing(){
-  return record('wait','마감 종가 확인 보류',
-   '15:30 마감 이후 게시된 최신 일봉과 수집 시각이 미확인입니다. 16:30 이후 새로고침해 다음 거래일 주문을 판단하세요. 이전 거래일 가격으로 매수를 권하지 않습니다.',0);
+ function missing(id){
+  var reason=byId[id]&&byId[id].error;
+  return record('wait','KRX 공식 종가 확인 보류',
+   reason?String(reason)+' · KRX 인증키와 ETF API 이용 승인을 확인하세요.':
+   '최신 확정 종가 또는 수집 시각을 확인하지 못했습니다. 다음 거래일 사전 주문은 보류합니다.',0);
  }
  function evaluateClose(id){
-  var x=checked[id];if(!x)return missing();
+  var x=checked[id];if(!x)return missing(id);
   plan.available++;
   var p=Number(x.close),cap=effectiveCap(id);
   if(!valid(cap.value))return record('wait','매수상한 확인 보류',cap.reason,0,p);
@@ -963,7 +965,7 @@ function nextSessionPlan(now){
     '기존 연동 적립 규칙. 리츠는 별도 매수상한이 없으니 다음 날 지정가를 키움에서 확인해야 합니다.',
     qty,Number(reit.close));
   }
- }else plan.rows.reit=missing();
+ }else plan.rows.reit=missing('reit');
  var sofr=checked.sofr,mon=new Date(phase.nextDay+'T12:00:00Z').getUTCDay()===1;
  if(sofr){
   plan.available++;
@@ -972,7 +974,7 @@ function nextSessionPlan(now){
     '기존 월요일 1주 주식모으기. 휴장일·예약 주문 가능 시간은 키움에서 확인하세요.',1,Number(sofr.close)):
    record('wait','SOFR 정기 적립일 아님',
     '다음 평일은 월요일이 아닙니다. 기존 월요일 1주 적립 설정을 해제할 필요는 없습니다.',0,Number(sofr.close));
- }else plan.rows.sofr=missing();
+ }else plan.rows.sofr=missing('sofr');
  var tr=checked.tr;
  if(tr){
   plan.available++;
@@ -981,7 +983,7 @@ function nextSessionPlan(now){
    'KODEX 200TR -5% 감시 도달':'KODEX 200TR -5% 감시 유지',
    valid(target)?'관찰가격 '+money(target)+' · 실제 지정가 주문 및 체결 여부는 별도로 확인하세요.':
     '감시 기준가가 설정되지 않았습니다.',0,Number(tr.close),target);
- }else plan.rows.tr=missing();
+ }else plan.rows.tr=missing('tr');
  var buys=FUNDS.filter(function(f){return plan.rows[f.id]?.type==='buy';});
  plan.estimated=buys.reduce(function(sum,f){var d=plan.rows[f.id];return sum+d.qty*d.close;},0);
  var budget=valid(settings.dailyBudget)?Number(settings.dailyBudget):null;
@@ -1131,7 +1133,7 @@ function renderPlan(prepared){
   var held=FUNDS.filter(function(f){return prepared.rows[f.id]?.type==='wait';}).length;
   var eodText='<p><b>'+safe(prepared.phase.stage)+'</b> · 다음 평일 '+safe(prepared.nextDay)+
    ' 주문 준비 (공휴일은 키움 확인) · 게시 종가 '+day(prepared.asOf)+' · 확인 '+prepared.available+'/6</p>';
-  if(prepared.available!==6)eodText+='<p class="sub">마감 종가 미확인 종목은 보류합니다. 16:30 이후 일봉 재조회가 필요할 수 있습니다.</p>';
+  if(prepared.available!==6)eodText+='<p class="sub">마감 종가 미확인 종목은 보류합니다. KRX 공식 API 인증 및 시세 갱신을 확인하세요.</p>';
   if(candidates.length)eodText+='<p><b>매수 검토 ('+candidates.length+'종목):</b> '+
    candidates.map(function(f){
     var d=prepared.rows[f.id];return safe(f.name)+' <b>'+d.qty+'주</b> · '+
@@ -1315,7 +1317,7 @@ async function refresh(){
   el('signal').textContent=count+'/6 유효';
   el('updated').textContent='마지막 자동 수집: '+fetchedTime+' · 최신 일봉: '+lastDay;
   el('checked').textContent='화면 확인: '+checkedTime+' · '+(priceChanged?'새 가격 반영':collectionChanged?'재수집 확인':'새 가격 없음');
-  el('alert').textContent=(first?'최초 게시 자료 확인.':priceChanged?'새로운 일봉 자료를 반영했습니다.':collectionChanged?'자료 수집 시각만 바뀌고 종가·이평선은 동일합니다.':'게시된 종가·이평선은 이전 확인과 동일합니다.')+' 시세 재확인은 실시간 조회가 아닙니다. '+(6-count)+'종목이 미확인/오래된 상태입니다. 실제 주문 전 키움증권과 대조하세요.';
+  el('alert').textContent=(first?'최초 게시 자료 확인.':priceChanged?'새로운 일봉 자료를 반영했습니다.':collectionChanged?'자료 수집 시각만 바뀌고 종가·이평선은 동일합니다.':'게시된 종가·이평선은 이전 확인과 동일합니다.')+' 시세 재확인은 실시간 조회가 아닙니다. '+(6-count)+'종목이 미확인/오래된 상태입니다. '+(Array.isArray(data.errors)&&data.errors.length?'수집 진단: '+data.errors.slice(0,2).join(' / ')+'. ':'')+'실제 주문 전 키움증권과 대조하세요.';
   manual={};render();
  }catch(err){
   el('signal').textContent='자료 확인 실패';
