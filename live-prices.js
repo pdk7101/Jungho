@@ -71,5 +71,5 @@ async function lookup(funds){
  // Official-only price policy. No direct Naver/CORS-proxy data may trigger buy signals.
  return {ok:false,quotes:{},reason:'공식 장중 시세 미연결 · KRX 확정 일봉 기준으로 다음 거래일 판단 (실시간 거래가격 아님)'};
 }
-window.ISA_livePriceFetch={lookup,parseResponse,parsePublished,tradeTime,active};
+window.ISA_livePriceFetch={lookup,parseResponse,parsePublished,tradeTime,active,officialOnly:true};
 })();
