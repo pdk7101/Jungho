@@ -159,7 +159,7 @@ function renderEditor(containerId,market,ids){
    '" placeholder="'+(r.avg===null?'평단 미확인':fmt(r.avg))+'"></label>'+
    '<label>토스 현재 원화 단가 (원 · 선택)<input type="number" min="0" step="0.01" data-toss-edit="'+
    esc(id)+'" data-market="'+market+'" data-kind="brokerPrice" value="'+
-   esc(stored.krwDay===seoulDay()&&positive(stored.krwCurrent)?stored.krwCurrent:'')+
+   esc(saved.krwDay===seoulDay()&&positive(saved.krwCurrent)?saved.krwCurrent:'')+
    '" placeholder="증권사 앱 단가 직접 입력 · 당일만 유효"></label></div>';
  }).join('');
  place.querySelectorAll('input[data-toss-edit]').forEach(input=>{
