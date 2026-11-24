@@ -167,17 +167,37 @@ function holdingCard(id,usdPx){
    official.holdings.find(x=>x?.marketCountry==='US'&&
     String(x.symbol||'').toUpperCase()===id.toUpperCase()):null;
  const stamp=Date.parse(official?.fetchedAt||'');
+ const recordState=window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state;
  const remote=candidate&&Number.isFinite(stamp)&&stamp<=Date.now()+60000&&
-  window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state==='live'?candidate:null;
+  ['live','cached'].includes(recordState)?candidate:null;
  const officialLine=remote?
   '<div class="us-card-pnl">토스 공식 보유 '+fmtQty(remote.quantity)+
   ' · USD 평단 '+(valid(remote.averagePurchasePrice)?usd(remote.averagePurchasePrice):'미확인')+
   ' · USD 평가 '+(valid(remote.marketValue)?usd(remote.marketValue):'미확인')+
   ' · 조회 '+new Date(stamp).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+
   ' · 원화 평단 기록과 별개</div>':'';
+ if(remote&&Number.isFinite(remote.marketValue)&&
+  Number.isFinite(remote.purchaseAmount)&&Number.isFinite(remote.quantity)){
+  const fx=Number(official.fx?.usdKrw);
+  const value=remote.marketValue,purchase=remote.purchaseAmount,delta=value-purchase;
+  const rate=purchase>0?100*delta/purchase:null;
+  const recorded=new Date(stamp).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'});
+  const source=recordState==='cached'?'마지막 저장된 토스 잔고 · 현재 잔고 아님':
+   '토스 공식 API 보유자료';
+  const rateLine=Number.isFinite(fx)&&fx>0?
+   '<div class="us-card-pnl">조회 당시 USD 금액 × 공식 참고환율 · 원화 평가 약 '+
+    wonAmount(value*fx)+' · 토스 앱 원화금액과 다를 수 있음</div>':'';
+  return '<div class="us-card-holding"><b>'+source+' · 보유 '+fmtQty(remote.quantity)+'</b>'+
+   '<div class="us-card-pnl">USD 평단 '+usd(remote.averagePurchasePrice)+
+   ' · USD 평가 '+usd(value)+' · 마지막 표시 단가 '+usd(remote.lastPrice)+'</div>'+
+   '<div class="us-card-pnl '+(delta>=0?'us-positive':'us-negative')+'">USD 참고 평가손익 '+
+   (delta>=0?'+':'')+usd(delta)+(rate===null?'':' ('+pct(rate)+')')+'</div>'+
+   rateLine+'<small>조회 '+recorded+' · 체결시각 미제공</small>'+
+   receiptLine+'</div>';
+ }
  const holdings='보유 '+(qty===null?'미입력':fmtQty(qty))+
   ' · 평단 '+(avg===null?'미입력':wonAmount(avg,2));
- if(qty===0)return '<div class="us-card-holding">'+holdings+officialLine+' · 현재 미보유'+officialLine+receiptLine+'</div>';
+ if(qty===0)return '<div class="us-card-holding">'+holdings+' · 현재 미보유'+receiptLine+'</div>';
  if(!position)return '<div class="us-card-holding">'+holdings+officialLine+
   '<div class="us-card-pnl">평가손익 계산 대기 · 보유정보와 원화 참고가격 확인</div>'+
   receiptLine+'</div>';
