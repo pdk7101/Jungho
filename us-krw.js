@@ -25,32 +25,33 @@ function fx(){
  return {rate:Number(r.usdKrw),source:'공개 비공식 참고 환율',when:r.observedAt,manual:false};
 }
 function priceKrw(id,priceUsd){
- const p=holdings()[id]||{};
- if(finitePositive(p.krwCurrent)&&p.krwDay===day()){
-  return {amount:Number(p.krwCurrent),manual:true,source:'토스 현재가 직접 입력',stamp:p.krwDay};
- }
- const rate=fx(),privateQuote=window.ISA_PERSONAL_US?.quote?.(id);
+ const p=holdings()[id]||{},rate=fx(),privateQuote=window.ISA_PERSONAL_US?.quote?.(id);
+ const broker=window.ISA_TOSS_BROKER?.snapshot?.(),brokerState=window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state,
+  brokerAt=Date.parse(broker?.fetchedAt||''),brokerAge=Date.now()-brokerAt;
+ const bar=window.ISA_US_APP?.getData?.()?.items?.find(x=>x.id===id);
+ const barDay=String(bar?.date||'');
+ const closeDate=/^\d{8}$/.test(barDay)?barDay.slice(0,4)+'-'+barDay.slice(4,6)+'-'+barDay.slice(6):null;
+ // A confirmed closing date supersedes a broker snapshot from before that US trading session.
+ const brokerDay=Number.isFinite(brokerAt)?new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(brokerAt)):null;
+ const match=['live','cached'].includes(brokerState)&&broker?.ok&&Array.isArray(broker.holdings)&&
+  Number.isFinite(brokerAge)&&brokerAge>=-60000&&brokerAge<=7*86400000&&(!closeDate||brokerDay>=closeDate)?
+  broker.holdings.find(h=>h?.marketCountry==='US'&&h.currency==='USD'&&String(h.symbol||'').toUpperCase()===id.toUpperCase()):null;
  if(rate&&privateQuote&&finitePositive(privateQuote.usd))
   return {amount:privateQuote.usd*rate.rate,manual:false,kind:'finnhub-private',
    usd:Number(privateQuote.usd),fxRate:rate.rate,fxAt:rate.when,fxSource:rate.source,fxManual:rate.manual,
    source:'Finnhub 개인 체결가 USD × '+rate.source,stamp:privateQuote.tradeAt};
- const broker=window.ISA_TOSS_BROKER?.snapshot?.(),
-  brokerState=window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state,
-  brokerAt=Date.parse(broker?.fetchedAt||''),brokerAge=Date.now()-brokerAt;
- const match=brokerState==='live'&&broker?.ok&&Array.isArray(broker.holdings)&&
-  Number.isFinite(brokerAge)&&brokerAge>=0&&brokerAge<=10*60000?
-  broker.holdings.find(h=>h?.marketCountry==='US'&&h.currency==='USD'&&
-   String(h.symbol||'').toUpperCase()===id.toUpperCase()):null;
- // The broker's last displayed USD price has no trade timestamp: it may
- // reflect the previous session. It is NOT a certified live trade or EOD bar.
- if(rate&&finitePositive(match?.lastPrice))
-  return {amount:Number(match.lastPrice)*rate.rate,manual:false,kind:'toss-broker-last',
-   usd:Number(match.lastPrice),fxRate:rate.rate,fxAt:rate.when,fxSource:rate.source,fxManual:rate.manual,
-   source:'토스 공식 잔고 조회 최종 표시 단가 (체결 시각 미제공) USD × '+rate.source,
+ const brokerFx=Number(broker?.fx?.usdKrw);
+ const br=finitePositive(brokerFx)?{rate:brokerFx,source:'토스 조회 환율',when:broker.fetchedAt,manual:false}:rate;
+ if(br&&finitePositive(match?.lastPrice))
+  return {amount:Number(match.lastPrice)*br.rate,manual:false,kind:'toss-broker-last',
+   usd:Number(match.lastPrice),fxRate:br.rate,fxAt:br.when,fxSource:br.source,fxManual:false,
+   source:'토스 '+(brokerState==='cached'?'마지막 저장':'최근 조회')+' 표시 단가 (체결시각 미제공) USD × '+br.source,
    stamp:broker.fetchedAt};
  if(rate&&finitePositive(priceUsd))return {amount:Number(priceUsd)*rate.rate,manual:false,kind:'usd-close',
   usd:Number(priceUsd),fxRate:rate.rate,fxAt:rate.when,fxSource:rate.source,fxManual:rate.manual,
-  source:'미국장 USD 종가 × '+rate.source,stamp:rate.when};
+  source:'미국장 USD 종가 × '+rate.source,stamp:closeDate||null};
+ if(finitePositive(p.krwCurrent)&&p.krwDay===day())
+  return {amount:Number(p.krwCurrent),manual:true,source:'토스 현재가 직접 입력',stamp:p.krwDay};
  return null;
 }
 
