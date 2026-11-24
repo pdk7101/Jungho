@@ -176,17 +176,19 @@ details[open]>summary{margin-bottom:12px}
 /* US completed-daily-bar action signals: KRW-first, not automated orders */
 .us-signals-panel{margin:14px 0;padding:12px;border:1px solid #476587;border-radius:12px;background:#13243e}
 .us-signals-panel h3{font-size:1rem;margin:0}
-.us-signal-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:8px}
+.us-signal-counts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:8px}
 .us-signal-counts>div{background:#203350;border-radius:8px;text-align:center;padding:10px 5px;font-size:.82rem}
 .us-trade-status{display:flex;align-items:center;gap:7px;border:1px solid #53657d;border-radius:8px;padding:7px 9px;font-weight:750;font-size:.85rem;margin:5px 0;width:100%;line-height:1.4}
 .us-trade-status.state-buy,.us-decision-buy{border-color:#437b9f;color:#9fd8ff}
 .us-trade-status.state-stop,.us-decision-stop{border-color:#a15a68;color:#ffaab9}
 .us-trade-status.state-wait,.us-decision-wait{border-color:#67788f;color:#d5deea}
+.us-trade-status.state-sell,.us-decision-sell{border-color:#c29363;color:#ffdcab}
 .us-signal-dot{display:block;width:8px;height:8px;border-radius:50%;background:currentColor;flex-shrink:0}
 .us-decision-block{background:#142943;border-left:4px solid #6887a5;padding:12px;border-radius:8px;margin:12px 0;font-size:.86rem;line-height:1.65}
 .us-decision-buy{border-left-color:#58acd6}
 .us-decision-stop{border-left-color:#e18492}
 .us-decision-wait{border-left-color:#8995a8}
+.us-decision-sell{border-left-color:#d6aa73}
 .us-decision-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .us-decision-kind{font-size:.74rem;color:inherit;border-radius:6px;border:1px solid currentColor;padding:2px 6px}
 .us-decision-block p{color:#d4deed;margin:7px 0}
@@ -195,7 +197,7 @@ details[open]>summary{margin-bottom:12px}
 .us-signal-limits label{font-size:.77rem;min-width:0}
 .us-signal-limits input{font-size:.86rem;padding:9px}
 .us-signals-panel details{border-top:1px solid #3b5270;padding-top:10px;margin-top:10px}
-@media(max-width:400px){.us-signal-counts{gap:4px}.us-signal-counts>div{font-size:.74rem}.us-signal-limits{grid-template-columns:1fr}}
+@media(max-width:430px){.us-signal-counts{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.us-signal-counts>div{font-size:.74rem}.us-signal-limits{grid-template-columns:1fr}}
 
 /* Single full-width US stock row on mobile and desktop, like Korean stock list. */
 /* American stock cards use the same structure as Korean ETF cards. */
@@ -253,6 +255,8 @@ details[open]>summary{margin-bottom:12px}
 #us-panel .us-card-signal.state-wait .us-card-signal-action{color:#d5deea}
 #us-panel .us-card-signal.state-stop{border-color:#a15a68;background:#302739}
 #us-panel .us-card-signal.state-stop .us-card-signal-action{color:#ffaab9}
+#us-panel .us-card-signal.state-sell{border-color:#c29363;background:#302d32}
+#us-panel .us-card-signal.state-sell .us-card-signal-action{color:#ffdcab}
 #us-panel .us-card-ma20{
  display:block;border:1px solid #4a6a8d;border-radius:12px;
  background:#122942;padding:13px;margin-top:13px
