@@ -124,6 +124,13 @@ function row(market,id){
  }
  if(unitPrice===null&&!us){
   const mapped=TOSS_KR.find(x=>x[0]===id)?.[2];
+  if(!mapped){
+   const extra=window.ISA_PRIVATE_KRX?.extraQuote?.(id);
+   if(extra&&positive(extra.close)&&/^\d{8}$/.test(String(extra.date))){
+    unitPrice=Number(extra.close);priceDate=extra.date.slice(0,4)+'-'+extra.date.slice(4,6)+'-'+extra.date.slice(6,8);
+    priceSource='KRX 공식 확정 종가 (개인 조회)';priceMode='kr-reference';
+   }
+  }
   if(mapped){
    try{
     const q=window.ISA_KR_APP?.decisions?.().find(x=>x.id===mapped);
