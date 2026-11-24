@@ -1406,13 +1406,31 @@ async function refresh(){
   manual={};render();
   document.dispatchEvent(new Event('isa-kr-private-data'));
  }catch(err){
+  var restored=null;
   if(window.ISA_PRIVATE_KRX?.configured?.()){
-   byId={};loadTime=null;dataSignature=null;
+   // Keep previously verified closing bars on a temporary private KRX outage.
+   // They remain dated references; trading eligibility still checks today.
+   restored=window.ISA_PRIVATE_KRX?.lastGood?.()||null;
+   if(restored&&Array.isArray(restored.items)){
+    var cached={};restored.items.forEach(function(x){cached[x.id]=x;});
+    if(FUNDS.every(function(f){return hasBars(cached[f.id]);})){
+     byId=cached;loadTime=restored.fetchedAt||null;
+     dataSignature=JSON.stringify(FUNDS.map(function(f){var x=cached[f.id];return [x.ok,x.date,x.close];}));
+    }else restored=null;
+   }
+   if(!restored){
+    var remaining=FUNDS.filter(function(f){return hasBars(byId[f.id]);}).length;
+    if(!remaining){byId={};loadTime=null;dataSignature=null;}
+   }
    render();document.dispatchEvent(new Event('isa-kr-private-data'));
   }
-  el('signal').textContent='자료 확인 실패';
+  var knownDates=FUNDS.map(function(f){return byId[f.id];}).filter(hasBars).map(function(x){return x.date;}).sort();
+  var knownDay=knownDates.length?day(knownDates[knownDates.length-1]):null;
+  el('signal').textContent=knownDay?'최신 조회 실패 · 종가 '+knownDay:'자료 확인 실패';
   el('checked').textContent='화면 확인 실패: '+new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'});
-  el('alert').textContent='조회 실패: '+String(err.message||err)+'. 기존 게시 자료를 최신 종가로 간주하지 마세요.';
+  el('alert').textContent='최신 KRX 공식 조회 실패: '+String(err.message||err)+
+   (knownDay?' · 보관된 '+knownDay+' 종가는 과거 참고 자료이며 오늘 매수·중지 신호로 사용하지 않습니다.':
+    ' · 최신 공식 종가가 확인되지 않아 매수판단을 보류합니다.');
  }finally{await refreshLiveQuotes();button.disabled=false;button.textContent='↻ 공식 종가 조회';}
 }
 FUNDS.forEach(function(f){var o=document.createElement('option');o.value=f.id;o.textContent=f.name;el('selection').appendChild(o);});
