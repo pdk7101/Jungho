@@ -7,7 +7,9 @@ const ORIGIN='https://pdk7101.github.io';
 const KRX_ENDPOINT='https://data-dbg.krx.co.kr/svc/apis/etp/etf_bydd_trd';
 const FUNDS=[['reit','329200'],['sol','0167B0'],['robot','469070'],
  ['space','0131V0'],['sofr','455030'],['tr','278530']];
-const CODE=new Map(FUNDS.map(([id,code])=>[code,id]));
+const EXTRA=[['biotech','0229F0'],['media','228810']];
+const EXTRA_IDS=new Set(EXTRA.map(([id])=>id));
+const CODE=new Map([...FUNDS,...EXTRA].map(([id,code])=>[code,id]));
 function kst(date){
  return Object.fromEntries(new Intl.DateTimeFormat('en-CA',{
   timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',
@@ -119,7 +121,8 @@ export default {
     return reply(502,{error:'KRX 인증·이용 승인 또는 API 호출 제한 확인 필요'},origin);
    if(result.errors.length)return reply(502,{error:'KRX 일별 자료 일부 수집 실패 · 해당 페이지 보류'},origin);
    return reply(200,{ok:true,source:'한국거래소(KRX) ETF 일별매매정보',
-    page,latestExpected:result.latestExpected,rows:result.rows},origin);
+    page,latestExpected:result.latestExpected,rows:result.rows.filter(x=>!EXTRA_IDS.has(x.id)),
+    extraQuotes:page===0?result.rows.filter(x=>EXTRA_IDS.has(x.id)).map(({id,code,date,close})=>({id,code,date,close})):[]},origin);
   }catch(_){
    return reply(502,{error:'KRX 공식 자료 조회 실패'},origin);
   }
