@@ -239,9 +239,12 @@ function render(){
  const combined=$('account-summary-total');if(!combined)return;
  const t=x.toss,k=x.kiwoom;
  if(finite(t?.invested)&&finite(k?.invested)){
-  const cost=Number(t.invested)+Number(k.invested);
+  // The summary must reconcile exactly with the integer KRW amounts visible
+  // in each brokerage row. Fractional-share FX conversions can carry sub-won
+  // values; adding those unrounded values created a 1 KRW P/L discrepancy.
+  const cost=Math.round(Number(t.invested))+Math.round(Number(k.invested));
   if(finite(t?.value)&&finite(k?.value)){
-   const value=Number(t.value)+Number(k.value);
+   const value=Math.round(Number(t.value))+Math.round(Number(k.value));
    const profit=value-cost;
    const profitText=(profit>0?'+':'')+money(profit);
    const rateText=cost>0?' ('+(profit>=0?'+':'')+(100*profit/cost).toFixed(2)+'%)':' (수익률 계산 불가)';
