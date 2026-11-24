@@ -1400,7 +1400,7 @@ aggStore.setItem('isa-account-totals-v1',JSON.stringify({
 aggStore.setItem('isa-account-calculation-mode-v1',JSON.stringify({toss:'manual',kiwoom:'manual'}));
 accountWindow.ISA_ACCOUNT_SUMMARY.refresh();
 const screenshotReference=cards['account-summary-total'].textContent;
-truth(screenshotReference.includes('참고 단순합계 (계좌별 기준일 다름)')&&
+truth(screenshotReference.includes('과거 참고 합계 (토스 실계좌 미연결)')&&
  screenshotReference.includes('총투자금 13,255,258원')&&
  screenshotReference.includes('평가금액 9,637,761원')&&
  screenshotReference.includes('평가손익 -3,617,497원 (-27.29%)'),
