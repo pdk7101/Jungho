@@ -309,7 +309,7 @@ const compactSignal=new Function('read','item','chartAssessment','quote','getLim
  {schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY'},x=>String(x)
 );
 for(const [id,expected,label] of [
- ['schd','buy','매수 검토'],['agnc','wait','대기'],
+ ['schd','buy','매수 검토'],['agnc','wait','보류'],
  ['spym','stop','중지'],['cony','stop','중지']]){
  const outcome=compactSignal.decision(id),card=compactSignal.cardStatus(id);
  equal(outcome.type,expected,id+' uses the current buy/wait/stop decision state');
