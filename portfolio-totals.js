@@ -103,7 +103,7 @@ function totals(){
  if(basis.length<14)note.push('매수원가 미입력 '+(14-basis.length)+'종목');
  if(values.length<14)note.push('평가액 미확인 '+(14-values.length)+'종목');
  if(prices.photo)note.push('과거 사진 가격 '+prices.photo+'종목 (실시간 아님)');
- if(prices.reference)note.push('비공식 참고가격 '+prices.reference+'종목');
+ if(prices.reference)note.push('참고가격 '+prices.reference+'종목 (실시간 확정 아님)');
  return {invested,value,knownInvested:basis.reduce((s,x)=>s+x.invested,0),
   knownValue:values.reduce((s,x)=>s+x.value,0),completeBasis:basis.length===14,
   completeValue:values.length===14,rows,count:14,knownCount:basis.length,
