@@ -114,7 +114,7 @@ function metricSignals(){
   }
   if(x.shares5&&Number.isFinite(x.shares5.value)){
    const drop=x.shares5.value<=-10;
-   if(drop)out.push(event(x.id,x.date,'risk','추정 좌수 5거래일 -10% 이상',pct(x.shares5.value)+' · 실제 설정·환매 확인 필요'));
+   if(drop)out.push(event(x.id,x.date,'risk','KRX 상장좌수 5거래일 -10% 이상',pct(x.shares5.value)+' · 실제 설정·환매 확인 필요'));
   }
  }
  return out;
