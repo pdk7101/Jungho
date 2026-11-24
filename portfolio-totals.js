@@ -54,7 +54,15 @@ function row(market,id){
  const avg=positive(us?stored.krwAvg:stored.avg)?Number(us?stored.krwAvg:stored.avg):inferredAvg;
  const edited=known(stored.qty)||positive(us?stored.krwAvg:stored.avg);
  let unitPrice=null,priceSource=null,priceDate=null,priceMode='none';
- if(us&&id!=='spacex'){
+ // Owner-entered Toss KRW reference has priority on its entry day. It is never
+ // claimed to be an authenticated broker API or a real-time portfolio balance.
+ if(positive(stored.krwCurrent)&&stored.krwDay===seoulDay()){
+  unitPrice=Number(stored.krwCurrent);
+  priceSource='토스증권 앱 원화 단가 직접 입력 (실시간 연동 아님)';
+  priceDate=stored.krwDay;
+  priceMode='broker-manual';
+ }
+ if(unitPrice===null&&us&&id!=='spacex'){
   try{
    const usd=window.ISA_US_APP?.getPrice?.(id);
    const q=window.ISA_US_KRW?.priceKrw?.(id,usd);
@@ -64,7 +72,7 @@ function row(market,id){
    }
   }catch(_){}
  }
- if(!us){
+ if(unitPrice===null&&!us){
   const mapped=TOSS_KR.find(x=>x[0]===id)?.[2];
   if(mapped){
    try{
@@ -104,6 +112,8 @@ function totals(){
  if(values.length<14)note.push('평가액 미확인 '+(14-values.length)+'종목');
  if(prices.photo)note.push('과거 사진 가격 '+prices.photo+'종목 (실시간 아님)');
  if(prices.reference)note.push('참고가격 '+prices.reference+'종목 (실시간 확정 아님)');
+ const directlyEntered=rows.filter(x=>x.qty>0&&x.priceMode==='broker-manual').length;
+ if(directlyEntered)note.push('토스 원화 단가 직접 입력 '+directlyEntered+'종목 (당일 한정)');
  return {invested,value,knownInvested:basis.reduce((s,x)=>s+x.invested,0),
   knownValue:values.reduce((s,x)=>s+x.value,0),completeBasis:basis.length===14,
   completeValue:values.length===14,rows,count:14,knownCount:basis.length,
@@ -114,8 +124,12 @@ function totals(){
 function markAuto(account){
  if(!['toss','kiwoom'].includes(account))return;
  const before=read(MODE);
- try{localStorage.setItem(MODE,JSON.stringify({...before,[account]:'auto',updatedAt:seoulDay()}));}
- catch(_){return;}
+ // Editing a holding must NOT discard an explicitly recorded whole-account
+ // Toss broker amount. The user can opt into automatic estimates separately.
+ if(before[account]!=='manual'){
+  try{localStorage.setItem(MODE,JSON.stringify({...before,[account]:'auto',updatedAt:seoulDay()}));}
+  catch(_){return;}
+ }
  document.dispatchEvent(new Event('isa-portfolio-holdings-updated'));
 }
 function labelText(r){
@@ -140,7 +154,11 @@ function renderEditor(containerId,market,ids){
    esc(qty)+ '" placeholder="'+(r.qty===null?'수량':qtyfmt(r.qty))+'"></label>'+
    '<label>원화 평단가 (원)<input type="number" min="0" step="0.01" data-toss-edit="'+
    esc(id)+'" data-market="'+market+'" data-kind="avg" value="'+esc(avg)+
-   '" placeholder="'+(r.avg===null?'평단 미확인':fmt(r.avg))+'"></label></div>';
+   '" placeholder="'+(r.avg===null?'평단 미확인':fmt(r.avg))+'"></label>'+
+   '<label>토스 현재 원화 단가 (원 · 선택)<input type="number" min="0" step="0.01" data-toss-edit="'+
+   esc(id)+'" data-market="'+market+'" data-kind="brokerPrice" value="'+
+   esc(stored.krwDay===seoulDay()&&positive(stored.krwCurrent)?stored.krwCurrent:'')+
+   '" placeholder="증권사 앱 단가 직접 입력 · 당일만 유효"></label></div>';
  }).join('');
  place.querySelectorAll('input[data-toss-edit]').forEach(input=>{
   input.addEventListener('change',()=>{
@@ -156,8 +174,12 @@ function renderEditor(containerId,market,ids){
     return;
    }
    const key=market==='us'?US:TD,old=read(key),entry={...(old[id]||{})};
-   const field=kind==='qty'?'qty':market==='us'?'krwAvg':'avg';
+   const field=kind==='qty'?'qty':kind==='brokerPrice'?'krwCurrent':market==='us'?'krwAvg':'avg';
    if(val===null)delete entry[field];else entry[field]=val;
+   if(kind==='brokerPrice'){
+    if(val===null)delete entry.krwDay;
+    else entry.krwDay=seoulDay();
+   }
    entry.updatedAt=seoulDay();
    try{
     localStorage.setItem(key,JSON.stringify({...old,[id]:entry}));
