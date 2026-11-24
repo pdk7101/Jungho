@@ -37,9 +37,20 @@ try {
   }
   if ($status -eq 401 -or $status -eq 400 -or $status -eq 403) {
     try {
-      $e=($result.Content | ConvertFrom-Json).error
-      if (@('invalid_client','invalid_request','access_denied','unsupported_grant_type').Contains([string]$e)) {
+      $errorData = $result.Content | ConvertFrom-Json
+      $e = [string]$errorData.error
+      if (@('invalid_client','invalid_request','access_denied','unsupported_grant_type').Contains($e)) {
         Write-Host ('공식 OAuth 오류 종류: '+$e)
+      }
+      # Print ONLY a known field name. Never echo the raw provider error_description,
+      # which may contain sensitive data in future API versions.
+      $desc = [string]$errorData.error_description
+      if ($desc -match 'client_secret') {
+        Write-Host '검증 실패 위치: Client Secret'
+      } elseif ($desc -match 'client_id') {
+        Write-Host '검증 실패 위치: Client ID'
+      } elseif ($e -eq 'invalid_client') {
+        Write-Host '검증 실패 위치: 불명확 (ID/Secret 발급 쌍과 활성 상태 확인)'
       }
     } catch {}
   }
