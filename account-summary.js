@@ -213,6 +213,18 @@ function tossOfficial(){
  const data=window.ISA_TOSS_BROKER?.snapshot?.();
  if(!data?.ok||!data.totals||!data.amounts)return null;
  const cached=window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state==='cached';
+ // When the gateway is offline, prefer a complete price-based valuation
+ // of the last saved quantities. Preserve the original broker snapshot.
+ if(cached){
+  const estimate=window.ISA_PORTFOLIO_TOTALS?.totals?.();
+  if(estimate?.completeBasis&&estimate?.completeValue&&
+   estimate.rows?.every(r=>r.cachedHolding)&&
+   estimate.rows.some(r=>r.priceMode!=='official-broker')){
+   return {invested:estimate.invested,value:estimate.value,date:estimate.date,
+    source:'마지막 공식 보유수량 × 최근 조회가격 · 새 매매 미반영'+(estimate.mixedDates?' · 가격 기준일 혼합':''),
+    complete:true,estimated:true,brokerApi:true,cached:true,revalued:true};
+  }
+ }
  const basis=data.totals.investedKRW,valuation=data.totals.valueKRW;
  const native=data.amounts.valued||{};
  const usd=Number(native.usd||0),krw=Number(native.krw||0);
@@ -330,7 +342,7 @@ function render(){
    new Date(n).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'미확인';};
   if(notice.dataset)notice.dataset.stale=x.toss?.brokerApi&&own?.state==='live'?'false':'true';
   notice.textContent=x.toss?.brokerApi?
-   (own?.state==='cached'?'토스 마지막 성공 조회 '+format(official?.fetchedAt)+' · 현재 잔고 아님'+(own.diagnosis?' · '+own.diagnosis:'')+'. ':
+   (own?.state==='cached'?'토스 마지막 성공 조회 '+format(official?.fetchedAt)+(x.toss.revalued?' · 저장 수량으로 참고 평가 갱신 · 새 매매 미반영':' · 현재 잔고 아님')+(own.diagnosis?' · '+own.diagnosis:'')+'. ':
     '토스 공식 계좌 '+(official?.holdingCount||0)+'종목 자동 반영 · 조회 '+format(official?.fetchedAt)+'. ')+
    (x.kiwoom?.date?'키움 참고 기준 '+String(x.kiwoom.date).slice(0,10):'키움 가격 확인 중'):
    connected?(own?.diagnosis?'토스 조회 실패: '+own.diagnosis+' · 과거 참고값':own?.loading?'토스 공식 잔고 확인 중 · 과거 참고값':'토스 연결 설정 저장됨 · 정상 잔고 아직 없음'):
@@ -340,7 +352,7 @@ function render(){
  if(note){
   const saved=read(REFERENCE),latest=[saved.toss?.checkedAt,saved.kiwoom?.checkedAt]
    .filter(Boolean).sort().at(-1);
-  note.textContent=(x.toss?.brokerApi?
+  note.textContent=(x.toss?.revalued?'노트북 연결 없이 저장된 보유수량과 최근 확인 가격으로 재평가합니다. 실제 새 매매는 반영되지 않습니다. ':x.toss?.brokerApi?
    '토스의 공식 API 원화·USD 통화별 합계를 현재 환율로 환산한 참고액입니다. 토스 앱의 비용·환율 산식과 다를 수 있습니다. ':
    '공식 토스 연결이 없으면 마지막 저장된 사진/가격만 표시합니다. ')+
    (latest?' 마지막 참고 계산: '+new Date(latest).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+'. ':'')+
