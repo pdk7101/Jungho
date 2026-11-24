@@ -392,7 +392,7 @@ details[open]>summary{margin-bottom:12px}
 @media(min-width:760px){#us-panel .us-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style><script src="./live-prices.js"></script><script src="./private-krx-client.js"></script>
 </head><body><main>
-<header><div><small>내 투자 · 무료 대시보드 · 11/25 v5</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
+<header><div><small>내 투자 · 무료 대시보드 · 11/25 v6</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
 <section class="panel account-summary" id="account-summary" aria-labelledby="account-summary-title">
  <div class="account-head"><h2 id="account-summary-title">전체 계좌 현황</h2><button type="button" id="account-summary-recalc" title="연결된 토스·KRX·미국 주식 시세를 한 번에 확인합니다.">↻ 전체 최신정보 조회</button></div>
  <p id="account-live-state" role="status">토스·KRX·미국 시세 자동 확인 중…</p>
@@ -429,6 +429,11 @@ details[open]>summary{margin-bottom:12px}
  </div>
 </section>
 <details class="panel" id="dashboard-settings"><summary><b>설정 · 계좌 연결 · 수동 보정</b></summary>
+<details class="panel" id="toss-broker-holdings-panel">
+ <summary><b>토스 보유 종목별 수량·평단·평가액 보기</b></summary>
+ <p class="fieldset-note">토스 공식 조회 내역입니다. 서버 연결이 끊기면 마지막 정상 저장 잔고만 표시됩니다.</p>
+ <div id="toss-broker-holdings" class="toss-broker-holdings">계좌 연결 후 조회 가능합니다.</div>
+</details>
 <details class="panel" id="toss-broker-config">
  <summary><b>토스증권 공식 계좌 자동 조회 · 휴대폰/노트북 공용</b></summary>
  <p class="fieldset-note">본인 전용 HTTPS 조회 서버에서 토스증권 공식 API를 호출합니다. <b>공식 조회 성공 시 마지막 잔고를 이 기기에 자동 저장</b>합니다. 노트북이 꺼져도 저장 당시의 수량·평가액과 조회일을 볼 수 있지만 최신 잔고로 갱신되지는 않습니다. 어제 날짜의 값은 어제 실제 조회한 기록이 있을 때만 사용됩니다. 토스 Client ID·Client Secret을 이 화면이나 공개 GitHub에 입력하지 마세요. 계좌 조회만 지원하며 매매 주문은 하지 않습니다.</p>
@@ -443,9 +448,6 @@ details[open]>summary{margin-bottom:12px}
   <button type="button" id="toss-broker-disconnect">연결 해제</button>
  </div>
  <p class="fieldset-note" id="toss-broker-status" role="status">토스 계좌 조회 서버 연결 전</p>
- <details><summary>토스 보유 종목별 수량·평단·평가액 보기</summary>
-  <div id="toss-broker-holdings" class="toss-broker-holdings">계좌 연결 후 조회 가능합니다.</div>
- </details>
  <p class="fieldset-note">토스 공식 API의 원화·달러 금액은 각각 별도 합산됩니다. 표시 환율로 원화 합계를 환산한 값은 토스 앱 평가금액과 다를 수 있습니다. 인증서버는 고정 공인IP를 가진 본인 전용 서버에서 운영해야 합니다. <a href="https://github.com/pdk7101/Jungho/blob/main/TOSS_READONLY_SETUP.md" target="_blank" rel="noopener noreferrer">휴대폰·노트북 연결 안내</a></p>
 </details>
 <details class="panel" id="krx-last-status">
