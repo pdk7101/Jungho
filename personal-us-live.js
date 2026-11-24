@@ -47,7 +47,7 @@
  }
  function quote(id){
   const item=quotes[id],now=Date.now(),f=Date.parse(fetchedAt||''),t=Date.parse(item?.tradeAt||'');
-  if(!IDS.includes(id)||!item||!Number.isFinite(item.usd)||item.usd<=0||item.usd>100000
+  if(!(IDS.includes(id)||id==='spacex')||!item||!Number.isFinite(item.usd)||item.usd<=0||item.usd>100000
     ||!Number.isFinite(f)||!Number.isFinite(t)||f>now+60000||t>now+60000
     ||now-f<0||now-f>RESPONSE_TTL||now-t<0||now-t>TRADE_TTL)return null;
   return {usd:item.usd,tradeAt:item.tradeAt,fetchedAt,source:'Finnhub personal authenticated US trade'};
@@ -79,7 +79,7 @@ function renderDiagnostics(){
  const host=$('us-quote-debug-text');if(!host)return;
  if(!Object.keys(diagnostics).length){host.textContent='조회 결과가 아직 없습니다. 연결·조회 버튼을 누르면 종목별 사유가 표시됩니다.';return;}
  host.textContent='시세 서버 코드 '+(workerVersion||'버전 표기 없음(구버전 Worker 가능)')+
-  ' / '+IDS.map(id=>id.toUpperCase()+': '+(diagnostics[id]||'미확인')).join(' / ');
+  ' / '+[...IDS,'spacex'].map(id=>(id==='spacex'?'SPCX':id.toUpperCase())+': '+(diagnostics[id]||'미확인')).join(' / ');
 }
  function connectionState(){
   // Public UI diagnostics only. Never return the access token or a secret-bearing URL.
@@ -104,7 +104,7 @@ function renderDiagnostics(){
   if($('us-personal-status'))$('us-personal-status').textContent=msg+line;
   renderDiagnostics();
   if($('us-live-badge'))$('us-live-badge').textContent=validCount?
-   'Finnhub 개인 장중 체결 '+validCount+'/4 · '+label+' 조회 · 거래소 전체 체결가와 다를 수 있음':
+   'Finnhub 개인 장중 체결 '+validCount+'/4 · '+label+' 조회 · SPCX '+(quote('spacex')?'연결':'미확인')+' · 거래소 전체 체결가와 다를 수 있음':
    '개인 장중시세 '+(endpoint?'조회 대기/만료':'미설정')+' · 기본 미국장 확정 종가 참고';
  }
  async function refresh(){
@@ -123,9 +123,9 @@ function renderDiagnostics(){
       ||f>now+60000||now-f>RESPONSE_TTL||!payload?.quotes)
      throw Error('응답 날짜·형식 검증 실패');
    const next={},details={};
-   for(const id of IDS){
+   for(const id of [...IDS,'spacex']){
     const v=payload.quotes[id],t=Date.parse(v?.tradeAt||''),p=Number(v?.usd);
-    if(v?.symbol===id.toUpperCase()&&Number.isFinite(p)&&p>0&&p<=100000&&
+    if(v?.symbol===(id==='spacex'?'SPCX':id.toUpperCase())&&Number.isFinite(p)&&p>0&&p<=100000&&
        Number.isFinite(t)&&t<=now+60000&&now-t>=0&&now-t<=TRADE_TTL){
       next[id]={usd:p,tradeAt:v.tradeAt};
       details[id]='최근 체결가격 사용 가능';
