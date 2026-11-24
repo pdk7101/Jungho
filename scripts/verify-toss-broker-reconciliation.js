@@ -59,8 +59,9 @@ portfolio.markAuto('toss');
 assert.equal(JSON.parse(localStorage.getItem('isa-account-calculation-mode-v1')).toss,'manual');
 assert.equal(account.getTotals().toss.value,2750,'holding refresh cannot erase broker total');
 // Direct user-entered daily Toss price has precedence over a past photo for that ticker.
-const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',
- year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const todayParts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',
+ year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(x=>[x.type,x.value]));
+const today=todayParts.year+'-'+todayParts.month+'-'+todayParts.day;
 localStorage.setItem('isa-private-toss-domestic-holdings-v1',JSON.stringify({
  treit:{qty:3,avg:100,krwCurrent:157,krwDay:today}
 }));
