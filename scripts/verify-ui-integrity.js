@@ -30,9 +30,13 @@ const required=[
  'id="funds"','id="plan"','id="etf-flow-list"'
 ];
 for(const control of required)assert.ok(markup.includes(control),'existing control must remain: '+control);
-assert.ok(markup.includes('계좌·분배금 기록은 이 기기에만 저장되며 자동 동기화되지 않습니다')&&
- markup.includes('id="account-summary-recalc"'),
- 'account overview explains device-local storage and explicit valuation refresh');
+assert.ok(markup.includes('계좌·분배금 기록은 이 브라우저에만 저장')&&
+ markup.includes('id="account-summary-recalc"')&&
+ markup.includes('↻ 전체 최신정보 조회')&&
+ markup.includes('id="account-live-state"')&&
+ markup.includes('id="account-connect-broker"')&&
+ markup.includes('<details id="account-details"'),
+ 'one-tap automated overview flags per-browser Toss connection and hides legacy manual calculation details');
 assert.ok(markup.includes('공식 확정 종가')&&html.includes('KRX 공식 확정 일봉 기준 주문 준비'),
  'dated Korean completed closes must be labeled correctly');
 assert.ok(!html.includes('비공식 게시 일봉 기준')&&
