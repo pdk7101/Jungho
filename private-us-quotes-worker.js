@@ -11,7 +11,7 @@
  * No Toss Open API credentials are used. No trading/account endpoints exist.
  */
 const ALLOWED_ORIGIN='https://pdk7101.github.io';
-const SYMBOLS=Object.freeze({schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY'});
+const SYMBOLS=Object.freeze({schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY',spacex:'SPCX'});
 const REFRESH_MS=120_000;
 const WORKER_VERSION='20261114-quote-transport-2';
 let cached=null,loadedAt=0,inFlight=null;
