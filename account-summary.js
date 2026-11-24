@@ -324,16 +324,16 @@ function render(){
  const notice=$('account-live-state'),connect=$('account-connect-broker');
  const broker=window.ISA_TOSS_BROKER,connected=!!broker?.configured?.();
  const own=broker?.snapshotMeta?.(),official=broker?.snapshot?.();
- if(connect)connect.hidden=connected;
+ if(connect){connect.hidden=connected&&!own?.diagnosis;connect.textContent=connected?'토스 연결 상태 확인':'토스 계좌 최초 연결';}
  if(notice){
   const format=iso=>{const n=Date.parse(iso||'');return Number.isFinite(n)?
    new Date(n).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'미확인';};
   if(notice.dataset)notice.dataset.stale=x.toss?.brokerApi&&own?.state==='live'?'false':'true';
   notice.textContent=x.toss?.brokerApi?
-   (own?.state==='cached'?'토스 마지막 성공 조회 '+format(official?.fetchedAt)+' · 현재 잔고 아님. ':
+   (own?.state==='cached'?'토스 마지막 성공 조회 '+format(official?.fetchedAt)+' · 현재 잔고 아님'+(own.diagnosis?' · '+own.diagnosis:'')+'. ':
     '토스 공식 계좌 '+(official?.holdingCount||0)+'종목 자동 반영 · 조회 '+format(official?.fetchedAt)+'. ')+
    (x.kiwoom?.date?'키움 참고 기준 '+String(x.kiwoom.date).slice(0,10):'키움 가격 확인 중'):
-   connected?'토스 자동 조회 연결됨 · 공식 잔고 확인 중 또는 서버 연결 실패 · 현재 표시는 과거 참고값입니다.':
+   connected?(own?.diagnosis?'토스 조회 실패: '+own.diagnosis+' · 과거 참고값':own?.loading?'토스 공식 잔고 확인 중 · 과거 참고값':'토스 연결 설정 저장됨 · 정상 잔고 아직 없음'):
    '현재 브라우저는 토스 연결 전 · 과거 계산액은 실제 잔고가 아닙니다. 아래 버튼으로 처음 한 번만 연결하세요.';
  }
  const note=$('account-valuation-note');
