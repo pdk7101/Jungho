@@ -1379,4 +1379,25 @@ truth(cards['account-dividend-total'].textContent.includes('2,100원')&&
  !screenshotReference.includes('배당'),
  'account cash payouts remain separate from evaluation P/L without double counting');
 
+
+// Fractional-share and FX-priced valuations may include sub-won values.
+// The displayed total must equal the sum of the displayed brokerage rows,
+// and displayed P/L must equal displayed valuation minus displayed cost.
+aggStore.setItem('isa-account-totals-v1',JSON.stringify({
+ toss:{invested:1000.2,value:600.8,date:'2026-11-21'},
+ kiwoom:{invested:300.2,value:200.8,date:'2026-11-23'}
+}));
+accountWindow.ISA_ACCOUNT_SUMMARY.refresh();
+truth(cards['toss-total-invested'].textContent==='1,000원'&&
+ cards['toss-total-value'].textContent==='601원'&&
+ cards['kiwoom-total-invested'].textContent==='300원'&&
+ cards['kiwoom-total-value'].textContent==='201원'&&
+ cards['account-summary-total'].textContent.includes('총투자금 1,300원')&&
+ cards['account-summary-total'].textContent.includes('평가금액 802원')&&
+ cards['account-summary-total'].textContent.includes('평가손익 -498원 (-38.31%)'),
+ 'brokerage rows, combined totals and P/L reconcile exactly to displayed integer KRW even with fractional US shares');
+truth(cards['account-dividend-total'].textContent.includes('2,100원')&&
+ !cards['account-summary-total'].textContent.includes('배당'),
+ 'one-won reconciliation keeps cash distributions separate from evaluation P/L');
+
 console.log('PASS: '+n+' contract checks. This gate does NOT certify actual live quote accuracy.');
