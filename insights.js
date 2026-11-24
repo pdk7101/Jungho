@@ -167,8 +167,6 @@ function updateAlerts(){
   (important.length?'<div class="change-feed">'+important.map(alertLabel).join('')+'</div>':
    '<p class="sub">'+(recent?'이번 확정 일봉에서 새로 발생한 중요 변화가 없습니다.':
     '최신 공식 확정 일봉이 없어 중요 변화를 판단할 수 없습니다.')+'</p>');
- // Decision reason is already available in each domestic card detail; do not duplicate it.
- document.querySelectorAll('#funds .change-mini').forEach(node=>node.remove());
 }
 const publicDists=[]; // Do not prefill unverified third-party historical payouts.
 function getDists(){
@@ -251,12 +249,12 @@ function mount(){
  '';
  root.parentNode.insertBefore(panel,root);
  const sol=document.createElement('section');sol.className='panel';sol.id='sol-panel';
- sol.innerHTML='<h2>SOL 200타겟위클리커버드콜 · 분배금 및 NAV</h2>'+
+ sol.innerHTML='<h2>SOL · 주당 분배금 목표 분석</h2>'+
  '<p class="fieldset-note">월 분배금 목표: 세전 30만~50만원 · ETF 실제 분배금·NAV·옵션 운용정보는 <a href="'+DOC_URL+'" target="_blank" rel="noopener noreferrer">운용사 SOL ETF 공식 안내</a>에서 확인하세요. 지급내역은 운용사 공식 공시에서 확인하세요.</p>'+
  '<label class="sol-input-label">목표 계산용 가정 수량 (주) <input id="sol-sim-shares" type="number" min="0" step="1" placeholder="내 보유수량 또는 가정 수량"></label>'+
  '<div id="sol-summary"></div>'+
- '<details><summary>주당 월 분배금 기록 추가·수정</summary>'+
- '<p class="fieldset-note">공식 운용사 공시에서 확인한 지급 금액만 입력하세요. 기존에 직접 저장한 분배금 기록은 유지됩니다.</p>'+
+ '<details><summary>목표 계산용 주당 월 분배금 기록 추가·수정</summary>'+
+ '<p class="fieldset-note">공식 운용사 공시에서 확인한 지급 금액만 입력하세요. 기존 입력 기록은 유지됩니다. 실제 계좌에 입금된 세후 지급금은 아래 국내주식 지급내역에서 별도 입력합니다.</p>'+
  '<div class="sol-inputs"><label>지급 기준 월<input type="month" id="sol-dist-month" min="2026-03"></label><label>확인된 주당 분배금 (원)<input type="number" id="sol-dist-amount" min="0" step="0.01" placeholder="공식 확인 금액"></label></div>'+
  '<button id="sol-dist-save" type="button">분배금 기록 저장</button><p id="sol-msg" class="fieldset-note"></p><div id="sol-records"></div></details>';
  const detail=$('detail');detail.parentNode.insertBefore(sol,detail);
