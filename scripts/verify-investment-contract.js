@@ -532,8 +532,8 @@ truth(!html.includes('id="posDetails"')&&
 truth(html.includes("querySelectorAll('input[data-pos]')")&&
  html.includes("var avgText=renderHoldingInCard(f.id,p);"),
  'all six Korean ETF cards read locally saved quantity/average cost and listen to editor changes');
-truth(html.includes('과거 일봉 종가 · '),
- 'Korean previous close is identified as historical, not current live price');
+truth(html.includes('KRX 확정 종가 · ')&&!html.includes('과거 일봉 종가 · '),
+ 'Korean official completed close is dated and not represented as a live price');
 truth(!html.includes('data-auto-kr-id=')&&!usKrwCode.includes('data-auto-krw-id='),
  'central holding form has no redundant read-only current-price inputs');
 truth(usKrwCode.includes("querySelectorAll('input[data-krw-id]')")&&
