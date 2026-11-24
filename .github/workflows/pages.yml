@@ -33,9 +33,9 @@ jobs:
           node-version: '22'
       - name: Verify established investment rules (fail closed)
         run: node scripts/verify-investment-contract.js && node scripts/verify-payout-entry.js && node scripts/verify-krx-official.js
-      - name: Obtain official KRX ETF completed daily bars
-        env:
-          KRX_AUTH_KEY: ${{ secrets.KRX_AUTH_KEY }}
+      # Public Pages must not redistribute KRX data.
+      # Official credentials are checked separately in a manual diagnostic.
+      - name: Keep licensed KRX price data out of public Pages
         run: node scripts/update-quotes.js
       - name: Flag unconnected official Korean intraday prices
         run: node scripts/update-intraday.js
