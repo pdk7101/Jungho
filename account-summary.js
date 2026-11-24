@@ -211,17 +211,19 @@ function kiwoomComputed(){
 function tossOfficial(){
  const data=window.ISA_TOSS_BROKER?.snapshot?.();
  if(!data?.ok||!data.totals||!data.amounts)return null;
+ const cached=window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state==='cached';
  const basis=data.totals.investedKRW,valuation=data.totals.valueKRW;
  const native=data.amounts.valued||{};
  const usd=Number(native.usd||0),krw=Number(native.krw||0);
- const source='토스 공식 API · 보유 '+data.holdingCount+'종목 · 국내 '+money(krw)+
+ const source=(cached?'토스 공식 API 마지막 저장 잔고 (현재 잔고 아님)':'토스 공식 API 이번 접속 조회 잔고')+
+  ' · 보유 '+data.holdingCount+'종목 · 국내 '+money(krw)+
   ' / 미국 USD '+usd.toLocaleString('ko-KR',{maximumFractionDigits:2})+
   (data.fx?.usdKrw?' · 공식 참고환율 '+data.fx.usdKrw:' · 환율 미확인')+
   ' · 실제 토스 앱 전체 원화액과 환율 및 비용 차이 가능';
  return {invested:finite(basis)?Number(basis):null,
   value:finite(valuation)?Number(valuation):null,
   date:data.fetchedAt||null,source,
-  complete:finite(basis)&&finite(valuation),estimated:true,brokerApi:true};
+  complete:finite(basis)&&finite(valuation),estimated:true,brokerApi:true,cached};
 }
 function totals(){
  const mode=read(MODE),tossManual=manualTotals('toss'),
@@ -280,7 +282,7 @@ function refreshReferenceTotals(){
  const x=totals(),updated=[],skipped=[];
  for(const id of ['toss','kiwoom']){
   const data=x[id];
-  if(data?.estimated&&finite(data.invested)&&finite(data.value)){
+  if(data?.estimated&&!data.brokerApi&&finite(data.invested)&&finite(data.value)){
    saveReference(id,data,referenceSignature(id,data));
    updated.push(id==='toss'?'토스':'키움 ISA');
   }else skipped.push(id==='toss'?'토스':'키움 ISA');
@@ -313,7 +315,9 @@ function render(){
  if(note){
   const saved=read(REFERENCE),latest=[saved.toss?.checkedAt,saved.kiwoom?.checkedAt]
    .filter(Boolean).sort().at(-1);
-  note.textContent=(x.toss?.brokerApi?'토스는 공식 API 조회 결과를 사용합니다. USD 보유분은 공식 표시환율로 참고 환산한 금액이며 토스 앱과 다를 수 있습니다. ':'계좌 참고평가액은 저장된 계산값으로 고정됩니다. 새 시세는 위의 ‘참고 평가액 갱신’을 눌러 반영합니다. ')+
+  note.textContent=(x.toss?.brokerApi?
+   (x.toss.cached?'토스는 이 기기에 마지막 저장된 공식 잔고입니다. 현재 잔고가 아니며 노트북이 꺼진 동안 변경되지 않습니다. ':'토스는 이번 접속의 공식 API 조회 결과입니다. ')+
+   'USD 보유분은 공식 표시환율로 참고 환산한 금액이며 토스 앱과 다를 수 있습니다. ':'계좌 참고평가액은 저장된 계산값으로 고정됩니다. 새 시세는 위의 ‘참고 평가액 갱신’을 눌러 반영합니다. ')+
    (latest?' 마지막 참고 계산: '+new Date(latest).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+'.':'')+
    ' 실제 증권사 잔고가 아니며 휴대폰·노트북 저장정보는 서로 동기화되지 않습니다.';
  }
@@ -324,8 +328,9 @@ function render(){
   const explicit=read(MODE).toss==='manual';
   if(official){
    const officialValue=finite(official.value)?money(official.value):'환율 미확인 · 통화별로만 표시';
-   brokerNote.textContent='토스 공식 API '+window.ISA_TOSS_BROKER.snapshot().holdingCount+'종목 · '+
-    '현재 원화 참고환산 '+officialValue+
+   brokerNote.textContent=(official.cached?'토스 마지막 저장 기록 (현재 잔고 아님) ':'토스 공식 API 이번 접속 조회 ')+
+    window.ISA_TOSS_BROKER.snapshot().holdingCount+'종목 · '+
+    (official.cached?'저장 당시 원화 참고환산 ':'조회 당시 원화 참고환산 ')+officialValue+
     (estimate&&finite(estimate.value)?' · 기존 14종목 사진·시세 참고액 '+money(estimate.value)+
      (finite(official.value)?' · 차이 '+(estimate.value>=official.value?'+':'')+
        money(Math.round(estimate.value)-Math.round(official.value)):''):'')+
