@@ -55,22 +55,22 @@ tossValue=8700;kiwoomValue=null;
 app.refresh();
 assert.equal(app.getTotals().toss.value,8700,'fresh calculations can change internally');
 assert.equal(app.getTotals().kiwoom.value,null,'KRX missing data remains unavailable in raw calculation');
-assert.equal(shown('toss-total-value'),oldToss,
- 'US and Korea quote arrival cannot silently change the shown Toss reference');
+assert.equal(shown('toss-total-value'),'8,700원',
+ 'a complete 14-position valuation automatically refreshes with available dated prices');
 assert.equal(shown('kiwoom-total-value'),oldKiwoom,
  'temporary KRX lookup failure keeps the previous reference instead of dropping it');
-assert.ok(shown('account-summary-total').includes('평가금액 10,900원'),
- 'combined value remains based on the same two saved references');
+assert.ok(shown('account-summary-total').includes('평가금액 10,600원'),
+ 'combined value reflects refreshed Toss and preserved last-good Kiwoom');
 kiwoomValue=1800;app.refresh();
-assert.equal(shown('kiwoom-total-value'),oldKiwoom,
- 'restored KRX bars alone do not silently update the reference');
+assert.equal(shown('kiwoom-total-value'),'1,800원',
+ 'restored complete KRX bars automatically update the reference');
 assert.equal(typeof handlers.get('account-summary-recalc:click'),'function',
  'there is an explicit owner action for recalculation');
 await handlers.get('account-summary-recalc:click')();
 assert.equal(shown('toss-total-value'),'8,700원',
- 'explicit refresh adopts current synthetic Toss basket');
+ 'optional explicit refresh keeps current synthetic Toss basket');
 assert.equal(shown('kiwoom-total-value'),'1,800원',
- 'explicit refresh adopts current synthetic Kiwoom valuation');
+ 'optional explicit refresh keeps current synthetic Kiwoom valuation');
 assert.ok(shown('account-summary-total').includes('평가금액 10,500원'));
 // Editing the actual holdings is a user action and must invalidate the lock.
 qty=11;invested=10300;tossValue=8750;app.refresh();
@@ -92,4 +92,4 @@ app.refresh();
 assert.equal(shown('toss-total-value'),'11,500원',
  'manual whole-account broker figure always takes priority');
 assert.equal(shown('kiwoom-total-value'),'1,800원');
-console.log('PASS: stable brokerage references, explicit refresh, incomplete KRX fallback, holding edits, manual overrides');
+console.log('PASS: automatic complete valuation refresh, incomplete KRX fallback, holding edits, manual overrides');
