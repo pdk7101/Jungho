@@ -17,7 +17,14 @@ const n=v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Numbe
 const positive=v=>n(v)!==null&&Number(v)>0;
 const iso=v=>/^\d{8}$/.test(String(v||''))?String(v):null;
 workerUrl=read(localStorage,URL_KEY);
-token=read(sessionStorage,TOKEN_KEY);
+const savedDeviceToken=read(localStorage,TOKEN_KEY);
+const savedTabToken=read(sessionStorage,TOKEN_KEY);
+token=savedDeviceToken||savedTabToken;
+// Upgrade a previously connected tab to the user's explicitly requested
+// trusted-device persistence without exposing credentials to the public site.
+if(!savedDeviceToken&&savedTabToken.length>=20&&workerUrl){
+ if(write(localStorage,TOKEN_KEY,savedTabToken))remove(sessionStorage,TOKEN_KEY);
+}
 function endpoint(raw){
  const u=new URL(String(raw).trim());
  if(u.protocol!=='https:'||u.username||u.password||u.search||u.hash)throw Error('HTTPS Worker 주소를 확인하세요.');
@@ -171,14 +178,20 @@ function setConnection(raw,secret,remember){
  const url=endpoint(raw),v=String(secret||'').trim();
  if(v.length<20)throw Error('접근 토큰은 20자 이상이어야 합니다.');
  workerUrl=url;token=v;
- write(localStorage,URL_KEY,url);
- if(remember)write(sessionStorage,TOKEN_KEY,v);
- else remove(sessionStorage,TOKEN_KEY);
+ if(!write(localStorage,URL_KEY,url))throw Error('Worker 주소를 브라우저에 저장할 수 없습니다.');
+ remove(localStorage,TOKEN_KEY);
+ remove(sessionStorage,TOKEN_KEY);
+ if(remember){
+  if(!write(localStorage,TOKEN_KEY,v))
+   throw Error('이 기기에서 접근 토큰을 저장할 수 없습니다. 브라우저 저장소 설정을 확인하세요.');
+ }else{
+  write(sessionStorage,TOKEN_KEY,v);
+ }
  snapshot=null;metricSnapshot=null;metricHistory=null;
 }
 function disconnect(){
  workerUrl='';token='';snapshot=null;metricSnapshot=null;metricHistory=null;
- remove(localStorage,URL_KEY);remove(sessionStorage,TOKEN_KEY);
+ remove(localStorage,URL_KEY);remove(localStorage,TOKEN_KEY);remove(sessionStorage,TOKEN_KEY);
 }
 function mount(){
  const url=document.getElementById('krx-private-worker');
@@ -189,7 +202,9 @@ function mount(){
  const off=document.getElementById('krx-private-disconnect');
  if(!url||!pass||!msg||!connect||!off)return;
  if(workerUrl)url.value=workerUrl;
- if(configured())msg.textContent='개인 KRX 연결 설정 있음 · 공식 종가 조회 가능';
+ if(configured())msg.textContent=read(localStorage,TOKEN_KEY)?
+  'KRX 연결 저장됨 · 이 기기에서 다음 접속 시 자동으로 공식 종가를 조회합니다.':
+  'KRX 연결됨 · 이 탭을 닫으면 접근 토큰을 다시 입력해야 합니다.';
  else if(workerUrl)msg.textContent='Worker 주소가 저장되어 있습니다. 개인 접근 토큰을 입력하세요.';
  else msg.textContent='개인 Worker 연결 전 · 공개 GitHub에는 KRX 가격이 저장되지 않습니다.';
  connect.onclick=async()=>{
