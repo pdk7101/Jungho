@@ -281,6 +281,23 @@ for(const id of ['schd','spym','agnc']){
  const risk=usCase(id,usFixture(93,96,100,180,false));
  equal(risk.type,'wait',id+' 1.8x-volume bearish chart still blocks a low-price buy');
 }
+// Four-state US decisions remain read-only and never mechanically sell a losing name.
+const exitCandidate=usFixture(88,94,100,100,false);
+exitCandidate.trend.deadCross=true;
+const exitReview=usRules.evaluate('schd',{
+ x:exitCandidate,usdPrice:88,usdClose:88,
+ krw:{amount:123200,source:'synthetic official US quote',manual:false},
+ qty:10,avg:105000,priceKind:'finnhub-private'},null);
+equal(exitReview.type,'sell',
+ 'a severe confirmed bearish cross with a positive KRW position flags SELL REVIEW only');
+truth(exitReview.title.includes('매도 검토')&&exitReview.reason.includes('자동 매도하지 않습니다'),
+ 'SELL REVIEW is not an executed trade or a broker order');
+const lossReview=usRules.evaluate('schd',{
+ x:exitCandidate,usdPrice:88,usdClose:88,
+ krw:{amount:123200,source:'synthetic US quote',manual:false},
+ qty:10,avg:145000,priceKind:'finnhub-private'},null);
+truth(lossReview.type!=='sell',
+ 'a losing long-term US holding is never automatically signaled for sale solely by moving averages');
 truth(usSignalCode.includes("id==='cony'&&read('isa-cony-autobuy-plan-v1')?.status!=='review'")&&
  usSignalCode.includes('현재 자동매수 중단 유지'),
  'CONY graph information cannot automatically restart paused buying');
