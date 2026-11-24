@@ -401,7 +401,8 @@ details[open]>summary{margin-bottom:12px}
   <label>개인 Cloudflare Worker HTTPS 주소<input id="krx-private-worker" type="url" autocomplete="off" placeholder="https://내-krx-연결.workers.dev"></label>
   <label>개인 접근 토큰 (KRX 인증키 아님)<input id="krx-private-token" type="password" autocomplete="off" placeholder="Worker KRX_VIEW_TOKEN · 20자 이상"></label>
  </div>
- <label class="fieldset-note"><input id="krx-private-remember" type="checkbox" checked> 이 브라우저 탭에서만 접근 토큰 기억 (탭 세션 종료까지)</label>
+ <label class="fieldset-note"><input id="krx-private-remember" type="checkbox" checked> 이 기기에 개인 접근 토큰 저장 · 다음 방문에도 자동 연결 (개인 기기 권장)</label>
+ <p class="fieldset-note">공용 기기에서는 체크 해제하세요. 저장된 토큰은 이 기기 브라우저 저장소에 남으며, 같은 기기의 다른 프로그램이나 브라우저 확장 프로그램으로부터 완전히 보호되는 비밀 저장소는 아닙니다. 저장 해제는 아래 개인 연결 해제를 누르세요.</p>
  <div class="flex">
   <button type="button" id="krx-private-connect">연결 및 공식 확정 종가 조회</button>
   <button type="button" id="krx-private-disconnect">개인 연결 해제</button>
