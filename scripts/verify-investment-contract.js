@@ -46,10 +46,11 @@ equal(app.defaults.capMode,'ma','moving-average-only is the default buy cap mode
 truth(app.FUNDS.find(f=>f.id==='reit').plan.includes('1·2·3·4주'),
  'REIT card description accurately covers SOL-rejected 4-share fallback');
 truth(html.includes('국내 ETF 매수계획 · 거래일 조건 점검')&&
- html.includes('function renderPlan(prepared){')&&
+ html.includes('function renderPlan(prepared,priorPlan){')&&
  html.includes('var prepared=nextSessionPlan();')&&
  html.includes('매수 검토 (')&&
- html.includes('마감 종가 미확인 종목은 보류합니다.'),
+ html.includes('오늘 필요한 확정 종가가 미확인인 종목은 현재 매수판단을 보류합니다.')&&
+ html.includes('오늘 주문 신호 아님'),
  'single plan panel switches between intraday and next-session close-based decisions');
 for(const mode of ['ma','manual','both'])truth(html.includes('value="'+mode+'"'),mode+' appears in mode selector');
 truth(html.indexOf('id="cap-settings"')<html.indexOf('id="summary"'),
