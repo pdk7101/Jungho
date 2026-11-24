@@ -265,23 +265,18 @@ function saveReference(id,data,signature){
 function referenceDisplay(id,data){
  if(!data?.estimated||data.brokerApi)return data;
  const signature=referenceSignature(id,data),old=read(REFERENCE)[id];
- // A complete verified newer Kiwoom dataset must replace an older locked
- // estimate automatically; never require a manual refresh to show a newer EOD.
- // Partial async responses retain the last good total.
- if(id==='kiwoom'&&data.complete&&finite(data.invested)&&finite(data.value)&&
-  data.date&&recordOK(old)&&old.signature===signature&&
-  String(data.date).slice(0,10)>String(old.date||'').slice(0,10)){
+ const same=recordOK(old)&&old.signature===signature;
+ const ready=data.complete&&finite(data.invested)&&finite(data.value);
+ const older=same&&old.date&&data.date&&String(data.date).slice(0,10)<String(old.date).slice(0,10);
+ if(ready&&!older){
+  if(same&&old.invested===Number(data.invested)&&old.value===Number(data.value)&&old.date===data.date&&old.source===data.source)
+   return {...data,checkedAt:old.checkedAt};
   const entry=saveReference(id,data,signature);
-  return {...data,checkedAt:entry.checkedAt,locked:true};
+  return {...data,checkedAt:entry.checkedAt};
  }
- if(recordOK(old)&&old.signature===signature){
-  return {...data,invested:old.invested,value:old.value,date:old.date,
-   source:old.source+' · 저장된 참고 평가액 (직접 갱신 시 변경)',
-   checkedAt:old.checkedAt,locked:true};
- }
- if(!finite(data.invested)||!finite(data.value))return data;
- const saved=saveReference(id,data,signature);
- return {...data,checkedAt:saved.checkedAt,locked:true};
+ if(same)return {...data,invested:old.invested,value:old.value,date:old.date,
+  source:old.source+' · 마지막 정상 참고평가 (새 자료 확인 중)',checkedAt:old.checkedAt,locked:true};
+ return data;
 }
 function viewTotals(){
  const x=totals();
@@ -292,7 +287,7 @@ function refreshReferenceTotals(){
  const x=totals(),updated=[],skipped=[];
  for(const id of ['toss','kiwoom']){
   const data=x[id];
-  if(data?.estimated&&!data.brokerApi&&finite(data.invested)&&finite(data.value)){
+  if(data?.estimated&&!data.brokerApi&&data.complete&&finite(data.invested)&&finite(data.value)){
    saveReference(id,data,referenceSignature(id,data));
    updated.push(id==='toss'?'토스':'키움 ISA');
   }else skipped.push(id==='toss'?'토스':'키움 ISA');
@@ -316,7 +311,7 @@ function displayAccount(id,data){
  }
  let sourceText=data.source+(data.date?' · 기준 '+String(data.date).slice(0,16).replace('T',' '):' · 기준일 미확인');
  if(id==='toss'&&!data.brokerApi)sourceText=(!data.estimated?
-  '증권사 앱 전체 금액 직접 기록 (자동 연결 아님) · ':'과거 저장·사진 참고액 (현재 토스 잔고 아님) · ')+
+  '증권사 앱 전체 금액 직접 기록 (자동 연결 아님) · ':'자동 참고평가 / 저장자료 (토스 공식 잔고 아님) · ')+
   (data.date||'기준일 없음');
  if(id==='kiwoom'&&!data.brokerApi)sourceText=data.source+' · 기준 '+(data.date||'미확인')+
   (data.locked?' · 마지막 검증값 보존':'');
@@ -466,7 +461,7 @@ function mount(){
  initDividendEditor();
  applyPrivateDividendPhoto();
  $('account-show-editor')?.addEventListener('click',()=>{
-  const outer=$('holdings-settings'),inner=$('account-edit');
+  const outer=$('holdings-settings'),inner=$('account-edit');if($('dashboard-settings'))$('dashboard-settings').open=true;
   if($('cap-settings'))$('cap-settings').open=true;
   if(outer)outer.open=true;
   if(inner)inner.open=true;
@@ -474,14 +469,15 @@ function mount(){
   $('account-toss-invested')?.focus?.();
  });
  $('account-connect-broker')?.addEventListener('click',()=>{
-  const node=$('toss-broker-config');if(node)node.open=true;
+  const node=$('toss-broker-config');if($('dashboard-settings'))$('dashboard-settings').open=true;if(node)node.open=true;
   node?.scrollIntoView?.({behavior:'smooth',block:'start'});
   $('toss-broker-url')?.focus?.();
  });
- $('account-summary-recalc')?.addEventListener('click',async()=>{
+ let lastAuto=0;
+ const refreshAll=async()=>{
   const button=$('account-summary-recalc'),state=$('account-live-state');
   if(button.disabled)return;
-  button.disabled=true;
+  button.disabled=true;lastAuto=Date.now();
   if(state)state.textContent='연결된 계좌·한국·미국 가격을 확인 중… 마지막 성공 기록은 유지합니다.';
   try{
    const tasks=[];
@@ -490,7 +486,7 @@ function mount(){
    if(window.ISA_US_APP?.refresh)tasks.push(window.ISA_US_APP.refresh());
    if(window.ISA_PERSONAL_US?.refresh)tasks.push(window.ISA_PERSONAL_US.refresh());
    await Promise.allSettled(tasks);
-   refreshReferenceTotals();
+   render();
   }finally{
    button.disabled=false;
    render();
@@ -498,7 +494,14 @@ function mount(){
     const c=$('account-connect-broker');if(c)c.hidden=false;
    }
   }
- });
+ };
+ $('account-summary-recalc')?.addEventListener('click',refreshAll);
+ const auto=()=>{if(document.visibilityState!=='hidden'&&Date.now()-lastAuto>=5*60000)refreshAll().catch(()=>{});};
+ lastAuto=Date.now();
+ setInterval(auto,60000);
+ document.addEventListener('visibilitychange',auto);
+ window.addEventListener('pageshow',auto);
+ window.addEventListener('online',()=>{lastAuto=0;auto();});
  document.addEventListener('isa-rendered',render);
  document.addEventListener('isa-portfolio-holdings-updated',render);
  window.addEventListener('isa-us-valuation-refreshed',render);
