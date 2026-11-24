@@ -23,7 +23,7 @@ assert.ok(inline.length>=10,'existing inline functionality not removed');
 for(const [i,item] of inline.entries())assert.doesNotThrow(()=>new vm.Script(item[1],{filename:'index-inline-'+i}),
  'inline script parse error at '+i);
 const required=[
- 'id="account-summary"','id="account-dividend-total"',
+ 'id="account-summary"','id="account-dividend-total"','id="account-show-editor"','id="account-broker-compare"',
  'id="positions"','id="kr-div-symbol"','id="kr-div-records"',
  'id="us-cards"','id="us-krw-editor"','id="us-live-secret"',
  'id="krx-private-connect"','id="krx-private-remember"',
@@ -42,6 +42,12 @@ assert.ok(!html.includes('비공식 게시 일봉 기준')&&
  'remove obsolete or duplicated official-quote and NAV descriptions');
 assert.ok(!html.includes('.change-mini{'),
  'unused duplicated per-card change styles must not reappear');
+const toss=read('portfolio-totals.js'),account=read('account-summary.js');
+assert.ok(toss.includes("priceMode='broker-manual'")&&
+ toss.includes("before[account]!=='manual'")&&
+ account.includes("brokerNote.textContent='토스 앱 직접 입력")&&
+ account.includes("$('account-show-editor')?.addEventListener"),
+ 'broker direct prices stay separate from mixed-date estimates and manual account values remain authoritative');
 const insights=read('insights.js');
 assert.ok(insights.includes('중요 변화 · 이번 일봉에서 새로 발생한 신호')&&
  insights.includes('const important=allowed.filter'),
