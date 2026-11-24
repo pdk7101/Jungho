@@ -1371,7 +1371,7 @@ equal(totalData.kiwoom.value,37400,'Kiwoom total comes from 6 domestic ETF calcu
 truth(cards['toss-total-value'].textContent.includes('3,300원')&&
  cards['kiwoom-total-invested'].textContent.includes('36,000원'),
  'top portfolio cards render totals in KRW without USD amounts');
-truth(cards['account-summary-total'].textContent.includes('기준일 다름')&&
+truth(cards['account-summary-total'].textContent.includes('과거 참고 합계')&&
  cards['account-summary-total'].textContent.includes('평가손익 +1,210원 (+3.06%)'),
  'combined mixed-date reference includes signed KRW evaluation gain and percentage');
 accountEl('account-toss-invested').value='5000';
