@@ -104,7 +104,7 @@ function totals(){
  const used=rows.filter(x=>x.qty>0);
  const stamps=[...new Set(used.map(x=>x.priceDate||'미확인'))];
  const prices={photo:rows.filter(x=>x.qty>0&&x.priceMode==='photo').length,
-  reference:rows.filter(x=>x.qty>0&&x.priceMode!=='none'&&x.priceMode!=='photo').length,
+  reference:rows.filter(x=>x.qty>0&&!['none','photo','broker-manual'].includes(x.priceMode)).length,
   missing:rows.filter(x=>x.qty>0&&x.priceMode==='none').length};
  const note=['토스 미국 5·국내 9종목 보유수량 × 원화평단 자동합계',
   '기록 '+basis.length+'/14종목'];
