@@ -331,7 +331,7 @@ function render(){
  if(notice){
   const format=iso=>{const n=Date.parse(iso||'');return Number.isFinite(n)?
    new Date(n).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'미확인';};
-  notice.dataset.stale=x.toss?.brokerApi&&own?.state==='live'?'false':'true';
+  if(notice.dataset)notice.dataset.stale=x.toss?.brokerApi&&own?.state==='live'?'false':'true';
   notice.textContent=x.toss?.brokerApi?
    (own?.state==='cached'?'토스 마지막 성공 조회 '+format(official?.fetchedAt)+' · 현재 잔고 아님. ':
     '토스 공식 계좌 '+(official?.holdingCount||0)+'종목 자동 반영 · 조회 '+format(official?.fetchedAt)+'. ')+
@@ -508,4 +508,4 @@ function mount(){
 }
 window.ISA_ACCOUNT_SUMMARY={getTotals:totals,getDisplayTotals:viewTotals,getDividends:dividendTotals,refresh:render,refreshReferenceTotals};
 mount();
-})()
+})();
