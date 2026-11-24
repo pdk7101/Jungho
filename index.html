@@ -1178,7 +1178,8 @@ function renderPlan(prepared,priorPlan){
   var stopped=FUNDS.filter(function(f){return prepared.rows[f.id]?.type==='stop';}).length;
   var held=FUNDS.filter(function(f){return prepared.rows[f.id]?.type==='wait';}).length;
   var eodText='<p><b>'+safe(prepared.phase.stage)+'</b> · 다음 평일 '+safe(prepared.nextDay)+
-   ' 주문 준비 (공휴일은 키움 확인) · 게시 종가 '+day(prepared.asOf)+' · 확인 '+prepared.available+'/6</p>';
+   ' 주문 준비 (공휴일은 키움 확인) · 마지막 공식 종가 '+day(prepared.asOf)+
+   ' · 해당일 판단 가능 '+prepared.available+'/6</p>';
   if(prepared.available!==6){
    eodText+='<p class="sub">오늘 필요한 확정 종가가 미확인인 종목은 현재 매수판단을 보류합니다. 과거 종가를 오늘 종가로 간주하지 않습니다.</p>';
    if(priorPlan&&priorPlan.available){
@@ -1389,10 +1390,19 @@ async function refresh(){
   var lastDay=lastDates.length?day(lastDates[lastDates.length-1]):'미확인';
   var checkedTime=new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour12:false});
   var fetchedTime=loadTime?new Date(loadTime).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour12:false}):'미확인';
-  el('signal').textContent=count+'/6 유효';
-  el('updated').textContent=(privateMode?'개인 조회: ':'게시 자료: ')+fetchedTime+' · 공식 종가 기준일: '+lastDay;
+  var expected=String(data.latestExpected||'');
+  var missingRequested=privateMode&&/^\d{8}$/.test(expected)&&lastDates.length&&
+   lastDates[lastDates.length-1]<expected;
+  el('signal').textContent=count+'/6 유효'+(missingRequested?' · '+day(expected)+' 미배포':'');
+  el('updated').textContent=(privateMode?'개인 조회: ':'게시 자료: ')+fetchedTime+
+   ' · 마지막 공식 종가 '+lastDay+
+   (missingRequested?' · 요청 거래일 '+day(expected)+' (KRX 원본 미제공)':'');
   el('checked').textContent='화면 확인: '+checkedTime+' · '+(priceChanged?'새 가격 반영':collectionChanged?'재수집 확인':'새 가격 없음');
-  el('alert').textContent=(count===6?'6종목의 공식 확정 종가가 확인되었습니다.':count+'/6종목 공식 종가 확인 · 미확인 '+(6-count)+'종목은 매수 판단 보류.')+
+  el('alert').textContent=(missingRequested?
+   'KRX에 '+day(expected)+' 종가를 조회했으나 아직 배포되지 않았습니다. 마지막 공식 종가 '+lastDay+
+   '는 참고로 보존하며 '+day(expected)+' 매수·중지 판단은 보류합니다. KRX 공식 자료 공개 후 재조회하세요.':
+   count===6?'6종목의 공식 확정 종가가 확인되었습니다.':
+   count+'/6종목 공식 종가 확인 · 미확인 '+(6-count)+'종목은 매수 판단 보류.')+
    (priceChanged?' 새 확정 일봉 반영.':first?' 첫 확인 완료.':'')+
    (Array.isArray(data.errors)&&data.errors.length?' 수집 진단: '+data.errors.slice(0,2).join(' / ')+'.':'')+
    ' 주문 전 증권사에서 확인하세요.';
