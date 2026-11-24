@@ -93,4 +93,32 @@ handlers.get('account-total-save:click')();
 assert.equal(account.getTotals().toss.value,2800);
 assert.equal(element('toss-total-value').textContent,'2,800원');
 assert.ok(element('account-broker-compare').textContent.includes('평가금액 차이 +900원'));
+// Laptop offline: cached broker holdings remain available, but a newer
+// independently sourced quote can change the reference valuation.
+const stamp=new Date(Date.now()-86400000).toISOString();
+const saved={
+ ok:true,fetchedAt:stamp,holdingCount:14,fx:{usdKrw:1400},
+ amounts:{valued:{krw:900,usd:100}},
+ totals:{investedKRW:14000,valueKRW:12000},
+ holdings:[
+  ...idsUS.map(id=>({marketCountry:'US',currency:'USD',symbol:id.toUpperCase(),
+   name:id==='spacex'?'스페이스X':id,quantity:2,averagePurchasePrice:1,lastPrice:1,
+   purchaseAmount:2,marketValue:2})),
+  ...[['455030','SOFR'],['329200','리츠'],['278530','200TR'],
+   ['test1','마이티 신약포커스바이오액티브'],['0131V0','우주'],['test2','TIGER 미디어컨텐츠'],
+   ['469070','로봇'],['test3','흥아해운'],['test4','센서뷰']].map(([symbol,name])=>({
+    marketCountry:'KR',currency:'KRW',symbol,name,quantity:3,averagePurchasePrice:100,
+    lastPrice:100,purchaseAmount:300,marketValue:300}))
+ ]
+};
+window.ISA_TOSS_BROKER={snapshot:()=>saved,snapshotMeta:()=>({state:'cached'})};
+window.ISA_US_KRW.priceKrw=()=>({amount:1500,stamp:new Date().toISOString(),source:'synthetic recent quote'});
+const offline=portfolio.row('us','schd');
+assert.equal(offline.qty,2);
+assert.equal(offline.value,3000,'saved broker quantity is multiplied by newer external quote');
+assert.equal(offline.cachedHolding,true);
+assert.equal(portfolio.row('domestic','sensor').value,300,'missing new quote retains last broker amount');
+assert.equal(account.getTotals().toss.revalued,true,'complete cached holdings produce automatic offline reference estimate');
+assert.equal(account.getTotals().toss.cached,true,'revalued snapshot must never be described as current actual account');
+assert.equal(saved.totals.valueKRW,12000,'original official snapshot remains intact');
 console.log('PASS: Toss actual broker total authority, discrepancy, 14-price provenance, same-day override, explicit auto mode');
