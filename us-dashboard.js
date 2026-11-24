@@ -178,18 +178,20 @@ function holdingCard(id,usdPx){
   ' · 원화 평단 기록과 별개</div>':'';
  if(remote&&Number.isFinite(remote.marketValue)&&
   Number.isFinite(remote.purchaseAmount)&&Number.isFinite(remote.quantity)){
-  const fx=Number(official.fx?.usdKrw);
-  const value=remote.marketValue,purchase=remote.purchaseAmount,delta=value-purchase;
+  const fx=Number(window.ISA_US_KRW?.priceKrw?.(id,usdPx)?.fxRate??official.fx?.usdKrw);
+  const quote=window.ISA_US_KRW?.priceKrw?.(id,usdPx);
+  const latest=valid(quote?.usd)?Number(quote.usd):null;
+  const value=latest!==null?remote.quantity*latest:remote.marketValue,purchase=remote.purchaseAmount,delta=value-purchase;
   const rate=purchase>0?100*delta/purchase:null;
   const recorded=new Date(stamp).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'});
   const source=recordState==='cached'?'마지막 저장된 토스 잔고 · 현재 잔고 아님':
    '토스 공식 API 보유자료';
   const rateLine=Number.isFinite(fx)&&fx>0?
-   '<div class="us-card-pnl">조회 당시 USD 금액 × 공식 참고환율 · 원화 평가 약 '+
+   '<div class="us-card-pnl">적용 USD 가격 × 참고환율 · 원화 평가 약 '+
     wonAmount(value*fx)+' · 토스 앱 원화금액과 다를 수 있음</div>':'';
   return '<div class="us-card-holding"><b>'+source+' · 보유 '+fmtQty(remote.quantity)+'</b>'+
    '<div class="us-card-pnl">USD 평단 '+usd(remote.averagePurchasePrice)+
-   ' · USD 평가 '+usd(value)+' · 마지막 표시 단가 '+usd(remote.lastPrice)+'</div>'+
+   ' · USD 참고 평가 '+usd(value)+' · 적용 단가 '+usd(latest??remote.lastPrice)+'</div>'+
    '<div class="us-card-pnl '+(delta>=0?'us-positive':'us-negative')+'">USD 참고 평가손익 '+
    (delta>=0?'+':'')+usd(delta)+(rate===null?'':' ('+pct(rate)+')')+'</div>'+
    rateLine+'<small>조회 '+recorded+' · 체결시각 미제공</small>'+
@@ -294,7 +296,7 @@ async function refresh(){
   const count=FUNDS.filter(f=>market(f)).length;
   const time=loadTime?new Date(loadTime).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'미확인';
   el.textContent='기술 분석용 확정 일봉 '+count+'/4 · 마지막 수집 '+time;
- }catch(e){data=null;if(el)el.textContent='미국장 자료 확인 실패: '+String(e.message||e);}
+ }catch(e){if(el)el.textContent='미국장 새 자료 조회 실패 · 마지막 확인 자료 유지: '+String(e.message||e);}
  render();
  window.dispatchEvent(new Event('isa-us-quotes-refreshed'));
 }
