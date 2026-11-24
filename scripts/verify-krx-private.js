@@ -66,10 +66,23 @@ assert.equal(window.ISA_PRIVATE_KRX.metrics().count,6,'NAV and AUM are derived p
 assert.equal(window.ISA_PRIVATE_KRX.metricHistory().source,'KRX OPEN API');
 assert.equal(officialCalls>60,true,'KRX requests are made privately, never through GitHub');
 assert.equal(JSON.stringify(snapshot).includes(token),false,'secret never appears in quotes');
-assert.deepEqual(Object.keys(localStorage.snapshot()),['isa-krx-private-worker-url-v1'],
- 'only Worker URL is persisted locally');
-assert.deepEqual(Object.keys(sessionStorage.snapshot()),['isa-krx-private-view-token-v1'],
- 'access token is remembered only for this browser tab');
+assert.deepEqual(Object.keys(localStorage.snapshot()).sort(),
+ ['isa-krx-private-view-token-v1','isa-krx-private-worker-url-v1'].sort(),
+ 'Worker URL and personal view token persist on this trusted device');
+assert.equal(sessionStorage.getItem('isa-krx-private-view-token-v1'),null,
+ 'persistent mode does not require session token');
+const reopenedWindow={};
+new Function('window','document','localStorage','sessionStorage','fetch',
+ clientSource)(reopenedWindow,document,localStorage,sessionStorage,browserFetch);
+assert.equal(reopenedWindow.ISA_PRIVATE_KRX.configured(),true,
+ 'new browser visit automatically restores saved KRX connection');
+assert.equal((await reopenedWindow.ISA_PRIVATE_KRX.load()).items.filter(x=>x.ok).length,6,
+ 'new browser visit can retrieve official-shaped prices without retyping the token');
+assert.ok(pageSource.includes('이 기기에 개인 접근 토큰 저장'),
+ 'UI must plainly explain persistent device storage');
+const cacheStamp=source('scripts/stamp-assets.js');
+assert.ok(cacheStamp.includes("'private-krx-client.js'"),
+ 'the one-time-token update must be cache-busted on deployment');
 assert.ok(pageSource.includes('내 전용 KRX 공식 종가 연결')&&
  pageSource.includes('private-krx-client.js'));
 assert.ok(workflow.includes('private-krx-client.js')&&
@@ -81,5 +94,24 @@ assert.throws(()=>window.ISA_PRIVATE_KRX.calculate('space','0131V0',[]),
 window.ISA_PRIVATE_KRX.disconnect();
 assert.equal(window.ISA_PRIVATE_KRX.configured(),false);
 assert.equal(sessionStorage.getItem('isa-krx-private-view-token-v1'),null,
- 'disconnect removes personal access token');
-console.log('PASS: private KRX Worker authentication, 6 ETF moving averages, NAV, zero public data leakage');
+ 'disconnect removes session token');
+assert.equal(localStorage.getItem('isa-krx-private-view-token-v1'),null,
+ 'disconnect removes persistent token');
+assert.equal(localStorage.getItem('isa-krx-private-worker-url-v1'),null,
+ 'disconnect removes Worker address but keeps unrelated portfolio records');
+window.ISA_PRIVATE_KRX.setConnection(host,token,false);
+assert.equal(localStorage.getItem('isa-krx-private-view-token-v1'),null,
+ 'unchecked mode does not store a persistent token');
+assert.equal(sessionStorage.getItem('isa-krx-private-view-token-v1'),token,
+ 'unchecked mode uses only tab session');
+const migratedWindow={};
+new Function('window','document','localStorage','sessionStorage','fetch',
+ clientSource)(migratedWindow,document,localStorage,sessionStorage,browserFetch);
+assert.equal(migratedWindow.ISA_PRIVATE_KRX.configured(),true,
+ 'existing browser session automatically upgrades to user-requested persistent connection');
+assert.equal(localStorage.getItem('isa-krx-private-view-token-v1'),token,
+ 'existing connected session is migrated without another token prompt');
+migratedWindow.ISA_PRIVATE_KRX.disconnect();
+assert.equal(localStorage.getItem('isa-krx-private-view-token-v1'),null);
+assert.equal(sessionStorage.getItem('isa-krx-private-view-token-v1'),null);
+console.log('PASS: private KRX Worker authentication, 6 ETF moving averages, NAV, persistent re-entry-free trusted-device access');
