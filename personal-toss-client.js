@@ -13,7 +13,7 @@ const put=(area,key,val)=>{try{area.setItem(key,val);return true}catch(_){return
 const del=(area,key)=>{try{area.removeItem(key)}catch(_){}};
 let gateway=get(localStorage,URL_KEY);
 let password=get(localStorage,TOKEN_KEY)||get(sessionStorage,TOKEN_KEY);
-let record=null,recordState='none',loading=null,lastError='';
+let record=null,recordState='none',loading=null,lastError='',diagnosis='';
 function validEndpoint(value){
  const u=new URL(String(value||'').trim());
  if(u.protocol!=='https:'||u.username||u.password||u.search||u.hash||
@@ -70,11 +70,11 @@ function setConnection(url,token,remember=true){
   if(!put(sessionStorage,TOKEN_KEY,password))throw Error('탭 세션 토큰 저장 실패');
   put(sessionStorage,SESSION_KEY,'1');
  }
- record=null;recordState='none';lastError='';
+ record=null;recordState='none';lastError='';diagnosis='';
  if(same)restoreLastGood();
 }
 function disconnect(){
- gateway='';password='';record=null;recordState='none';lastError='';
+ gateway='';password='';record=null;recordState='none';lastError='';diagnosis='';
  del(localStorage,URL_KEY);del(localStorage,TOKEN_KEY);del(localStorage,SNAPSHOT_KEY);
  del(sessionStorage,TOKEN_KEY);del(sessionStorage,SESSION_KEY);
  status('토스 계좌 자동 조회 연결 해제. 기존 보유 기록·분배금은 보존됩니다.');
@@ -103,12 +103,15 @@ async function load(){
  if(loading)return loading;
  loading=(async()=>{
   status('토스증권 새 잔고 조회 중…'+(record?' · '+displayTime(record.fetchedAt)+' 기록은 보존 중':''));
+  diagnosis='';
   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),25000);
+  let httpStatus=null;
   try{
    const response=await fetch(gateway+'/api/toss/holdings',{
     headers:{Authorization:'Bearer '+password,Accept:'application/json'},
     method:'GET',cache:'no-store',signal:controller.signal
    });
+   httpStatus=response.status;
    const payload=await response.json().catch(()=>({error:'JSON 응답 오류'}));
    if(!response.ok)throw Error('토스 자동 조회 실패 ('+response.status+'): '+String(payload.error||'서버 상태 확인').slice(0,100));
    const fresh=validate(payload);
@@ -122,6 +125,15 @@ async function load(){
    return record;
   }catch(e){
    lastError=String(e?.message||e);
+   diagnosis=httpStatus===401?'HTTP 401 · 개인 조회 암호 불일치':
+    httpStatus===403?'HTTP 403 · 서버 접근 허용 설정 확인':
+    httpStatus===404?'HTTP 404 · 계좌 조회 경로 없음':
+    httpStatus===429?'HTTP 429 · 호출 한도 초과':
+    httpStatus>=500?'HTTP '+httpStatus+' · 토스 조회 서버 또는 공식 API 오류':
+    httpStatus===200?'HTTP 200 · 계좌 응답 형식 검증 실패':
+    httpStatus?'HTTP '+httpStatus+' · 조회 실패':
+    e?.name==='AbortError'?'25초 응답 없음 · 서버 연결 상태 확인':
+    '서버 접속 실패 · 서버 실행, HTTPS 또는 CORS 확인';
    if(record)recordState='cached';
    else recordState='none';
    status('새 조회 실패: '+lastError+
@@ -192,7 +204,7 @@ function mount(){
  else status('아직 연결되지 않았습니다. 토스 API 인증정보는 개인 서버 내부에만 보관합니다.');
 }
 window.ISA_TOSS_BROKER={configured,load,snapshot:()=>record,
- snapshotMeta:()=>({state:recordState,fetchedAt:record?.fetchedAt||null}),
+ snapshotMeta:()=>({state:recordState,fetchedAt:record?.fetchedAt||null,loading:!!loading,diagnosis}),
  setConnection,disconnect,lastError:()=>lastError};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});
 else mount();
