@@ -64,10 +64,17 @@ for(const ticker of snapshot.items){
 }
 assert.equal(window.ISA_PRIVATE_KRX.metrics().count,6,'NAV and AUM are derived privately');
 assert.equal(window.ISA_PRIVATE_KRX.metricHistory().source,'KRX OPEN API');
+const remembered=window.ISA_PRIVATE_KRX.lastGood();
+assert.ok(remembered&&remembered.items.length===6,
+ 'owner-only official 6-ETF snapshot is retained for temporary KRX outages');
+assert.equal(remembered.fetchedAt,snapshot.fetchedAt);
+assert.equal(JSON.stringify(remembered).includes(token),false);
+
 assert.equal(officialCalls>60,true,'KRX requests are made privately, never through GitHub');
 assert.equal(JSON.stringify(snapshot).includes(token),false,'secret never appears in quotes');
 assert.deepEqual(Object.keys(localStorage.snapshot()).sort(),
- ['isa-krx-private-view-token-v1','isa-krx-private-worker-url-v1'].sort(),
+ ['isa-krx-private-view-token-v1','isa-krx-private-worker-url-v1',
+  'isa-krx-last-good-device-v1'].sort(),
  'Worker URL and personal view token persist on this trusted device');
 assert.equal(sessionStorage.getItem('isa-krx-private-view-token-v1'),null,
  'persistent mode does not require session token');
@@ -92,6 +99,8 @@ assert.ok(workflow.includes('private-krx-client.js')&&
 assert.throws(()=>window.ISA_PRIVATE_KRX.calculate('space','0131V0',[]),
  /40거래일/,'cannot issue signal without verified 40-day history');
 window.ISA_PRIVATE_KRX.disconnect();
+assert.equal(localStorage.getItem('isa-krx-last-good-device-v1'),null,
+ 'disconnect also removes last official KRX close from this device');
 assert.equal(window.ISA_PRIVATE_KRX.configured(),false);
 assert.equal(sessionStorage.getItem('isa-krx-private-view-token-v1'),null,
  'disconnect removes session token');
