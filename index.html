@@ -636,6 +636,33 @@ function freshQuote(id){
  if(nowMinute>930&&(tradeMinute<920||tradeMinute>931))return null;
  return q;
 }
+function brokerLastPrice(id){
+ // Recent, read-only Toss official holdings: quote is the LAST reported unit
+ // price at fetch time. It has NO verified trade timestamp or final-close flag.
+ var broker=window.ISA_TOSS_BROKER?.snapshot?.(),meta=window.ISA_TOSS_BROKER?.snapshotMeta?.();
+ var at=Date.parse(broker?.fetchedAt||''),age=Date.now()-at;
+ if(!broker?.ok||!Array.isArray(broker.holdings)||!Number.isFinite(age)||
+  age< -60000||age>7*86400000)return null;
+ var fund=FUNDS.find(function(x){return x.id===id;});if(!fund)return null;
+ var row=broker.holdings.find(function(x){
+  var symbol=String(x.symbol||'').toUpperCase().replace(/^A(?=[0-9A-Z]{6}$)/,'');
+  return x.marketCountry==='KR'&&x.currency==='KRW'&&symbol===fund.code;
+ });
+ if(!row||!valid(row.lastPrice))return null;
+ var time=new Date(at),parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{
+  timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'
+ }).formatToParts(time).map(function(x){return [x.type,x.value];}));
+ var reported=parts.year+parts.month+parts.day;
+ var x=byId[id];
+ if(hasBars(x)&&reported<x.date)return null;
+ return {price:Number(row.lastPrice),asOf:reported,at:broker.fetchedAt,
+  cached:meta?.state==='cached',source:'토스 공식 보유잔고 최종 표시단가 (체결시각 미제공)'};
+}
+function displayPrice(id){
+ var q=freshQuote(id);if(q)return {price:Number(q.price),source:'확인된 국내 거래가격',date:q.tradeAt};
+ var b=brokerLastPrice(id);if(b)return b;
+ var x=byId[id];return hasBars(x)?{price:Number(x.close),source:'마지막 KRX 확정 종가',date:x.date}:null;
+}
 function current(x,id){var q=freshQuote(id);return q?Number(q.price):valid(manual[id])?Number(manual[id]):Number(x.close);}
 function verified(id){return !!(hasBars(byId[id])&&!stale(byId[id]));}
 function effectiveCap(id){
@@ -1051,15 +1078,16 @@ function actionLabel(type){
 }
 function accountTotals(){
  // The Kiwoom ISA holds the six listed domestic ETFs. Never mix in Toss positions.
- var principal=0,value=0,missingHoldings=[],missingPrice=[],usedIntraday=0,usedClose=0,dates=[];
+ var principal=0,value=0,missingHoldings=[],missingPrice=[],usedIntraday=0,usedClose=0,usedBroker=0,dates=[];
  FUNDS.forEach(function(f){
   var h=positions[f.id],qty=h&&qtyValid(h.qty)?Number(h.qty):null;
   if(qty===null){missingHoldings.push(f.id+' 수량');return;}
   if(qty===0)return;
   if(!valid(h.avg)){missingHoldings.push(f.id+' 평단');return;}
   principal+=qty*Number(h.avg);
-  var q=freshQuote(f.id),x=byId[f.id],price=null;
+  var q=freshQuote(f.id),b=!q?brokerLastPrice(f.id):null,x=byId[f.id],price=null;
   if(q){price=Number(q.price);usedIntraday++;}
+  else if(b){price=b.price;usedBroker++;dates.push(day(b.asOf));}
   else if(verified(f.id)){price=Number(x.close);usedClose++;dates.push(day(x.date));}
   if(price!==null&&Number.isFinite(price)&&price>0)value+=qty*price;
   else missingPrice.push(f.id);
@@ -1068,7 +1096,7 @@ function accountTotals(){
   principal:missingHoldings.length?null:principal,
   value:missingHoldings.length||missingPrice.length?null:value,
   missingHoldings:missingHoldings,missingPrice:missingPrice,
-  intraday:usedIntraday,close:usedClose,dates:dates,
+  intraday:usedIntraday,close:usedClose,broker:usedBroker,dates:dates,
   holdingsKey:JSON.stringify(FUNDS.map(function(f){var h=positions[f.id]||{};return [f.id,h.qty??null,h.avg??null];})),
   count:FUNDS.length
  };
@@ -1286,14 +1314,17 @@ function render(){
  var list=el('funds');
  list.innerHTML=FUNDS.map(function(f){
   var x=byId[f.id],v=prepared?prepared.rows[f.id]:verdict(f),live=prepared?null:freshQuote(f.id),
-  p=prepared?(valid(v.close)?v.close:hasBars(x)?Number(x.close):null):hasBars(x)?current(x,f.id):(live?live.price:null),
+  outside=displayPrice(f.id),broker=outside&&outside.source?.includes('토스 공식')?outside:null,
+  p=broker?broker.price:prepared?(valid(v.close)?v.close:hasBars(x)?Number(x.close):null):hasBars(x)?current(x,f.id):(live?live.price:null),
   isReference=prepared&&!valid(v.close)&&hasBars(x),
   past=priorPlan&&isReference?priorPlan.rows[f.id]:null,
   h=p?holding(f.id,p):null,b=hasBars(x)&&p?band(x,p):null;
   var tag=b?'<span class="band-tag '+(b.name==='하단 20%'?'band20':'')+'">'+b.name+'</span>':'';
   var avgText=renderHoldingInCard(f.id,p);
-  return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+(prepared?'다음 거래일 주문준비':safe(f.plan))+'</small><strong>'+(p?money(p):'마감 종가 미확인')+'</strong>'+(p?'<small>'+(live?'오늘 공개 체결가 ('+(live.method==='published'?'GitHub 게시 · 지연 가능':'당일 시세 제공처')+') · 체결 '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+' · '+Math.max(0,Math.floor((Date.now()-new Date(live.tradeAt).getTime())/60000))+'분 경과':(isReference?'직전 확정 종가 참고 (오늘 종가 미확인) · ':
-    prepared?'주문준비 참고 종가 · ':'KRX 확정 종가 · ')+(hasBars(x)?day(x.date):'확인 불가'))+'</small>':'')+
+  return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+(prepared?'다음 거래일 주문준비':safe(f.plan))+'</small><strong>'+(p?money(p):'마감 종가 미확인')+'</strong>'+(p?'<small>'+(live?'오늘 공개 체결가 ('+(live.method==='published'?'GitHub 게시 · 지연 가능':'당일 시세 제공처')+') · 체결 '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+' · '+Math.max(0,Math.floor((Date.now()-new Date(live.tradeAt).getTime())/60000))+'분 경과':(broker?'토스 계좌 최종 표시단가 (확정 종가 아님) · 조회 '+day(broker.asOf)+(broker.cached?' · 저장 기록':'')+' · KRX 종가 '+(hasBars(x)?day(x.date):'미확인'):
+   isReference?'직전 확정 종가 참고 (오늘 종가 미확인) · '+
+    (hasBars(x)?day(x.date):'확인 불가'):
+   (prepared?'주문준비 참고 종가 · ':'KRX 확정 종가 · ')+(hasBars(x)?day(x.date):'확인 불가')))+'</small>':'')+
   (['robot','space','sol'].includes(f.id)?'<small>매수 적용상한 '+(valid(effectiveCap(f.id).value)?money(effectiveCap(f.id).value):'확인 대기')+' · '+safe(effectiveCap(f.id).reason)+'</small>':'')+avgText+renderMa20InCard(f.id)+tag+(window.ISA_KR_DIVIDENDS?.cardLine?.(f.id,p)||'')+
   (past&&valid(past.close)?'<small class="eod-reason">직전 '+day(priorPlan.asOf)+' 참고 분류: '+
     (past.type==='buy'?'매수 검토':past.type==='stop'?'중지':'보류')+
@@ -1452,6 +1483,7 @@ el('selection').value=selected;el('selection').onchange=function(){selected=this
 Object.keys(defaults).forEach(function(k){el(k).value=settings[k];el(k).onchange=function(){var v=this.value.trim();settings[k]=k==='capMode'?(['ma','manual','both'].includes(v)?v:defaults.capMode):k==='dailyBudget'?(valid(v)?Number(v):''):(valid(v)?Number(v):defaults[k]);persist();render();};});
 renderPositions();
 el('reload').onclick=refresh;
+document.addEventListener('isa-toss-broker-data',render);
 // While this page is visible, refresh public KR quotes approximately once a minute.
 // Browsers may throttle timers in background; never claim push while the app is closed.
 var pollEvery=60000,lastPoll=0;
