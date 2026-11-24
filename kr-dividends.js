@@ -240,7 +240,7 @@ function renderTossCards(){
     '</b> <small>(사진 기준 '+clean(date||'미확인')+')</small></div>';
   }
   return '<div class="kr-toss-dividend-card" data-toss-div-card="'+clean(id)+'"><b>'+clean(name)+'</b>'+
-   status(symbol)+total+'</div>';
+   '<div class="kr-div-card-return">최근 표시 단가 <b>'+(computed?.unitPrice!=null?money(computed.unitPrice):'미확인')+'</b></div>'+status(symbol)+total+'</div>';
  }).join('');
 }
 function importPhoto(){
@@ -287,6 +287,7 @@ function mount(){
  $('kr-div-date').value=localDay();
  document.addEventListener('isa-rendered',renderTossCards);
  document.addEventListener('isa-portfolio-holdings-updated',renderTossCards);
+ document.addEventListener('isa-toss-broker-data',renderTossCards);
  document.addEventListener('click',e=>{
   const card=e.target?.closest?.('[data-id]');
   if(card&&allowed.has('kiwoom:'+card.dataset.id)){
