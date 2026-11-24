@@ -66,7 +66,7 @@ assert.equal(shown('kiwoom-total-value'),oldKiwoom,
  'restored KRX bars alone do not silently update the reference');
 assert.equal(typeof handlers.get('account-summary-recalc:click'),'function',
  'there is an explicit owner action for recalculation');
-handlers.get('account-summary-recalc:click')();
+await handlers.get('account-summary-recalc:click')();
 assert.equal(shown('toss-total-value'),'8,700원',
  'explicit refresh adopts current synthetic Toss basket');
 assert.equal(shown('kiwoom-total-value'),'1,800원',
@@ -80,7 +80,7 @@ assert.equal(shown('toss-total-value'),'8,750원',
 // A temporarily incomplete fresh KRX reference does not overwrite the saved one.
 kiwoomValue=null;app.refresh();
 assert.equal(shown('kiwoom-total-value'),'1,800원');
-handlers.get('account-summary-recalc:click')();
+await handlers.get('account-summary-recalc:click')();
 assert.equal(shown('kiwoom-total-value'),'1,800원',
  'explicit refresh also refuses to replace a verified reference with missing prices');
 // A user's manually entered broker-wide valuation must still override automatic data.
