@@ -140,6 +140,7 @@ function allSignals(){
 function alertLabel(s){
  return '<span class="change-item change-'+s.level+'"><b>'+safe(s.title)+'</b> · '+safe(s.text)+'<small>'+safe(day(s.date))+(s.sub?' · '+safe(s.sub):'')+'</small></span>';
 }
+// 중요 변화 · 이번 일봉에서 새로 발생한 신호: one host inside domestic plan.
 function updateAlerts(){
  const area=$('important-changes');
  if(!area)return;
@@ -242,12 +243,7 @@ function updateSol(){
 }
 function mount(){
  const root=$('summary');
- if(!root||$('important-changes'))return;
- const panel=document.createElement('section');
- panel.className='panel';panel.id='changes-panel';
- panel.innerHTML='<h2>중요 변화 · 이번 일봉에서 새로 발생한 신호</h2><div id="important-changes">시세 확인 중</div>'+
- '';
- root.parentNode.insertBefore(panel,root);
+ if(!root||!$('important-changes')||$('sol-panel'))return;
  const sol=document.createElement('section');sol.className='panel';sol.id='sol-panel';
  sol.innerHTML='<h2>SOL · 주당 분배금 목표 분석</h2>'+
  '<p class="fieldset-note">월 분배금 목표: 세전 30만~50만원 · ETF 실제 분배금·NAV·옵션 운용정보는 <a href="'+DOC_URL+'" target="_blank" rel="noopener noreferrer">운용사 SOL ETF 공식 안내</a>에서 확인하세요. 지급내역은 운용사 공식 공시에서 확인하세요.</p>'+
