@@ -21,14 +21,25 @@ function item(id){
  const d=window.ISA_US_APP?.getData?.();
  return d?.items?.find(x=>x.id===id)||null;
 }
+function brokerHolding(id){
+ const b=window.ISA_TOSS_BROKER?.snapshot?.(),meta=window.ISA_TOSS_BROKER?.snapshotMeta?.();
+ const fetched=Date.parse(b?.fetchedAt||''),age=Date.now()-fetched;
+ if(!b?.ok||!Array.isArray(b.holdings)||meta?.state!=='live'||
+  !Number.isFinite(age)||age<0||age>10*60000)return null;
+ const q=b.holdings.find(h=>h?.marketCountry==='US'&&
+  String(h.symbol||'').toUpperCase()===NAMES[id]);
+ return q&&Number.isFinite(q.quantity)&&q.quantity>=0?q:null;
+}
 function quote(id){
- const x=item(id);
- const v=x?.close,fx=window.ISA_US_KRW;
- const kr=fx?.priceKrw?.(id,v);
- const p=read('isa-us-holdings-v1')?.[id]||{};
- const qty=num(p.qty),avg=num(p.krwAvg);
+ const x=item(id),v=x?.close,kr=window.ISA_US_KRW?.priceKrw?.(id,v);
+ const p=read('isa-us-holdings-v1')?.[id]||{},actual=brokerHolding(id);
+ const qty=actual?.quantity??num(p.qty),avg=num(p.krwAvg);
+ const live=kr?.kind==='finnhub-private'&&valid(Number(kr.usd));
  return {x,krw:kr,qty:qty!==null&&Number.isFinite(qty)&&qty>=0?qty:null,
-  avg:valid(avg)?avg:null,usdClose:valid(v)?v:null};
+  avg:valid(avg)?avg:null,usdClose:valid(v)?v:null,
+  usdPrice:live?Number(kr.usd):valid(v)?Number(v):null,
+  priceKind:live?'finnhub-private':kr?.kind||'missing',
+  brokerQtySource:!!actual};
 }
 function latest(x){
  if(!x||!x.ok||!/^\d{8}$/.test(x.date)||!Array.isArray(x.bars)||x.bars.length<40)return false;
@@ -77,7 +88,8 @@ function dailyAmount(id){
  return typeof v==='number'&&Number.isFinite(v)&&v>0?v:defaults[id]??0;
 }
 function evaluate(id,source,cap){
- const x=source?.x,usd=source?.usdClose,kr=source?.krw,qty=source?.qty,avg=source?.avg;
+ const x=source?.x,usd=source?.usdPrice??source?.usdClose,kr=source?.krw,
+  qty=source?.qty,avg=source?.avg;
  const basic=(type,title,reason,extra={})=>({
   type,title,reason,qty:0,amountKRW:null,sourceDate:x?.date||null,rule:'US closed daily candle',...extra});
  if(!NAMES[id])return basic('wait','종목 미확인','미국장 관리 대상 4종목이 아닙니다.');
@@ -102,7 +114,14 @@ function evaluate(id,source,cap){
   '그래프 매수 보조: '+graph.note];
  const extras={priceKRW:kr.amount,ma20USD:ma20,ma5USD:ma5,low,healthy,down,steep,
   graphLevel:graph.level,volumeRatio:graph.ratio,
-  quoteSource:kr.source,quoteManual:!!kr.manual,notes:reasons};
+  quoteSource:kr.source,quoteManual:!!kr.manual,
+  priceKind:source?.priceKind||'usd-close',brokerQtySource:!!source?.brokerQtySource,
+  notes:reasons.concat([
+   source?.priceKind==='finnhub-private'?
+    '최근 미국 체결가에 직전 완료 일봉 5·20일선 적용 · 당일 확정 종가 아님':
+    '미국장 마지막 완료 일봉 기준 · 장중 체결가격 아님',
+   source?.brokerQtySource?'보유수량: 토스 공식 계좌 방금 조회':'보유수량: 이 기기 저장값'
+  ])};
  if(cap!==null&&(!valid(cap)||cap<100||cap>10000000))return basic('wait','상한 설정 확인','원화 매수 상한 설정이 올바르지 않습니다.',extras);
  if(cap!==null&&kr.amount>cap)return basic('stop','매수 중단 · 원화 상한 초과',
   '표시가격 '+krw(kr.amount)+'이 직접 설정한 매수 상한 '+krw(cap)+'을 초과했습니다. 추격매수 보류.',extras);
@@ -131,6 +150,12 @@ function evaluate(id,source,cap){
   '토스 당일 가격과 확정 일봉을 혼합하지 않도록 주문 전 최신 가격을 재확인하세요. 표시 원화 가격은 자동매수 신호가 아닙니다.',extras);
  const canLower=avg!==null&&kr.amount<avg;
  const lowOpportunity=low&&(avg===null||canLower);
+ // Review only, never an automatic sell or a mechanical stop-loss.
+ if(qty!==null&&qty>0&&avg!==null&&kr.amount>avg&&
+   x.close<ma20*.94&&t.deadCross&&ma5<ma20)
+  return basic('sell','매도 검토 · 하락 위험 확대',
+   '완료된 미국장 종가가 20일선보다 6% 넘게 낮고 데드크로스가 확인됐습니다. 원화 평가이익 구간이라 일부 이익실현 여부를 검토할 수 있지만 장기 투자 방침, 실제 토스 평단, 세금, 배당 전망을 먼저 확인하세요. 자동 매도하지 않습니다.',
+   {...extras,reviewOnly:true});
  if(graph.level==='risk')return basic('wait','거래량·약세 위험 확인 대기',
   '최근 확정 일봉의 강한 약세와 거래량 급증이 동시에 확인됐습니다. 무리한 추가매수를 보류하고 추세 안정 여부를 확인하세요. '+graph.note,extras);
  if(id==='agnc'){
@@ -168,8 +193,8 @@ function decision(id){
 }
 function cardStatus(id){
  const v=decision(id);
- const kind=['buy','wait','stop'].includes(v.type)?v.type:'wait';
- const label=kind==='buy'?'매수 검토':kind==='stop'?'중지':'대기';
+ const kind=['buy','wait','stop','sell'].includes(v.type)?v.type:'wait';
+ const label=kind==='buy'?'매수 검토':kind==='stop'?'중지':kind==='sell'?'매도 검토':'보류';
  const note=id==='cony'&&kind==='stop'&&v.title==='CONY 자동매수 일시중단 유지'?
   '기존 CONY 자동매수 중단 계획 유지':v.title;
  return '<div class="us-card-signal state-'+kind+'" aria-label="'+
@@ -183,18 +208,22 @@ function cardLine(id){
  return '<div class="us-trade-status state-'+v.type+'"><span class="us-signal-dot"></span>'+
   esc(v.title)+'</div>'+
   '<span class="us-small">토스 매일 주식모으기 설정 기준: <b>'+krw(daily)+'</b> · 소수점 적립 (실제 활성·중지 상태 별도 확인)</span>'+
-  '<span class="us-small">기술적 추가매수 분석: <b>'+(v.type==='buy'?'정액 적립 유지 검토':id==='cony'?'CONY 일시중지 유지 검토':'추가매수 주의 · 정액 모으기와 별개')+'</b></span>';
+  '<span class="us-small">기술적 판단: <b>'+
+ (v.type==='sell'?'매도 여부 검토 · 자동 주문 아님':v.type==='buy'?'정액 적립 유지 검토':
+ id==='cony'?'CONY 일시중지 유지 검토':'추가매수 주의 · 정액 모으기와 별개')+'</b></span>';
 }
 function detailLine(id){
  const v=decision(id);
  let html='<div class="us-decision-block us-decision-'+v.type+'">'+
   '<div class="us-decision-head"><b>'+esc(NAMES[id])+' · 기술적 참고: '+esc(v.title)+'</b>'+
-  '<span class="us-decision-kind">'+(v.type==='buy'?'기술상 매수 검토':v.type==='stop'?'기술상 추가매수 보류':'추세 확인 대기')+'</span></div>'+
+  '<span class="us-decision-kind">'+(v.type==='buy'?'기술상 매수 검토':v.type==='stop'?'기술상 추가매수 중지':v.type==='sell'?'매도 검토 · 실제 주문 아님':'추세 확인 보류')+'</span></div>'+
   '<p>'+esc(v.reason)+'</p>';
  if(v.notes?.length)html+='<p class="us-small">'+v.notes.map(esc).join(' · ')+'</p>';
- html+='<p class="us-small">토스 매일 주식모으기 기준 <b>'+krw(dailyAmount(id))+' 원화 정액 소수점 매수</b> · 프로그램 판단: <b>'+(v.type==='buy'?'정액매수 유지 검토':id==='cony'?'기존 매수 일시중지 유지':'대기·중지 검토')+'</b>'+
+ html+='<p class="us-small">토스 매일 주식모으기 기준 <b>'+krw(dailyAmount(id))+' 원화 정액 소수점 매수</b> · 프로그램 판단: <b>'+(v.type==='sell'?'매도 여부 검토':v.type==='buy'?'정액매수 유지 검토':id==='cony'?'기존 매수 일시중지 유지':'보류·중지 검토')+'</b>'+
   '</b> · 시세 '+(v.sourceDate?v.sourceDate.slice(0,4)+'-'+v.sourceDate.slice(4,6)+'-'+v.sourceDate.slice(6,8):'확인 불가')+
-  ' 미국장 확정 일봉 · 비공식, 실시간 주문 신호 아님</p>';
+  ' 미국장 확정 일봉에 기초한 참고 판단 · '+
+ (v.priceKind==='finnhub-private'?'가격은 최근 개인 미국 체결가':'가격은 마지막 완료 일봉')+
+ ' · 실제 매매 주문 아님</p>';
  if(id!=='cony')html+='<p class="us-small">매수 상한: '+(getLimit(id)!==null?krw(getLimit(id)):'미설정')+
   ' · 예산과 계좌 비중은 별도 확인. CONY 목표 달성 뒤 재투자 우선순위: SCHD → AGNC → SPYM.</p>';
  else html+='<p class="us-small">CONY의 공식 NAV·COIN 기초자산·총수익률·역분할 공시는 자동 검증하지 않습니다. 신호는 자동 주문이나 매도 지시가 아닙니다.</p>';
@@ -225,10 +254,12 @@ function render(){
 function refreshSummary(){
  const panel=$('us-signal-summary');if(!panel)return;
  const vals=Object.keys(NAMES).map(id=>decision(id));
- const counts={buy:vals.filter(d=>d.type==='buy').length,stop:vals.filter(d=>d.type==='stop').length,wait:vals.filter(d=>d.type==='wait').length};
+ const counts={buy:vals.filter(d=>d.type==='buy').length,stop:vals.filter(d=>d.type==='stop').length,
+  sell:vals.filter(d=>d.type==='sell').length,wait:vals.filter(d=>d.type==='wait').length};
  panel.innerHTML='<div class="us-signal-counts"><div><b class="state-buy">매수 검토 '+counts.buy+'</b></div>'+
- '<div><b class="state-stop">추가매수 보류 '+counts.stop+'</b></div>'+
- '<div><b class="state-wait">대기 '+counts.wait+'</b></div></div>'+
+ '<div><b class="state-stop">추가매수 중지 '+counts.stop+'</b></div>'+
+ '<div><b class="state-wait">매도 검토 '+counts.sell+'</b></div>'+
+ '<div><b class="state-wait">보류 '+counts.wait+'</b></div></div>'+
  '<p class="us-small">이 숫자는 이동평균·저가 등 기술적 참고 분석이며 토스의 실제 매수중·일시중지 종목 수가 아닙니다. 실제 주문상태는 사용자 확인 기록으로 별도 표시합니다.</p>';
 }
 function mount(){
@@ -247,6 +278,8 @@ function mount(){
  window.ISA_US_SIGNAL={evaluate,decision,cardLine,cardStatus,detailLine,settings,refreshSummary};
  updateLimitsUI();
  window.addEventListener('isa-us-quotes-refreshed',render);
+ document.addEventListener('isa-toss-broker-data',render);
+ window.addEventListener('isa-personal-us-quote-refreshed',render);
  render();
 }
 mount();
