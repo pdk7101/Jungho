@@ -88,6 +88,7 @@ function row(market,id){
  if(!idOk)return null;
  const key=us?US:TD,stored=read(key)[id]||{},shot=snapshotInfo(market,id);
  const official=officialHolding(market,id);
+ const cached=!!official&&window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state==='cached';
  const snap=shot.row,oldQty=snap&&known(snap.qty)?Number(snap.qty):null;
  const qty=official?official.qty:known(stored.qty)?Number(stored.qty):oldQty;
  let inferredAvg=positive(snap?.avg)?Number(snap.avg):null;
@@ -101,7 +102,7 @@ function row(market,id){
  let unitPrice=null,priceSource=null,priceDate=null,priceMode='none';
  // Owner-entered Toss KRW reference has priority on its entry day. It is never
  // claimed to be an authenticated broker API or a real-time portfolio balance.
- if(official){
+ if(official&&!cached){
   unitPrice=official.unitPrice;priceSource=official.source;
   priceDate=official.fetchedAt;priceMode='official-broker';
  }
@@ -133,6 +134,16 @@ function row(market,id){
    }catch(_){}
   }
  }
+ // Cached account quantities are useful offline, but a price dated before
+ // the saved account must not displace its last reported price.
+ if(cached){
+  const quoteDay=String(priceDate||'').slice(0,10);
+  const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:us?'America/New_York':'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(official.fetchedAt)).map(x=>[x.type,x.value]));
+  const savedDay=p.year+'-'+p.month+'-'+p.day;
+  if(unitPrice===null||!quoteDay||quoteDay<savedDay){
+   unitPrice=official.unitPrice;priceSource=official.source;priceDate=official.fetchedAt;priceMode='official-broker';
+  }
+ }
  if(unitPrice===null&&positive(oldQty)&&known(snap?.value)){
   unitPrice=Number(snap.value)/oldQty;
   priceSource='과거 증권사 사진 환산 단가';priceDate=shot.date;priceMode='photo';
@@ -140,10 +151,10 @@ function row(market,id){
  const zero=qty===0,hasBasis=zero||(qty!==null&&avg!==null&&qty>=0);
  const hasPrice=zero||hasBasis&&unitPrice!==null;
  const invested=official?official.invested:hasBasis?(zero?0:qty*avg):null;
- const value=official?official.value:hasPrice?(zero?0:qty*unitPrice):null;
+ const value=official&&(!cached||priceMode==='official-broker')?official.value:hasPrice?(zero?0:qty*unitPrice):null;
  return {market,id,qty,avg,invested,value,profit:value!==null?value-invested:null,
   edited,unitPrice,priceSource,priceDate,priceMode,fromSnapshot:!edited&&!!snap,
-  official:!!official,
+  official:!!official,holdingDate:official?.fetchedAt||stored.updatedAt||shot.date||null,cachedHolding:cached,
   hasBasis,hasPrice};
 }
 function totals(){
@@ -161,6 +172,7 @@ function totals(){
   '기록 '+basis.length+'/14종목'];
  if(basis.length<14)note.push('매수원가 미입력 '+(14-basis.length)+'종목');
  if(values.length<14)note.push('평가액 미확인 '+(14-values.length)+'종목');
+ if(rows.some(x=>x.cachedHolding))note.push('마지막 공식 보유수량 기준 · 새 매매 미반영');
  if(prices.official)note.push('공식 토스 보유자료 '+prices.official+'종목 · 각 종목 조회시각 기준');
  if(prices.photo)note.push('과거 사진 가격 '+prices.photo+'종목 (실시간 아님)');
  if(prices.reference)note.push('참고가격 '+prices.reference+'종목 (실시간 확정 아님)');
