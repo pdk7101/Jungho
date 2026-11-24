@@ -355,7 +355,7 @@ function render(){
   const actual=x.toss?.brokerApi&&own?.state==='live';
   const ready=x.toss?.complete&&finite(x.toss?.value);
   notice.textContent=actual?'토스 계좌 조회 완료 · '+format(official?.fetchedAt):
-   ready?'참고 평가 자동 갱신 · 토스 실계좌 미연결':
+   ready?(x.toss.estimated?(x.toss.brokerApi&&!x.toss.revalued?'마지막 토스 저장 잔고':'참고 평가 자동 갱신'):'직접 기록한 계좌 금액')+' · 토스 실계좌 미연결':
    own?.loading?'보유정보·시세 확인 중':'토스 실계좌 미연결 · 참고 평가 확인 필요';
   if(!actual&&ready&&x.toss?.estimated)notice.textContent+=' · 새 매매 미반영';
   const diagnostic=$('account-connection-detail');
