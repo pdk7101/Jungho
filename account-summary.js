@@ -63,7 +63,7 @@ function renderDividends(){
  const x=dividendTotals(),label=$('account-dividend-label'),total=$('account-dividend-total'),
   breakdown=$('account-dividend-breakdown'),note=$('account-dividend-source');
  if(!label||!total||!breakdown||!note)return;
- label.textContent=x.complete?'총 누적 세후 배당·분배금':'확인된 누적 세후 배당·분배금 (미입력 제외)';
+ label.textContent=x.complete?'기록된 누적 세후 배당·분배금':'기록된 누적 세후 배당·분배금 (일부 확인 필요)';
  total.textContent=money(x.all);
  breakdown.textContent='토스 미국 '+x.usKnown+'/4종목 '+money(x.us)+' · 토스 국내 '+
   (x.domestic===null?'미입력':money(x.domestic))+' · 키움 ISA '+(x.kiwoom===null?'미입력':money(x.kiwoom));
