@@ -78,6 +78,26 @@ async function daily(day,key){
  if(!response.ok)throw Error('KRX HTTP '+response.status);
  return match(day,await response.json());
 }
+// Separate stock-market services may require their own KRX approval.
+const STOCKS=[['hongah','003280','stk_bydd_trd'],['sensor','321370','ksq_bydd_trd']];
+async function stockClose(id,code,service,days,key){
+ for(const day of days){
+  try{
+   const r=await fetch('https://data-dbg.krx.co.kr/svc/apis/sto/'+service+'?basDd='+day,{
+    headers:{AUTH_KEY:key,Accept:'application/json'},signal:AbortSignal.timeout(5000)
+   });
+   if(!r.ok)return {id,error:'KRX HTTP '+r.status+' · 주식 API 승인 또는 호출 상태 확인'};
+   const data=await r.json();
+   if(!Array.isArray(data?.OutBlock_1))return {id,error:'주식 API 응답 형식 또는 승인 확인'};
+   const row=data.OutBlock_1.find(x=>
+    [x.ISU_SRT_CD,x.ISU_CD,x.ISU_SHORT_CD,x.SRT_CD].some(v=>String(v??'').trim().replace(/^A(?=\\d{6}$)/,'')===code)&&
+    (!x.BAS_DD||String(x.BAS_DD).replace(/-/g,'')===day));
+   const close=pos(row?.TDD_CLSPRC);
+   if(close)return {id,code,date:day,close};
+  }catch(_){return {id,error:'주식 API 연결 또는 응답 확인 실패'};}
+ }
+ return {id,error:'최근 공식 종가 미확인'};
+}
 async function pageRows(page,key){
  const end=targetDay(),start=new Date(end);
  start.setUTCDate(start.getUTCDate()-(page*20));
@@ -120,9 +140,12 @@ export default {
    if(result.errors.some(x=>/KRX HTTP (401|403|429)/.test(x.reason)))
     return reply(502,{error:'KRX 인증·이용 승인 또는 API 호출 제한 확인 필요'},origin);
    if(result.errors.length)return reply(502,{error:'KRX 일별 자료 일부 수집 실패 · 해당 페이지 보류'},origin);
+   const days=[...new Set([result.latestExpected,result.rows.at(-1)?.date].filter(Boolean))];
+   const stocks=page===0?await Promise.all(STOCKS.map(([id,code,service])=>stockClose(id,code,service,days,String(env.KRX_AUTH_KEY)))):[];
+   const extras=page===0?result.rows.filter(x=>EXTRA_IDS.has(x.id)).map(({id,code,date,close})=>({id,code,date,close})):[];
    return reply(200,{ok:true,source:'한국거래소(KRX) ETF 일별매매정보',
     page,latestExpected:result.latestExpected,rows:result.rows.filter(x=>!EXTRA_IDS.has(x.id)),
-    extraQuotes:page===0?result.rows.filter(x=>EXTRA_IDS.has(x.id)).map(({id,code,date,close})=>({id,code,date,close})):[]},origin);
+    extraQuotes:[...extras,...stocks.filter(x=>!x.error)],extraErrors:stocks.filter(x=>x.error)},origin);
   }catch(_){
    return reply(502,{error:'KRX 공식 자료 조회 실패'},origin);
   }
