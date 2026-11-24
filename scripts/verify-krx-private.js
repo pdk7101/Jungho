@@ -104,6 +104,17 @@ assert.equal(localStorage.getItem('isa-krx-private-view-token-v1'),null,
  'unchecked mode does not store a persistent token');
 assert.equal(sessionStorage.getItem('isa-krx-private-view-token-v1'),token,
  'unchecked mode uses only tab session');
+assert.equal(sessionStorage.getItem('isa-krx-private-session-only-v1'),'1',
+ 'explicit session-only mode remains respected after reopening the same tab');
+const sessionWindow={};
+new Function('window','document','localStorage','sessionStorage','fetch',
+ clientSource)(sessionWindow,document,localStorage,sessionStorage,browserFetch);
+assert.equal(sessionWindow.ISA_PRIVATE_KRX.configured(),true,
+ 'session-only token is usable on a same-tab reload');
+assert.equal(localStorage.getItem('isa-krx-private-view-token-v1'),null,
+ 'explicit session-only mode does not silently upgrade to persistence');
+// Emulate a token stored by the old tab-only version, before the new setting existed.
+sessionStorage.removeItem('isa-krx-private-session-only-v1');
 const migratedWindow={};
 new Function('window','document','localStorage','sessionStorage','fetch',
  clientSource)(migratedWindow,document,localStorage,sessionStorage,browserFetch);
