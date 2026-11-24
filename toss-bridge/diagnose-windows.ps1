@@ -1,7 +1,6 @@
 # Windows PowerShell 7 diagnostic for the locally running read-only Toss gateway.
 # Does not display tokens, broker secrets, account numbers, or account values.
 # Run: pwsh -NoProfile -File "C:\Jungho\app\diagnose-windows.ps1"
-Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $envPath = "C:\Jungho\private\toss.env"
 $serverUri = "http://127.0.0.1:8788/api/toss/holdings"
