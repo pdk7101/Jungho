@@ -547,8 +547,8 @@ truth(!html.includes('.uo-panel')&&!html.includes('.portfolio-shot-row'),
 truth(usKrwCode.includes("const LEDGER_KEY='isa-us-distributions-krw-v1'"),
  'verified after-tax payout ledger is retained in the personal US holdings view');
 // Shared holding settings: one edit location for six Kiwoom and four Toss holdings.
-const capSection=html.slice(html.indexOf('<section class="panel" id="cap-settings">'),
- html.indexOf('</section>',html.indexOf('<section class="panel" id="cap-settings">')));
+const capSection=html.slice(html.indexOf('<details class="panel" id="cap-settings">'),
+ html.indexOf('</details>\n<div class="legend">',html.indexOf('<details class="panel" id="cap-settings">')));
 truth(capSection.includes('id="holdings-settings"')&&
  capSection.includes('id="positions"')&&
  capSection.includes('id="us-krw-editor"'),
