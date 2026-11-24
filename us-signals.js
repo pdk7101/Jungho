@@ -35,10 +35,11 @@ function quote(id){
  const p=read('isa-us-holdings-v1')?.[id]||{},actual=brokerHolding(id);
  const qty=actual?.quantity??num(p.qty),avg=num(p.krwAvg);
  const live=kr?.kind==='finnhub-private'&&valid(Number(kr.usd));
+ const brokerRef=kr?.kind==='toss-broker-last'&&valid(Number(kr.usd));
  return {x,krw:kr,qty:qty!==null&&Number.isFinite(qty)&&qty>=0?qty:null,
   avg:valid(avg)?avg:null,usdClose:valid(v)?v:null,
-  usdPrice:live?Number(kr.usd):valid(v)?Number(v):null,
-  priceKind:live?'finnhub-private':kr?.kind||'missing',
+  usdPrice:live||brokerRef?Number(kr.usd):valid(v)?Number(v):null,
+  priceKind:live?'finnhub-private':brokerRef?'toss-broker-last':kr?.kind||'missing',
   brokerQtySource:!!actual};
 }
 function latest(x){
@@ -119,6 +120,8 @@ function evaluate(id,source,cap){
   notes:reasons.concat([
    source?.priceKind==='finnhub-private'?
     '최근 미국 체결가에 직전 완료 일봉 5·20일선 적용 · 당일 확정 종가 아님':
+   source?.priceKind==='toss-broker-last'?
+    '토스 공식 잔고 최종 표시 단가 참고 · 체결 시각 없음 · 확정 종가/실시간 체결가 아님':
     '미국장 마지막 완료 일봉 기준 · 장중 체결가격 아님',
    source?.brokerQtySource?'보유수량: 토스 공식 계좌 방금 조회':'보유수량: 이 기기 저장값'
   ])};
