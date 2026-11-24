@@ -9,6 +9,7 @@ const IDS=[['reit','329200'],['sol','0167B0'],['robot','469070'],
 const OFFICIAL='https://openapi.krx.co.kr/contents/OPP/USES/service/OPPUSES003_S2.cmd?BO_ID=nrEpCLaZpoLCTzPUMxuF';
 const URL_KEY='isa-krx-private-worker-url-v1';
 const TOKEN_KEY='isa-krx-private-view-token-v1';
+const SESSION_ONLY_KEY='isa-krx-private-session-only-v1';
 let workerUrl='',token='',snapshot=null,metricSnapshot=null,metricHistory=null,busy=false;
 const read=(storage,key)=>{try{return storage.getItem(key)||'';}catch(_){return ''}};
 const write=(storage,key,val)=>{try{storage.setItem(key,val);return true}catch(_){return false}};
@@ -22,7 +23,7 @@ const savedTabToken=read(sessionStorage,TOKEN_KEY);
 token=savedDeviceToken||savedTabToken;
 // Upgrade a previously connected tab to the user's explicitly requested
 // trusted-device persistence without exposing credentials to the public site.
-if(!savedDeviceToken&&savedTabToken.length>=20&&workerUrl){
+if(!savedDeviceToken&&savedTabToken.length>=20&&workerUrl&&read(sessionStorage,SESSION_ONLY_KEY)!=='1'){
  if(write(localStorage,TOKEN_KEY,savedTabToken))remove(sessionStorage,TOKEN_KEY);
 }
 function endpoint(raw){
@@ -181,17 +182,19 @@ function setConnection(raw,secret,remember){
  if(!write(localStorage,URL_KEY,url))throw Error('Worker 주소를 브라우저에 저장할 수 없습니다.');
  remove(localStorage,TOKEN_KEY);
  remove(sessionStorage,TOKEN_KEY);
+ remove(sessionStorage,SESSION_ONLY_KEY);
  if(remember){
   if(!write(localStorage,TOKEN_KEY,v))
    throw Error('이 기기에서 접근 토큰을 저장할 수 없습니다. 브라우저 저장소 설정을 확인하세요.');
  }else{
   write(sessionStorage,TOKEN_KEY,v);
+  write(sessionStorage,SESSION_ONLY_KEY,'1');
  }
  snapshot=null;metricSnapshot=null;metricHistory=null;
 }
 function disconnect(){
  workerUrl='';token='';snapshot=null;metricSnapshot=null;metricHistory=null;
- remove(localStorage,URL_KEY);remove(localStorage,TOKEN_KEY);remove(sessionStorage,TOKEN_KEY);
+ remove(localStorage,URL_KEY);remove(localStorage,TOKEN_KEY);remove(sessionStorage,TOKEN_KEY);remove(sessionStorage,SESSION_ONLY_KEY);
 }
 function mount(){
  const url=document.getElementById('krx-private-worker');
