@@ -105,11 +105,16 @@ function createGateway(config,upstream=fetch){
   if(!force&&access&&Date.now()<expires)return access;
   const body=new URLSearchParams({grant_type:'client_credentials',client_id:clientId,
    client_secret:clientSecret});
-  const response=await ask('/oauth2/token',{method:'POST',
-   headers:{'Content-Type':'application/x-www-form-urlencoded'},
-   body:body.toString()});
-  if(!response?.access_token||!Number.isFinite(Number(response.expires_in)))
-   throw Error('토스 액세스 토큰 발급 실패');
+  let response;
+  try{
+   response=await ask('/oauth2/token',{method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:body.toString()});
+  }catch(e){e.stage='토큰 발급';throw e;}
+  if(!response?.access_token||!Number.isFinite(Number(response.expires_in))){
+   const e=new Error('토스 액세스 토큰 응답 형식 오류');e.stage='토큰 발급';
+   throw e;
+  }
   access=response.access_token;
   expires=Date.now()+Math.max(60,Number(response.expires_in)-120)*1000;
   return access;
@@ -131,20 +136,33 @@ function createGateway(config,upstream=fetch){
   throw Error('토스 API 인증 오류');
  }
  async function retrieve(){
-  const ac=await api('/api/v1/accounts');
-  if(!Array.isArray(ac))throw Error('토스 계좌목록 형식 오류');
+  let ac;
+  try{ac=await api('/api/v1/accounts');}
+  catch(e){if(!e.stage)e.stage='계좌 목록';throw e;}
+  if(!Array.isArray(ac)){
+   const e=new Error('토스 계좌목록 형식 오류');e.stage='계좌 목록';throw e;
+  }
   const selected=ac.filter(x=>x?.accountType==='BROKERAGE'&&
    Number.isSafeInteger(Number(x.accountSeq))&&Number(x.accountSeq)>0);
-  if(!selected.length)throw Error('조회 가능한 토스 종합매매 계좌 없음');
-  if(selected.length>5)throw Error('다수 계좌 자동 합산 보류');
+  if(!selected.length){
+   const e=new Error('조회 가능한 토스 종합매매 계좌 없음');e.stage='계좌 목록';
+   throw e;
+  }
+  if(selected.length>5){
+   const e=new Error('다수 계좌 자동 합산 보류');e.stage='계좌 목록';
+   throw e;
+  }
   const results=[];
   for(const acc of selected){
-   results.push(await api('/api/v1/holdings',Number(acc.accountSeq)));
+   try{results.push(await api('/api/v1/holdings',Number(acc.accountSeq)));}
+   catch(e){if(!e.stage)e.stage='보유주식 조회';throw e;}
   }
   let rate=null;
   try{rate=await api('/api/v1/exchange-rate?baseCurrency=USD&quoteCurrency=KRW');}
   catch(_){/* Per-currency balances remain available; do not invent FX. */}
-  const data=parsePortfolio(results,rate);
+  let data;
+  try{data=parsePortfolio(results,rate);}
+  catch(e){e.stage='응답 형식 확인';throw e;}
   cache={data,until:Date.now()+20000};return data;
  }
  const headers=origin=>{
@@ -182,11 +200,20 @@ function createGateway(config,upstream=fetch){
    if(!pending)pending=retrieve().finally(()=>{pending=null;});
    reply(res,200,await pending,origin);
   }catch(err){
-   const status=err.status===403?502:err.status===429?429:502;
-   const message=err.status===403?'토스증권 허용 IP·API 이용 권한 확인 필요':
-    err.status===429?'토스 API 호출 제한 · 잠시 후 재조회':
-    '토스 공식 계좌 조회 실패 · 서버 설정 및 접근 권한 확인';
-   reply(res,status,{error:message},origin);
+   // Protected diagnostics: never return API credentials, OAuth token, account
+   // number, request body, raw provider response or exception stack.
+   const steps=new Set(['토큰 발급','계좌 목록','보유주식 조회','응답 형식 확인']);
+   const stage=steps.has(err.stage)?err.stage:'서버 연결';
+   const upstreamStatus=[400,401,403,404,409,429,500,502,503].includes(err.status)?
+    err.status:null;
+   const status=upstreamStatus===429?429:502;
+   const cause=upstreamStatus===403?'토스 허용 IP 등록·접속 권한 확인':
+    upstreamStatus===401?'토스 인증키·활성 상태 확인':
+    upstreamStatus===400?'토스 API 요청 형식 확인':
+    upstreamStatus===429?'토스 API 호출 제한':
+    stage==='응답 형식 확인'?'공식 API 응답 필드 확인 필요':
+    '공식 API 연결·계좌 상태 확인 필요';
+   reply(res,status,{error:cause,stage,upstreamStatus},origin);
   }
  }
  return {handle,parsePortfolio:()=>undefined};
