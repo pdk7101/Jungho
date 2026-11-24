@@ -947,11 +947,16 @@ function completedClose(id,phase,latestDate){
  if(collected.date<x.date||(collected.date===x.date&&collected.minute<990))return null;
  return x;
 }
-function nextSessionPlan(now){
+function nextSessionPlan(now,referenceOnly){
  now=now||new Date();
  var phase=orderPrepPhase(now);if(!phase)return null;
  var published=FUNDS.map(function(f){var x=byId[f.id];return verified(f.id)?x.date:null;}).filter(Boolean).sort();
  var latestDate=published.length?published[published.length-1]:null;
+ if(referenceOnly){
+  // Historical classification never replaces the latest-day action signal.
+  if(!latestDate||latestDate===phase.expectedDate)return null;
+  phase=Object.assign({},phase,{expectedDate:latestDate,requireToday:false,historicalReference:true});
+ }
  var checked={};
  FUNDS.forEach(function(f){checked[f.id]=latestDate?completedClose(f.id,phase,latestDate):null;});
  var plan={phase:phase,asOf:latestDate,nextDay:phase.nextDay,rows:{},available:0,estimated:0,overBudget:false};
@@ -1166,7 +1171,7 @@ function renderPositions(){
   });
  });
 }
-function renderPlan(prepared){
+function renderPlan(prepared,priorPlan){
  if(prepared){
   if(el('domestic-plan-title'))el('domestic-plan-title').textContent='다음 거래일 주문준비 · '+prepared.nextDay;
   var candidates=FUNDS.filter(function(f){return prepared.rows[f.id]?.type==='buy';});
@@ -1174,7 +1179,17 @@ function renderPlan(prepared){
   var held=FUNDS.filter(function(f){return prepared.rows[f.id]?.type==='wait';}).length;
   var eodText='<p><b>'+safe(prepared.phase.stage)+'</b> · 다음 평일 '+safe(prepared.nextDay)+
    ' 주문 준비 (공휴일은 키움 확인) · 게시 종가 '+day(prepared.asOf)+' · 확인 '+prepared.available+'/6</p>';
-  if(prepared.available!==6)eodText+='<p class="sub">마감 종가 미확인 종목은 보류합니다. KRX 공식 API 인증 및 시세 갱신을 확인하세요.</p>';
+  if(prepared.available!==6){
+   eodText+='<p class="sub">오늘 필요한 확정 종가가 미확인인 종목은 현재 매수판단을 보류합니다. 과거 종가를 오늘 종가로 간주하지 않습니다.</p>';
+   if(priorPlan&&priorPlan.available){
+    var past=FUNDS.filter(function(f){return valid(priorPlan.rows[f.id]?.close);});
+    eodText+='<p class="sub"><b>'+day(priorPlan.asOf)+' 직전 확정 종가 참고 분석 ('+past.length+'/6):</b> '+
+     past.map(function(f){var v=priorPlan.rows[f.id];
+      return safe(f.name)+' '+(v.type==='buy'?'과거 매수 검토':v.type==='stop'?'과거 중지':'과거 보류');
+     }).join(' · ')+
+     '. <b>오늘 주문 신호가 아니며</b> 최신 KRX 확정 종가가 확인되면 다시 계산합니다.</p>';
+   }
+  }
   if(candidates.length)eodText+='<p><b>매수 검토 ('+candidates.length+'종목):</b> '+
    candidates.map(function(f){
     var d=prepared.rows[f.id];return safe(f.name)+' <b>'+d.qty+'주</b> · '+
@@ -1260,17 +1275,24 @@ function renderPlan(prepared){
 }
 function render(){
  var prepared=nextSessionPlan();
+ var priorPlan=prepared&&prepared.available<6?nextSessionPlan(undefined,true):null;
  renderCaps();
- renderPlan(prepared);
+ renderPlan(prepared,priorPlan);
  var list=el('funds');
  list.innerHTML=FUNDS.map(function(f){
   var x=byId[f.id],v=prepared?prepared.rows[f.id]:verdict(f),live=prepared?null:freshQuote(f.id),
-  p=prepared?(valid(v.close)?v.close:null):hasBars(x)?current(x,f.id):(live?live.price:null),
+  p=prepared?(valid(v.close)?v.close:hasBars(x)?Number(x.close):null):hasBars(x)?current(x,f.id):(live?live.price:null),
+  isReference=prepared&&!valid(v.close)&&hasBars(x),
+  past=priorPlan&&isReference?priorPlan.rows[f.id]:null,
   h=p?holding(f.id,p):null,b=hasBars(x)&&p?band(x,p):null;
   var tag=b?'<span class="band-tag '+(b.name==='하단 20%'?'band20':'')+'">'+b.name+'</span>':'';
   var avgText=renderHoldingInCard(f.id,p);
-  return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+(prepared?'다음 거래일 주문준비':safe(f.plan))+'</small><strong>'+(p?money(p):'마감 종가 미확인')+'</strong>'+(p?'<small>'+(live?'오늘 공개 체결가 ('+(live.method==='published'?'GitHub 게시 · 지연 가능':'당일 시세 제공처')+') · 체결 '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+' · '+Math.max(0,Math.floor((Date.now()-new Date(live.tradeAt).getTime())/60000))+'분 경과':(prepared?'주문준비 참고 종가 · ':'KRX 확정 종가 · ')+(hasBars(x)?day(x.date):'확인 불가'))+'</small>':'')+
-  (['robot','space','sol'].includes(f.id)?'<small>매수 적용상한 '+(valid(effectiveCap(f.id).value)?money(effectiveCap(f.id).value):'확인 대기')+' · '+safe(effectiveCap(f.id).reason)+'</small>':'')+avgText+renderMa20InCard(f.id)+tag+(window.ISA_KR_DIVIDENDS?.cardLine?.(f.id,p)||'')+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+(prepared&&v.type==='wait'?'보류':actionLabel(v.type))+'</div>'+
+  return '<div role="button" tabindex="0" class="fund '+(selected===f.id?'selected':'')+'" data-id="'+f.id+'"><div class="title">'+safe(f.name)+'</div><small>'+f.code+' · '+(prepared?'다음 거래일 주문준비':safe(f.plan))+'</small><strong>'+(p?money(p):'마감 종가 미확인')+'</strong>'+(p?'<small>'+(live?'오늘 공개 체결가 ('+(live.method==='published'?'GitHub 게시 · 지연 가능':'당일 시세 제공처')+') · 체결 '+new Date(live.tradeAt).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'})+' · '+Math.max(0,Math.floor((Date.now()-new Date(live.tradeAt).getTime())/60000))+'분 경과':(isReference?'직전 확정 종가 참고 (오늘 종가 미확인) · ':
+    prepared?'주문준비 참고 종가 · ':'KRX 확정 종가 · ')+(hasBars(x)?day(x.date):'확인 불가'))+'</small>':'')+
+  (['robot','space','sol'].includes(f.id)?'<small>매수 적용상한 '+(valid(effectiveCap(f.id).value)?money(effectiveCap(f.id).value):'확인 대기')+' · '+safe(effectiveCap(f.id).reason)+'</small>':'')+avgText+renderMa20InCard(f.id)+tag+(window.ISA_KR_DIVIDENDS?.cardLine?.(f.id,p)||'')+
+  (past&&valid(past.close)?'<small class="eod-reason">직전 '+day(priorPlan.asOf)+' 참고 분류: '+
+    (past.type==='buy'?'매수 검토':past.type==='stop'?'중지':'보류')+
+    ' · 오늘 주문 신호 아님</small>':'')+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+(prepared&&v.type==='wait'?'보류':actionLabel(v.type))+'</div>'+
   (prepared?'<small class="eod-reason">'+safe(v.title)+'</small>':'')+'</div>';
  }).join('');
  document.dispatchEvent(new Event('isa-rendered'));
