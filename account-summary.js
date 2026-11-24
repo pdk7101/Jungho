@@ -332,12 +332,12 @@ function displayAccount(id,data){
  }
  let sourceText=data.source+(data.date?' · 기준 '+String(data.date).slice(0,16).replace('T',' '):' · 기준일 미확인');
  if(id==='toss'&&!data.brokerApi)sourceText=(!data.estimated?
-  '증권사 앱 전체 금액 직접 기록 (자동 연결 아님) · ':'저장 보유정보 × 확인된 가격 (실계좌 아님) · ')+
+  '증권사 앱 전체 금액 직접 기록 (자동 연결 아님) · ':'참고 평가 · ')+
   (data.locked?'마지막 정상 계산 보존 · ':'')+
   (data.locked?(data.date||'가격 기준일 혼합'):(data.priceRange||data.date||'가격 기준일 미확인'))+
-  (!data.locked&&data.photoCount?' · 과거 사진 '+data.photoCount+'종목 포함':'');
- if(id==='kiwoom'&&!data.brokerApi)sourceText=data.source+' · 기준 '+(data.date||'미확인')+
-  (data.locked?' · 마지막 검증값 보존':'');
+  (!data.locked&&data.photoCount?' · 사진 가격 '+data.photoCount+'종목':'');
+ if(id==='kiwoom'&&!data.brokerApi&&data.complete)sourceText='참고 평가 · '+(data.date||'기준일 미확인')+
+  (data.locked?' · 이전 정상값':'');
  source.textContent=sourceText;
 }
 function render(){
@@ -352,12 +352,18 @@ function render(){
   const format=iso=>{const n=Date.parse(iso||'');return Number.isFinite(n)?
    new Date(n).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'미확인';};
   if(notice.dataset)notice.dataset.stale=x.toss?.brokerApi&&own?.state==='live'?'false':'true';
-  notice.textContent=x.toss?.brokerApi?
-   (own?.state==='cached'?'토스 마지막 성공 조회 '+format(official?.fetchedAt)+(x.toss.revalued?' · 저장 수량으로 참고 평가 갱신 · 새 매매 미반영':' · 현재 잔고 아님')+(own.diagnosis?' · '+own.diagnosis:'')+'. ':
-    '토스 공식 계좌 '+(official?.holdingCount||0)+'종목 자동 반영 · 조회 '+format(official?.fetchedAt)+'. ')+
-   (x.kiwoom?.date?'키움 참고 기준 '+String(x.kiwoom.date).slice(0,10):'키움 가격 확인 중'):
-   connected?(own?.diagnosis?(x.toss?.estimated&&x.toss.complete?'저장 보유정보로 참고 평가 자동 갱신 · 실제 신규 매매 미반영 · ':'')+'토스 실계좌 조회 실패: '+own.diagnosis:own?.loading?'토스 공식 잔고 확인 중 · 과거 참고값':'토스 연결 설정 저장됨 · 정상 잔고 아직 없음'):
-   '현재 브라우저는 토스 연결 전 · 과거 계산액은 실제 잔고가 아닙니다. 아래 버튼으로 처음 한 번만 연결하세요.';
+  const actual=x.toss?.brokerApi&&own?.state==='live';
+  const ready=x.toss?.complete&&finite(x.toss?.value);
+  notice.textContent=actual?'토스 계좌 조회 완료 · '+format(official?.fetchedAt):
+   ready?'참고 평가 자동 갱신 · 토스 실계좌 미연결':
+   own?.loading?'보유정보·시세 확인 중':'토스 실계좌 미연결 · 참고 평가 확인 필요';
+  if(!actual&&ready&&x.toss?.estimated)notice.textContent+=' · 새 매매 미반영';
+  const diagnostic=$('account-connection-detail');
+  if(diagnostic)diagnostic.textContent=(own?.diagnosis?'토스 연결: '+own.diagnosis:
+   connected?'토스 연결 설정 저장됨':'토스 연결 설정 없음')+
+   (x.toss?.cached?' · 마지막 공식 조회 '+format(official?.fetchedAt):'')+
+   (x.kiwoom?.date?' · 키움 가격 기준 '+String(x.kiwoom.date).slice(0,10):'');
+
  }
  const note=$('account-valuation-note');
  if(note){
