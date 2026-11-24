@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify established investment rules (fail closed)
-        run: node scripts/verify-investment-contract.js && node scripts/verify-payout-entry.js && node scripts/verify-krx-official.js && node scripts/verify-krx-private.js && node scripts/verify-ui-integrity.js && node scripts/verify-valuation-stability.js && node scripts/verify-toss-broker-reconciliation.js
+        run: node scripts/verify-investment-contract.js && node scripts/verify-payout-entry.js && node scripts/verify-krx-official.js && node scripts/verify-krx-private.js && node scripts/verify-ui-integrity.js && node scripts/verify-valuation-stability.js && node scripts/verify-toss-broker-reconciliation.js && node scripts/verify-toss-readonly.js
       # Public Pages must not redistribute KRX data.
       # Official credentials are checked separately in a manual diagnostic.
       - name: Keep licensed KRX price data out of public Pages
