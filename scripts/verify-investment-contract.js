@@ -45,6 +45,10 @@ equal([app.defaults.robotCap,app.defaults.spaceCap,app.defaults.solCap,app.defau
 equal(app.defaults.capMode,'ma','moving-average-only is the default buy cap mode');
 truth(app.FUNDS.find(f=>f.id==='reit').plan.includes('1·2·3·4주'),
  'REIT card description accurately covers SOL-rejected 4-share fallback');
+truth(html.includes('직전 확정 종가 참고 (오늘 종가 미확인)')&&
+ html.includes('과거 매수 검토')&&
+ html.includes('오늘 주문 신호가 아니며'),
+ 'current-order cards distinguish last-close historical insight from a fresh order signal');
 truth(html.includes('국내 ETF 매수계획 · 거래일 조건 점검')&&
  html.includes('function renderPlan(prepared,priorPlan){')&&
  html.includes('var prepared=nextSessionPlan();')&&
@@ -87,6 +91,13 @@ equal(preOpen.rows.robot.type,'buy','pre-opening view reuses the last completed 
 const lateOldClose=app.nextSessionPlan(new FixedDate('2026-11-04T22:15:00.000Z'));
 equal(lateOldClose.rows.robot.type,'wait',
  'old bars cannot be reused to advertise BUY when the most recent weekday close is missing');
+const datedReference=app.nextSessionPlan(new FixedDate('2026-11-04T22:15:00.000Z'),true);
+equal(datedReference.asOf,'20261102',
+ 'missing current close retains the exact date of the last verified official close');
+equal(datedReference.rows.robot.type,'buy',
+ 'last verified close may still show the historical BUY classification for reference only');
+truth(datedReference.phase.historicalReference===true&&lateOldClose.rows.robot.type==='wait',
+ 'historical BUY never overrides the current-day wait action');
 equal(app.nextSessionPlan(new FixedDate('2026-11-03T01:00:00.000Z')),null,
  'do not present EOD conditions as a fresh real-time signal during KRX open hours');
 app.settings.capMode='manual';app.settings.robotCap=9000;
