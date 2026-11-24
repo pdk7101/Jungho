@@ -31,7 +31,8 @@ function priceKrw(id,priceUsd){
  const rate=fx(),privateQuote=window.ISA_PERSONAL_US?.quote?.(id);
  const broker=window.ISA_TOSS_BROKER?.snapshot?.(),brokerState=window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state,
   brokerAt=Date.parse(broker?.fetchedAt||''),brokerAge=Date.now()-brokerAt;
- const bar=window.ISA_US_APP?.getData?.()?.items?.find(x=>x.id===id);
+ const bar=window.ISA_US_APP?.getData?.()?.items?.find(x=>x.id===id)||
+  (id==='spacex'?window.ISA_US_APP?.getData?.()?.extraQuotes?.spacex:null);
  const barDay=String(bar?.date||'');
  const closeDate=/^\d{8}$/.test(barDay)?barDay.slice(0,4)+'-'+barDay.slice(4,6)+'-'+barDay.slice(6):null;
  // A confirmed closing date supersedes a broker snapshot from before that US trading session.
@@ -40,7 +41,7 @@ function priceKrw(id,priceUsd){
  const afterBar=!closeDate||(brokerDay&&(brokerDay>closeDate||(brokerDay===closeDate&&Number(bp.hour)>=16)));
  const match=['live','cached'].includes(brokerState)&&broker?.ok&&Array.isArray(broker.holdings)&&
   Number.isFinite(brokerAge)&&brokerAge>=-60000&&brokerAge<=7*86400000&&afterBar?
-  broker.holdings.find(h=>h?.marketCountry==='US'&&h.currency==='USD'&&String(h.symbol||'').toUpperCase()===id.toUpperCase()):null;
+  broker.holdings.find(h=>h?.marketCountry==='US'&&h.currency==='USD'&&String(h.symbol||'').toUpperCase()===(id==='spacex'?'SPCX':id.toUpperCase())):null;
  if(rate&&privateQuote&&finitePositive(privateQuote.usd))
   return {amount:privateQuote.usd*rate.rate,manual:false,kind:'finnhub-private',
    usd:Number(privateQuote.usd),fxRate:rate.rate,fxAt:rate.when,fxSource:rate.source,fxManual:rate.manual,
