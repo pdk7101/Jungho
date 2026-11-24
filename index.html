@@ -316,7 +316,7 @@ details[open]>summary{margin-bottom:12px}
 .us-head-actions{display:flex;flex-wrap:wrap;gap:7px}
 .us-head-actions .us-header-button{white-space:nowrap}
 #us-live-badge{font-size:.84rem;font-weight:650;line-height:1.55}
-.account-summary h2{font-size:1rem;margin-bottom:12px}
+.account-summary h2{font-size:1rem;margin-bottom:0}.account-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}.account-head button{padding:7px 9px;font-size:.74rem;white-space:nowrap}
 .account-summary-table{width:100%;table-layout:fixed;border-collapse:collapse}
 .account-summary-table th,.account-summary-table td{padding:9px 6px;vertical-align:middle;min-width:0}
 .account-summary-table thead th{font-size:.75rem;font-weight:650;color:#b7c8df;text-align:right}
@@ -359,7 +359,7 @@ details[open]>summary{margin-bottom:12px}
 </head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel account-summary" id="account-summary" aria-labelledby="account-summary-title">
- <h2 id="account-summary-title">토스·키움 전체 계좌 투자 현황</h2>
+ <div class="account-head"><h2 id="account-summary-title">토스·키움 전체 계좌 투자 현황</h2><button type="button" id="account-summary-recalc" class="outline" title="최근 확인된 가격으로 개인 참고 평가액을 다시 계산합니다. 실제 증권사 계좌 잔고는 아닙니다.">참고 평가액 갱신</button></div>
  <table class="account-summary-table" aria-label="증권사별 투자금과 평가금액">
   <thead><tr><th scope="col">증권사</th><th scope="col">총투자금</th><th scope="col">평가금액</th></tr></thead>
   <tbody>
@@ -378,7 +378,7 @@ details[open]>summary{margin-bottom:12px}
   </tbody>
  </table>
  <p id="account-summary-total" class="account-summary-combined">계좌 합계 확인 중</p>
- <p class="account-summary-foot">계좌·분배금 기록은 이 기기 브라우저에만 저장됩니다. 휴대폰과 노트북 사이에 자동 동기화되지 않습니다.</p>
+ <p class="account-summary-foot" id="account-valuation-note">참고 평가액은 저장된 기준으로 표시합니다. 계좌·분배금 기록은 이 기기에만 저장되며 자동 동기화되지 않습니다.</p>
  <div class="account-dividend" aria-live="polite">
   <div class="account-dividend-title" id="account-dividend-label">누적 세후 배당·분배금</div>
   <div class="account-dividend-amount" id="account-dividend-total">지급금 확인 중</div>
