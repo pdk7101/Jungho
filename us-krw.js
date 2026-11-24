@@ -32,9 +32,11 @@ function priceKrw(id,priceUsd){
  const barDay=String(bar?.date||'');
  const closeDate=/^\d{8}$/.test(barDay)?barDay.slice(0,4)+'-'+barDay.slice(4,6)+'-'+barDay.slice(6):null;
  // A confirmed closing date supersedes a broker snapshot from before that US trading session.
- const brokerDay=Number.isFinite(brokerAt)?new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(brokerAt)):null;
+ const bp=Number.isFinite(brokerAt)?Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(brokerAt)).map(x=>[x.type,x.value])):null;
+ const brokerDay=bp?bp.year+'-'+bp.month+'-'+bp.day:null;
+ const afterBar=!closeDate||(brokerDay&&(brokerDay>closeDate||(brokerDay===closeDate&&Number(bp.hour)>=16)));
  const match=['live','cached'].includes(brokerState)&&broker?.ok&&Array.isArray(broker.holdings)&&
-  Number.isFinite(brokerAge)&&brokerAge>=-60000&&brokerAge<=7*86400000&&(!closeDate||brokerDay>=closeDate)?
+  Number.isFinite(brokerAge)&&brokerAge>=-60000&&brokerAge<=7*86400000&&afterBar?
   broker.holdings.find(h=>h?.marketCountry==='US'&&h.currency==='USD'&&String(h.symbol||'').toUpperCase()===id.toUpperCase()):null;
  if(rate&&privateQuote&&finitePositive(privateQuote.usd))
   return {amount:privateQuote.usd*rate.rate,manual:false,kind:'finnhub-private',
