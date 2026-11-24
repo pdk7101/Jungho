@@ -197,7 +197,8 @@ function kiwoomComputed(){
  if(data.missingPrice?.length)details.push('평가가격 미확인 '+data.missingPrice.length+'종목');
  const p=pair(data.principal,data.value);
  const d=Array.isArray(data.dates)&&data.dates.length?data.dates.slice().sort()[0]:null;
- const priceText=data.intraday&&data.close?'당일 검증 시세·확정 종가 혼합':
+ const priceText=data.broker?'KRX 일봉·토스 최근 표시단가 (기준일 혼합)': 
+  data.intraday&&data.close?'당일 검증 시세·확정 종가 혼합':
   data.intraday?'당일 검증 시세':'직전 확정 종가 참고';
  return {
   invested:finite(data.principal)?Number(data.principal):null,
@@ -215,11 +216,299 @@ function tossOfficial(){
  const basis=data.totals.investedKRW,valuation=data.totals.valueKRW;
  const native=data.amounts.valued||{};
  const usd=Number(native.usd||0),krw=Number(native.krw||0);
- const source=(cached?'토스 공식 API 마지막 저장 잔고 (현재 잔고 아님)':'토스 공식 API 이번 접속 조회 잔고')+
-  ' · 보유 '+data.holdingCount+'종목 · 국내 '+money(krw)+
-  ' / 미국 USD '+usd.toLocaleString('ko-KR',{maximumFractionDigits:2})+
-  (data.fx?.usdKrw?' · 공식 참고환율 '+data.fx.usdKrw:' · 환율 미확인')+
-  ' · 실제 토스 앱 전체 원화액과 환율 및 비용 차이 가능';
+ const source=(cached?'마지막 토스 공식 잔고 (현재 잔고 아님)':'토스 공식 API 자동 조회')+
+  ' · '+data.holdingCount+'종목 · '+(data.fx?.usdKrw?
+  'USD 표시환율 환산 참고액 (토스 앱 원화 평가와 차이 가능)':
+  '원화 환율 미확인 · 국내 '+money(krw)+' / 미국 
+ return {invested:finite(basis)?Number(basis):null,
+  value:finite(valuation)?Number(valuation):null,
+  date:data.fetchedAt||null,source,
+  complete:finite(basis)&&finite(valuation),estimated:true,brokerApi:true,cached};
+}
+function totals(){
+ const mode=read(MODE),tossManual=manualTotals('toss'),
+  kiwoomManual=manualTotals('kiwoom'),
+  tossAutomatic=tossComputed(),kiwoomAutomatic=kiwoomComputed();
+ return {
+  toss:tossOfficial()||(mode.toss==='auto'?(tossAutomatic||tossManual||snapshotToss()):
+   (tossManual||(tossAutomatic&&tossAutomatic.invested!==null?tossAutomatic:null)||snapshotToss()||tossAutomatic)),
+  kiwoom:mode.kiwoom==='auto'?(kiwoomAutomatic||kiwoomManual):
+   (kiwoomManual||kiwoomAutomatic)
+ };
+}
+// Account-wide estimates are a saved reference, not a live broker balance.
+// Quotes arrive asynchronously, so a partly updated 14-stock mixed-date basket
+// must never silently overwrite a value already shown to the user.
+function referenceSignature(id,data){
+ if(id==='toss'){
+  const rows=window.ISA_PORTFOLIO_TOTALS?.totals?.()?.rows;
+  return Array.isArray(rows)&&rows.length===14?
+   JSON.stringify(rows.map(r=>[r.market,r.id,r.qty,r.avg])):
+   String(data?.invested??'missing');
+ }
+ const k=window.ISA_KR_APP?.accountTotals?.();
+ return k?.holdingsKey||String(k?.principal??data?.invested??'missing');
+}
+function recordOK(x){
+ return x&&finite(x.invested)&&finite(x.value)&&
+  typeof x.signature==='string'&&typeof x.checkedAt==='string';
+}
+function saveReference(id,data,signature){
+ const entry={signature,checkedAt:new Date().toISOString(),
+  invested:Number(data.invested),value:Number(data.value),
+  date:data.date||null,source:data.source||'자동 참고평가'};
+ try{localStorage.setItem(REFERENCE,JSON.stringify({...read(REFERENCE),[id]:entry}));}
+ catch(_){}
+ return entry;
+}
+function referenceDisplay(id,data){
+ if(!data?.estimated||data.brokerApi)return data;
+ const signature=referenceSignature(id,data),old=read(REFERENCE)[id];
+ // A complete verified newer Kiwoom dataset must replace an older locked
+ // estimate automatically; never require a manual refresh to show a newer EOD.
+ // Partial async responses retain the last good total.
+ if(id==='kiwoom'&&data.complete&&finite(data.invested)&&finite(data.value)&&
+  data.date&&recordOK(old)&&old.signature===signature&&
+  String(data.date).slice(0,10)>String(old.date||'').slice(0,10)){
+  const entry=saveReference(id,data,signature);
+  return {...data,checkedAt:entry.checkedAt,locked:true};
+ }
+ if(recordOK(old)&&old.signature===signature){
+  return {...data,invested:old.invested,value:old.value,date:old.date,
+   source:old.source+' · 저장된 참고 평가액 (직접 갱신 시 변경)',
+   checkedAt:old.checkedAt,locked:true};
+ }
+ if(!finite(data.invested)||!finite(data.value))return data;
+ const saved=saveReference(id,data,signature);
+ return {...data,checkedAt:saved.checkedAt,locked:true};
+}
+function viewTotals(){
+ const x=totals();
+ return {toss:referenceDisplay('toss',x.toss),
+  kiwoom:referenceDisplay('kiwoom',x.kiwoom)};
+}
+function refreshReferenceTotals(){
+ const x=totals(),updated=[],skipped=[];
+ for(const id of ['toss','kiwoom']){
+  const data=x[id];
+  if(data?.estimated&&!data.brokerApi&&finite(data.invested)&&finite(data.value)){
+   saveReference(id,data,referenceSignature(id,data));
+   updated.push(id==='toss'?'토스':'키움 ISA');
+  }else skipped.push(id==='toss'?'토스':'키움 ISA');
+ }
+ render();
+ const note=$('account-valuation-note');
+ if(note)note.textContent=(updated.length?'참고 평가액 재계산: '+updated.join('·')+'. ':'')+
+  (skipped.length?'현재 평가가격 미확인·직접 입력 유지: '+skipped.join('·')+'. ':'')+
+  '실제 증권사 잔고와 다를 수 있습니다. 휴대폰·노트북 저장정보는 서로 동기화되지 않습니다.';
+}
+function displayAccount(id,data){
+ const invested=$(id+'-total-invested'),value=$(id+'-total-value'),
+  source=$(id+'-total-source');
+ if(!invested||!value||!source)return;
+ invested.textContent=finite(data?.invested)?money(data.invested):'합계 미확인';
+ value.textContent=finite(data?.value)?money(data.value):'평가액 미확인';
+ if(!data){
+  source.textContent=id==='toss'?'토스 전체계좌 사진 기록 또는 합계 직접 입력 필요':
+   '키움 ISA 6종목의 보유수량·평단·가격 확인 필요';
+  return;
+ }
+ let sourceText=data.source+(data.date?' · 기준 '+String(data.date).slice(0,16).replace('T',' '):' · 기준일 미확인');
+ if(id==='toss'&&!data.brokerApi)sourceText='과거 저장·사진 참고액 (현재 토스 잔고 아님) · '+(data.date||'기준일 없음');
+ if(id==='kiwoom'&&!data.brokerApi)sourceText=data.source+' · 기준 '+(data.date||'미확인')+
+  (data.locked?' · 마지막 검증값 보존':'');
+ source.textContent=sourceText;
+}
+function render(){
+ const x=viewTotals();
+ displayAccount('toss',x.toss);displayAccount('kiwoom',x.kiwoom);
+ renderDividends();
+ const notice=$('account-live-state'),connect=$('account-connect-broker');
+ const broker=window.ISA_TOSS_BROKER,connected=!!broker?.configured?.();
+ const own=broker?.snapshotMeta?.(),official=broker?.snapshot?.();
+ if(connect)connect.hidden=connected;
+ if(notice){
+  const format=iso=>{const n=Date.parse(iso||'');return Number.isFinite(n)?
+   new Date(n).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'미확인';};
+  notice.dataset.stale=x.toss?.brokerApi&&own?.state==='live'?'false':'true';
+  notice.textContent=x.toss?.brokerApi?
+   (own?.state==='cached'?'토스 마지막 성공 조회 '+format(official?.fetchedAt)+' · 현재 잔고 아님. ':
+    '토스 공식 계좌 '+(official?.holdingCount||0)+'종목 자동 반영 · 조회 '+format(official?.fetchedAt)+'. ')+
+   (x.kiwoom?.date?'키움 참고 기준 '+String(x.kiwoom.date).slice(0,10):'키움 가격 확인 중'):
+   connected?'토스 자동 조회 연결됨 · 공식 잔고 확인 중 또는 서버 연결 실패 · 현재 표시는 과거 참고값입니다.':
+   '현재 브라우저는 토스 연결 전 · 과거 계산액은 실제 잔고가 아닙니다. 아래 버튼으로 처음 한 번만 연결하세요.';
+ }
+ const note=$('account-valuation-note');
+ if(note){
+  const saved=read(REFERENCE),latest=[saved.toss?.checkedAt,saved.kiwoom?.checkedAt]
+   .filter(Boolean).sort().at(-1);
+  note.textContent=(x.toss?.brokerApi?
+   '토스의 공식 API 원화·USD 통화별 합계를 현재 환율로 환산한 참고액입니다. 토스 앱의 비용·환율 산식과 다를 수 있습니다. ':
+   '공식 토스 연결이 없으면 마지막 저장된 사진/가격만 표시합니다. ')+
+   (latest?' 마지막 참고 계산: '+new Date(latest).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+'. ':'')+
+   '기기·브라우저마다 기록이 별도 저장됩니다. 데이터 삭제는 피하세요.';
+ }
+ const brokerNote=$('account-broker-compare');
+ if(brokerNote){
+  const broker=manualTotals('toss');
+  const estimate=tossComputed(),official=tossOfficial();
+  const explicit=read(MODE).toss==='manual';
+  if(official){
+   const officialValue=finite(official.value)?money(official.value):'환율 미확인 · 통화별로만 표시';
+   brokerNote.textContent=(official.cached?'토스 마지막 저장 기록 (현재 잔고 아님) ':'토스 공식 API 이번 접속 조회 ')+
+    window.ISA_TOSS_BROKER.snapshot().holdingCount+'종목 · '+
+    (official.cached?'저장 당시 원화 참고환산 ':'조회 당시 원화 참고환산 ')+officialValue+
+    (estimate&&finite(estimate.value)?' · 기존 14종목 사진·시세 참고액 '+money(estimate.value)+
+     (finite(official.value)?' · 차이 '+(estimate.value>=official.value?'+':'')+
+       money(Math.round(estimate.value)-Math.round(official.value)):''):'')+
+    ' · 미국 자산 원화 환산은 토스증권 앱의 예상세금·수수료·매입환율 반영액과 다를 수 있습니다.';
+  }else if(broker){
+   if(estimate&&finite(estimate.value)&&finite(estimate.invested)){
+    const valueDelta=Math.round(estimate.value)-Math.round(broker.value);
+    const basisDelta=Math.round(estimate.invested)-Math.round(broker.invested);
+    const signed=v=>(v>0?'+':'')+money(v);
+    brokerNote.textContent='토스 앱 직접 입력 '+money(broker.value)+' ('+(broker.date||'날짜 미확인')+
+     ') · 14종목 참고 계산 '+money(estimate.value)+' · 평가금액 차이 '+signed(valueDelta)+
+     ' · 원금 차이 '+signed(basisDelta)+
+     (explicit?' · 상단은 토스 앱 입력값 우선 표시':' · 현재 자동 참고 모드 · 위 입력값으로 전환하려면 계좌 합계를 다시 저장')+
+     ' · 기준일·환율·가격 출처가 다르므로 차이는 실제 손익이 아닙니다.';
+   }else{
+    brokerNote.textContent='토스 앱에서 직접 기록한 전체 평가금액 '+money(broker.value)+
+     ' · 14종목 참고 계산은 일부 수량·평단·가격 미확인으로 비교 보류.'+
+     (explicit?' 상단은 직접 입력값을 표시합니다.':' 상단 자동 참고 모드.');
+   }
+  }else{
+   brokerNote.textContent='현재 브라우저에서 공식 토스 연결이 확인되지 않았습니다. 과거 사진/평가 금액을 오늘 잔고로 사용하지 않습니다. 기존 연결을 설정하면 이후 자동 갱신합니다.';
+  }
+ }
+ const combined=$('account-summary-total');if(!combined)return;
+ const t=x.toss,k=x.kiwoom;
+ if(finite(t?.invested)&&finite(k?.invested)){
+  // The summary must reconcile exactly with the integer KRW amounts visible
+  // in each brokerage row. Fractional-share FX conversions can carry sub-won
+  // values; adding those unrounded values created a 1 KRW P/L discrepancy.
+  const cost=Math.round(Number(t.invested))+Math.round(Number(k.invested));
+  if(finite(t?.value)&&finite(k?.value)){
+   const value=Math.round(Number(t.value))+Math.round(Number(k.value));
+   const profit=value-cost;
+   const profitText=(profit>0?'+':'')+money(profit);
+   const rateText=cost>0?' ('+(profit>=0?'+':'')+(100*profit/cost).toFixed(2)+'%)':' (수익률 계산 불가)';
+   const difference=!(t.date&&k.date&&t.date===k.date);
+   combined.textContent=(!t.brokerApi?'과거 참고 합계 (토스 실계좌 미연결)':
+    difference?'참고 합계 (계좌별 기준일 다름)':'두 계좌 합계')+
+    ' · 총투자금 '+money(cost)+' · 평가금액 '+money(value)+
+    ' · 평가손익 '+profitText+rateText;
+  }else combined.textContent='두 계좌 총투자금 '+money(cost)+' · 전체 평가금액 확인 대기';
+ }else combined.textContent='전체 합계는 두 계좌의 총투자금·평가액이 확인된 후 표시합니다.';
+}
+function initEditor(){
+ const fields={
+  toss:['account-toss-invested','account-toss-value'],
+  kiwoom:['account-kiwoom-invested','account-kiwoom-value']
+ };
+ const before=read(KEY);
+ for(const [id,keys] of Object.entries(fields)){
+  const manual=before[id]||{};
+  if(finite(manual.invested)&&$(keys[0]))$(keys[0]).value=manual.invested;
+  if(finite(manual.value)&&$(keys[1]))$(keys[1]).value=manual.value;
+ }
+ const status=$('account-total-message'),save=$('account-total-save'),reset=$('account-total-reset');
+ if(!status||!save||!reset)return;
+ save.addEventListener('click',()=>{
+  const changes={};
+  for(const [id,keys] of Object.entries(fields)){
+   const a=$(keys[0]).value.trim(),b=$(keys[1]).value.trim();
+   if(!a&&!b)continue;
+   if(!a||!b||!finite(a)||!finite(b)||!Number.isSafeInteger(Number(a))||
+      !Number.isSafeInteger(Number(b))){
+    status.textContent='각 계좌의 총투자금과 평가금액을 모두 0원 이상 정수로 입력해 주세요.';
+    return;
+   }
+   changes[id]={invested:Number(a),value:Number(b),date:seoulDay()};
+  }
+  if(!Object.keys(changes).length){
+   status.textContent='입력한 계좌 금액이 없습니다. 기존 사진·시세 기준 금액은 유지됩니다.';
+   return;
+  }
+  const previous=localStorage.getItem(KEY);
+  try{
+   localStorage.setItem(KEY,JSON.stringify({...read(KEY),...changes}));
+   localStorage.setItem(MODE,JSON.stringify({...read(MODE),...Object.fromEntries(Object.keys(changes).map(id=>[id,'manual']))}));
+   status.textContent='이 휴대전화에 계좌별 금액을 저장했습니다. 상단에 입력 날짜와 함께 표시됩니다.';
+   render();
+  }catch(_){
+   try{if(previous===null)localStorage.removeItem(KEY);else localStorage.setItem(KEY,previous);}catch(__){}
+   status.textContent='계좌 금액 저장에 실패했습니다. 기존 설정은 보존하도록 처리했습니다.';
+  }
+ });
+ $('account-total-auto')?.addEventListener('click',()=>{
+  try{
+   localStorage.removeItem(REFERENCE);
+   localStorage.setItem(MODE,JSON.stringify({...read(MODE),toss:'auto',kiwoom:'auto'}));
+   status.textContent='보유수량·평단 기반 자동합계가 우선 적용됩니다. 기존 수동 계좌 합계는 삭제하지 않았습니다.';
+   render();
+  }catch(_){status.textContent='자동합계 모드 저장 실패 · 기존 설정을 유지합니다.';}
+ });
+ reset.addEventListener('click',()=>{
+  try{localStorage.removeItem(REFERENCE);localStorage.removeItem(KEY);localStorage.setItem(MODE,JSON.stringify({...read(MODE),toss:'auto',kiwoom:'auto'}));}
+  catch(_){status.textContent='기기 저장소를 초기화할 수 없습니다.';return;}
+  Object.values(fields).flat().forEach(id=>{if($(id))$(id).value='';});
+  status.textContent='계좌별 직접 입력값만 해제했습니다. 보유수량·평단·분배금 기록은 그대로입니다.';
+  render();
+ });
+}
+function mount(){
+ if(!$('account-summary'))return;
+ initEditor();
+ initDividendEditor();
+ applyPrivateDividendPhoto();
+ $('account-show-editor')?.addEventListener('click',()=>{
+  const outer=$('holdings-settings'),inner=$('account-edit');
+  if($('cap-settings'))$('cap-settings').open=true;
+  if(outer)outer.open=true;
+  if(inner)inner.open=true;
+  if(inner?.scrollIntoView)inner.scrollIntoView({behavior:'smooth',block:'start'});
+  $('account-toss-invested')?.focus?.();
+ });
+ $('account-connect-broker')?.addEventListener('click',()=>{
+  const node=$('toss-broker-config');if(node)node.open=true;
+  node?.scrollIntoView?.({behavior:'smooth',block:'start'});
+  $('toss-broker-url')?.focus?.();
+ });
+ $('account-summary-recalc')?.addEventListener('click',async()=>{
+  const button=$('account-summary-recalc'),state=$('account-live-state');
+  if(button.disabled)return;
+  button.disabled=true;
+  if(state)state.textContent='연결된 계좌·한국·미국 가격을 확인 중… 마지막 성공 기록은 유지합니다.';
+  try{
+   const tasks=[];
+   if(window.ISA_TOSS_BROKER?.configured?.())tasks.push(window.ISA_TOSS_BROKER.load());
+   if(window.ISA_KR_APP?.refresh)tasks.push(window.ISA_KR_APP.refresh());
+   if(window.ISA_US_APP?.refresh)tasks.push(window.ISA_US_APP.refresh());
+   if(window.ISA_PERSONAL_US?.refresh)tasks.push(window.ISA_PERSONAL_US.refresh());
+   await Promise.allSettled(tasks);
+   refreshReferenceTotals();
+  }finally{
+   button.disabled=false;
+   render();
+   if(!window.ISA_TOSS_BROKER?.configured?.()){
+    const c=$('account-connect-broker');if(c)c.hidden=false;
+   }
+  }
+ });
+ document.addEventListener('isa-rendered',render);
+ document.addEventListener('isa-portfolio-holdings-updated',render);
+ window.addEventListener('isa-us-valuation-refreshed',render);
+ document.addEventListener('isa-kr-dividends-updated',render);
+ document.addEventListener('isa-toss-broker-data',render);
+ window.addEventListener('storage',render);
+ window.addEventListener('pageshow',render);
+ render();
+}
+window.ISA_ACCOUNT_SUMMARY={getTotals:totals,getDisplayTotals:viewTotals,getDividends:dividendTotals,refresh:render,refreshReferenceTotals};
+mount();
+})();
++usd.toLocaleString('ko-KR',{maximumFractionDigits:2}));
  return {invested:finite(basis)?Number(basis):null,
   value:finite(valuation)?Number(valuation):null,
   date:data.fetchedAt||null,source,
