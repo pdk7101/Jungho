@@ -223,10 +223,15 @@ function otherHoldingCard(){
  const avg=valid(r?.avg)?wonAmount(r.avg,2):'미입력';
  const pnl=has(r?.profit)?Number(r.profit):null;
  const rate=pnl!==null&&Number(r.invested)>0?100*pnl/r.invested:null;
+ const rawDate=String(r?.priceDate||'');
+ const stamp=Date.parse(rawDate);
+ const label=/^\d{4}-\d{2}-\d{2}$/.test(rawDate)?rawDate:
+  Number.isFinite(stamp)?new Date(stamp).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'기준일 미확인';
+ const source=r?.priceSource?.includes('Finnhub')?'Finnhub 장중 체결 · 참고환율':(r?.priceSource||'시세 미연결');
  return '<div class="us-card us-list-row" id="us-other-holding-card">'+
   '<span class="us-list-top"><strong class="us-list-ticker">스페이스X</strong><b class="us-list-price">'+text(price)+'</b></span>'+
   '<span class="us-list-subtitle">토스 보유 미국 기타 종목 · SPCX · 나스닥</span>'+
-  '<span class="us-list-source">'+text((r?.priceSource||'시세 미연결')+' · '+(r?.priceDate||'기준일 미확인'))+'</span>'+
+  '<span class="us-list-source">'+text(source+' · '+label)+'</span>'+
   '<div class="us-card-signal state-wait"><strong class="us-card-signal-action">보류</strong><span class="us-card-signal-note">별도 매수 기준 미설정</span></div>'+
   '<div class="us-card-holding">보유 '+text(qty)+' · 평단 '+text(avg)+
   (has(r?.value)?'<div class="us-card-pnl">참고 평가금액 '+wonAmount(r.value)+'</div>':'')+
