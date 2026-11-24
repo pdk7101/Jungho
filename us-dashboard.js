@@ -279,6 +279,7 @@ async function refresh(){
  window.dispatchEvent(new Event('isa-us-quotes-refreshed'));
 }
 window.ISA_US_APP={
+ refresh,
  getData:()=>data,
  getPrice:id=>{const f=FUNDS.find(x=>x.id===id);return f?price(f):null;},
  getPosition:id=>(read('isa-us-holdings-v1')||{})[id]||{},
