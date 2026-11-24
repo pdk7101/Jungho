@@ -546,13 +546,13 @@ truth(!html.includes('.uo-panel')&&!html.includes('.portfolio-shot-row'),
  'obsolete broker order and screenshot snapshot styles are removed from published page');
 truth(usKrwCode.includes("const LEDGER_KEY='isa-us-distributions-krw-v1'"),
  'verified after-tax payout ledger is retained in the personal US holdings view');
-// Shared holding settings: one edit location for six Kiwoom and four Toss holdings.
-const capSection=html.slice(html.indexOf('<details class="panel" id="cap-settings">'),
- html.indexOf('</details>\n<div class="legend">',html.indexOf('<details class="panel" id="cap-settings">')));
-truth(capSection.includes('id="holdings-settings"')&&
- capSection.includes('id="positions"')&&
- capSection.includes('id="us-krw-editor"'),
- 'both Korean and US portfolio editors appear inside original ETF price-cap settings');
+// Shared holding settings: one menu for broker view and all locally editable holdings.
+const holdingsSection=html.slice(html.indexOf('<details id="holdings-settings"'),html.indexOf('</details>\n<div class="legend">'));
+truth(holdingsSection.includes('id="toss-broker-holdings"')&&
+ holdingsSection.includes('id="positions"')&&holdingsSection.includes('id="us-krw-editor"')&&
+ html.indexOf('id="holdings-settings"')>html.indexOf('id="cap-settings"')&&
+ html.split('id="toss-broker-holdings"').length===2,
+ 'single holdings management menu contains broker viewer and both market editors');
 truth(html.split('id="positions"').length===2&&html.split('id="us-krw-editor"').length===2,
  'there is exactly one editor host for each domestic and US market');
 truth(!html.includes('id="posDetails"')&&
