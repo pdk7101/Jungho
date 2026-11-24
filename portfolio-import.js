@@ -5,6 +5,7 @@
 'use strict';
 const KEY='isa-user-portfolio-snapshot-v1';
 const KRKEY='isa-private-positions-v1',USKEY='isa-us-holdings-v1',TDKEY='isa-private-toss-domestic-snapshot-v1';
+const TD_HOLD='isa-private-toss-domestic-holdings-v1';
 const KR=['reit','sol','robot','space','sofr','tr'];
 const US=['schd','spym','cony','agnc','spacex'];
 const TD=['tsofr','treit','ttr','biotech','tspace','media','trobot','hongah','sensor'];
@@ -51,12 +52,18 @@ function decodePortfolio(encoded){
     !Number.isFinite(avg)||avg<=0||avg>1000000000)
     throw Error('토스 보유수량·원화 평균매수가를 확인해 주세요');
    all.usPositions[id]={qty,avg};
-  }else if(group==='D'&&p.length===4){
-   const [id,q,v,pl]=p,qty=Number(q),value=Number(v),pnl=Number(pl);
+  }else if(group==='D'&&(p.length===4||p.length===6)){
+   const [id,q,v,pl,c,priceDate]=p,qty=Number(q),value=Number(v),pnl=Number(pl);
    if(!TD.includes(id)||all.tossDomestic[id]||!Number.isInteger(qty)||qty<0||qty>10000000||
     !Number.isFinite(value)||value<0||!Number.isFinite(pnl)||value-pnl<0)
     throw Error('토스 국내주식 보유수량·평가손익을 확인해 주세요');
-   all.tossDomestic[id]={qty,value,pnl};
+   if(p.length===6){
+    const current=Number(c);
+    if(qty<=0||!Number.isFinite(current)||current<=0||value-pnl<=0||
+     !/^\d{4}-\d{2}-\d{2}$/.test(priceDate)||priceDate>date)
+     throw Error('국내 사진의 표시 단가·가격 기준일 확인 필요');
+    all.tossDomestic[id]={qty,value,pnl,avg:(value-pnl)/qty,current,priceDate};
+   }else all.tossDomestic[id]={qty,value,pnl};
   }else if(group==='N'&&p.length===3){
    const [id,total,increment]=p,div=Number(total),inc=Number(increment);
    if(id!=='cony'||all.conyNote||!Number.isInteger(div)||!Number.isInteger(inc)||
@@ -127,11 +134,21 @@ function importSnapshot(){
    us[id]=next;usApplied++;
   }
   // Save in the user's browser, not GitHub. Roll back on a storage failure.
-  const backup=Object.fromEntries([KEY,KRKEY,USKEY,TDKEY].map(k=>[k,localStorage.getItem(k)]));
+  const backup=Object.fromEntries([KEY,KRKEY,USKEY,TDKEY,TD_HOLD].map(k=>[k,localStorage.getItem(k)]));
   try{
    if(parsed.hasKR)store(KRKEY,kr);
    if(parsed.hasUS||parsed.hasBalance)store(USKEY,us);
-   if(parsed.hasTD)store(TDKEY,{date:parsed.date,rows:parsed.tossDomestic});
+   if(parsed.hasTD){
+    store(TDKEY,{date:parsed.date,rows:parsed.tossDomestic});
+    const td={...(load(TD_HOLD)||{})};let changed=false;
+    for(const id of TD){
+     const v=parsed.tossDomestic[id],old=td[id]||{};
+     if(!v.priceDate)continue;
+     if(old.updatedAt&&old.updatedAt>parsed.date){kept++;continue;}
+     td[id]={...old,qty:v.qty,avg:v.avg,updatedAt:parsed.date};changed=true;
+    }
+    if(changed)store(TD_HOLD,td);
+   }
    // Retain the untouched market's historical screenshot and browser holdings.
    // Each market keeps its own snapshot date; the URL never contains account identifiers.
    const priorKr=existing?.kr||{},priorUs=existing?.us||{},priorTD=existing?.tossDomestic||{};
