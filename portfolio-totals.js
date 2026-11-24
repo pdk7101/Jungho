@@ -39,24 +39,73 @@ function snapshotInfo(market,id){
  const s=read(SNAP);return {row:(market==='us'?s.us:s.tossDomestic)?.[id]||null,
   date:market==='us'?s.usDate||null:s.tdDate||null};
 }
+function officialHolding(market,id){
+ const data=window.ISA_TOSS_BROKER?.snapshot?.();
+ if(!data?.ok||!Array.isArray(data.holdings)||!data.fetchedAt)return null;
+ const age=Date.now()-Date.parse(data.fetchedAt);
+ if(!Number.isFinite(age)||age< -60000||age>7*86400000)return null;
+ const norm=x=>String(x||'').toUpperCase().replace(/[^0-9A-Z가-힣]/g,'');
+ const names=market==='us'?{
+  schd:['SCHD'],spym:['SPYM'],cony:['CONY'],agnc:['AGNC'],
+  spacex:['스페이스X','SPACEX']
+ }:{
+  tsofr:['KODEX미국달러SOFR','미국달러SOFR'],
+  treit:['TIGER리츠부동산인프라'],
+  ttr:['KODEX200TR'],biotech:['마이티신약포커스바이오액티브'],
+  tspace:['1Q미국우주항공테크'],media:['TIGER미디어컨텐츠'],
+  trobot:['RISEAI로봇'],hongah:['흥아해운'],sensor:['센서뷰']
+ };
+ const keys=(names[id]||[]).map(norm);
+ const code=TOSS_KR.find(x=>x[0]===id)?.[2];
+ const codeId={sofr:'455030',reit:'329200',tr:'278530',
+  space:'0131V0',robot:'469070'}[code];
+ const matches=data.holdings.filter(h=>{
+  if(h.marketCountry!==(market==='us'?'US':'KR')||
+   h.currency!==(market==='us'?'USD':'KRW'))return false;
+  const symbol=norm(h.symbol).replace(/^A(?=[0-9A-Z]{6}$)/,'');
+  const name=norm(h.name);
+  return market==='us'?
+   keys.includes(symbol)||(id==='spacex'&&keys.some(x=>name.includes(x))):
+   codeId===symbol||keys.some(x=>name===x||name.includes(x));
+ });
+ if(matches.length!==1)return null;
+ const h=matches[0];
+ if(!positive(h.lastPrice)||!known(h.marketValue)||
+  !known(h.quantity)||!known(h.purchaseAmount))return null;
+ const fx=market==='us'?Number(data.fx?.usdKrw):1;
+ if(!(fx>0&&Number.isFinite(fx)))return null;
+ return {unitPrice:Number(h.lastPrice)*fx,qty:Number(h.quantity),
+  invested:Number(h.purchaseAmount)*fx,value:Number(h.marketValue)*fx,
+  avg:Number(h.averagePurchasePrice)*fx,
+  source:'토스 공식 API '+(market==='us'?'달러 원화 환산':'국내')+
+   ' 보유잔고 · '+(window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state==='cached'?
+   '마지막 저장 기록':'최근 조회')+' (실시간 체결가격 아님)',
+  fetchedAt:data.fetchedAt};
+}
 function row(market,id){
  if(market!=='us'&&market!=='domestic')return null;
  const us=market==='us',idOk=us?TOSS_US.includes(id):TOSS_KR.some(x=>x[0]===id);
  if(!idOk)return null;
  const key=us?US:TD,stored=read(key)[id]||{},shot=snapshotInfo(market,id);
+ const official=officialHolding(market,id);
  const snap=shot.row,oldQty=snap&&known(snap.qty)?Number(snap.qty):null;
- const qty=known(stored.qty)?Number(stored.qty):oldQty;
+ const qty=official?official.qty:known(stored.qty)?Number(stored.qty):oldQty;
  let inferredAvg=positive(snap?.avg)?Number(snap.avg):null;
  if(inferredAvg===null&&positive(oldQty)&&known(snap?.value)&&known(snap?.pnl)){
   const basis=Number(snap.value)-Number(snap.pnl);
   if(basis>=0)inferredAvg=basis/oldQty;
  }
- const avg=positive(us?stored.krwAvg:stored.avg)?Number(us?stored.krwAvg:stored.avg):inferredAvg;
+ const avg=official&&positive(official.avg)?official.avg:
+  positive(us?stored.krwAvg:stored.avg)?Number(us?stored.krwAvg:stored.avg):inferredAvg;
  const edited=known(stored.qty)||positive(us?stored.krwAvg:stored.avg);
  let unitPrice=null,priceSource=null,priceDate=null,priceMode='none';
  // Owner-entered Toss KRW reference has priority on its entry day. It is never
  // claimed to be an authenticated broker API or a real-time portfolio balance.
- if(positive(stored.krwCurrent)&&stored.krwDay===seoulDay()){
+ if(official){
+  unitPrice=official.unitPrice;priceSource=official.source;
+  priceDate=official.fetchedAt;priceMode='official-broker';
+ }
+ if(unitPrice===null&&positive(stored.krwCurrent)&&stored.krwDay===seoulDay()){
   unitPrice=Number(stored.krwCurrent);
   priceSource='토스증권 앱 원화 단가 직접 입력 (실시간 연동 아님)';
   priceDate=stored.krwDay;
@@ -90,10 +139,11 @@ function row(market,id){
  }
  const zero=qty===0,hasBasis=zero||(qty!==null&&avg!==null&&qty>=0);
  const hasPrice=zero||hasBasis&&unitPrice!==null;
- const invested=hasBasis?(zero?0:qty*avg):null;
- const value=hasPrice?(zero?0:qty*unitPrice):null;
+ const invested=official?official.invested:hasBasis?(zero?0:qty*avg):null;
+ const value=official?official.value:hasPrice?(zero?0:qty*unitPrice):null;
  return {market,id,qty,avg,invested,value,profit:value!==null?value-invested:null,
   edited,unitPrice,priceSource,priceDate,priceMode,fromSnapshot:!edited&&!!snap,
+  official:!!official,
   hasBasis,hasPrice};
 }
 function totals(){
@@ -103,13 +153,15 @@ function totals(){
  const value=values.length===14?rows.reduce((s,x)=>s+x.value,0):null;
  const used=rows.filter(x=>x.qty>0);
  const stamps=[...new Set(used.map(x=>x.priceDate||'미확인'))];
- const prices={photo:rows.filter(x=>x.qty>0&&x.priceMode==='photo').length,
+ const prices={official:rows.filter(x=>x.qty>0&&x.priceMode==='official-broker').length,
+ photo:rows.filter(x=>x.qty>0&&x.priceMode==='photo').length,
   reference:rows.filter(x=>x.qty>0&&!['none','photo','broker-manual'].includes(x.priceMode)).length,
   missing:rows.filter(x=>x.qty>0&&x.priceMode==='none').length};
  const note=['토스 미국 5·국내 9종목 보유수량 × 원화평단 자동합계',
   '기록 '+basis.length+'/14종목'];
  if(basis.length<14)note.push('매수원가 미입력 '+(14-basis.length)+'종목');
  if(values.length<14)note.push('평가액 미확인 '+(14-values.length)+'종목');
+ if(prices.official)note.push('공식 토스 보유자료 '+prices.official+'종목 · 각 종목 조회시각 기준');
  if(prices.photo)note.push('과거 사진 가격 '+prices.photo+'종목 (실시간 아님)');
  if(prices.reference)note.push('참고가격 '+prices.reference+'종목 (실시간 확정 아님)');
  const directlyEntered=rows.filter(x=>x.qty>0&&x.priceMode==='broker-manual').length;
@@ -203,4 +255,5 @@ function renderEditors(){
 window.ISA_PORTFOLIO_TOTALS={totals,row,markAuto,renderEditors,getMode:()=>read(MODE)};
 renderEditors();
 window.addEventListener('pageshow',()=>renderEditors());
+document.addEventListener('isa-toss-broker-data',()=>renderEditors());
 })();
