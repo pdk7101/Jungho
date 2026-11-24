@@ -383,13 +383,19 @@ details[open]>summary{margin-bottom:12px}
 #us-cards .us-price-meaning,#us-cards .us-list-foot{display:none}
 #account-summary .account-source-row{font-size:11px}
 #funds .fund .title{line-height:1.25}
+#account-summary .account-head{align-items:center;flex-wrap:nowrap;margin-bottom:4px}
+#account-summary-recalc{width:auto;padding:7px 9px;font-size:.72rem;background:#29476b;white-space:normal;max-width:48%}
+#account-live-state{font-size:.75rem;line-height:1.5;margin:6px 0 9px}
+#account-summary .account-actions{gap:8px}
+.account-dividend-info{margin:5px 0 0;padding:0;border:0;background:none;box-shadow:none;font-size:.73rem;color:#a7b8d0}
+.account-dividend-info>summary{cursor:pointer}
+@media(min-width:760px){#us-panel .us-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style><script src="./live-prices.js"></script><script src="./private-krx-client.js"></script>
 </head><body><main>
-<header><div><small>내 투자 · 무료 대시보드 · 11/25 v4</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
+<header><div><small>내 투자 · 무료 대시보드 · 11/25 v5</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
 <section class="panel account-summary" id="account-summary" aria-labelledby="account-summary-title">
  <div class="account-head"><h2 id="account-summary-title">전체 계좌 현황</h2><button type="button" id="account-summary-recalc" title="연결된 토스·KRX·미국 주식 시세를 한 번에 확인합니다.">↻ 전체 최신정보 조회</button></div>
  <p id="account-live-state" role="status">토스·KRX·미국 시세 자동 확인 중…</p>
- <button type="button" id="account-connect-broker" hidden>이 브라우저 토스 계좌 최초 연결</button>
  <table class="account-summary-table" aria-label="증권사별 투자금과 평가금액">
   <thead><tr><th scope="col">증권사</th><th scope="col">총투자금</th><th scope="col">평가금액</th></tr></thead>
   <tbody>
@@ -410,7 +416,8 @@ details[open]>summary{margin-bottom:12px}
  <p id="account-summary-total" class="account-summary-combined">계좌 합계 확인 중</p>
  <details id="account-details" class="account-more">
   <summary>기준일·계산 근거·수동 보정 (필요할 때만)</summary>
-  <div class="account-actions"><button id="account-show-editor" type="button" class="outline">수동 기록 열기</button></div>
+  <p id="account-connection-detail" class="account-summary-foot" role="status">계좌 연결 확인 중</p>
+  <div class="account-actions"><button type="button" id="account-connect-broker" hidden>이 브라우저 토스 계좌 최초 연결</button><button id="account-show-editor" type="button" class="outline">수동 기록 열기</button></div>
   <p id="account-broker-compare" class="account-summary-foot" role="status">공식 계좌와 참고 계산의 차이를 확인합니다.</p>
   <p class="account-summary-foot" id="account-valuation-note">계좌·분배금 기록은 이 브라우저에만 저장되며 다른 브라우저로 자동 전송되지 않습니다.</p>
  </details>
@@ -418,7 +425,7 @@ details[open]>summary{margin-bottom:12px}
   <div class="account-dividend-title" id="account-dividend-label">누적 세후 배당·분배금</div>
   <div class="account-dividend-amount" id="account-dividend-total">지급금 확인 중</div>
   <div class="account-dividend-breakdown" id="account-dividend-breakdown">토스·키움 분배금 확인 중</div>
-  <p class="account-dividend-source" id="account-dividend-source"></p>
+  <details class="account-dividend-info"><summary>분배금 기록·확인 사항</summary><p class="account-dividend-source" id="account-dividend-source"></p></details>
  </div>
 </section>
 <details class="panel" id="dashboard-settings"><summary><b>설정 · 계좌 연결 · 수동 보정</b></summary>
@@ -569,7 +576,7 @@ details[open]>summary{margin-bottom:12px}
 </details>
 <section id="us-panel" class="panel">
  <div class="us-head">
-  <div><h2>미국 주식 · SCHD / AGNC / SPYM / CONY</h2><p class="sub">원화 참고가격 · 보유손익 · 분배금</p></div>
+  <div><h2>미국 주식 · 5종목</h2><p class="sub">원화 참고가격 · 보유손익 · 분배금</p></div>
   <details class="us-advance-actions"><summary>개별 조회</summary>
    <div class="us-head-actions">
     <button class="us-header-button" id="us-live-refresh" type="button">장중가격 조회</button>
