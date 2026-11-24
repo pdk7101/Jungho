@@ -213,6 +213,26 @@ function holdingCard(id,usdPx){
    '<div class="us-card-inclusive">분배금 포함 총손익: 누적 세후 지급금 확인 후 계산</div>')+
   '</div>';
 }
+// The fifth holding is already included in account totals. Show the same
+// locally stored valuation without guessing a symbol or inventing signals.
+function otherHoldingCard(){
+ const r=window.ISA_PORTFOLIO_TOTALS?.row?.('us','spacex');
+ const has=n=>n!==null&&n!==undefined&&Number.isFinite(Number(n));
+ const price=valid(r?.unitPrice)?wonAmount(r.unitPrice):'가격 미확인';
+ const qty=has(r?.qty)?fmtQty(r.qty):'미입력';
+ const avg=valid(r?.avg)?wonAmount(r.avg,2):'미입력';
+ const pnl=has(r?.profit)?Number(r.profit):null;
+ const rate=pnl!==null&&Number(r.invested)>0?100*pnl/r.invested:null;
+ return '<div class="us-card us-list-row" id="us-other-holding-card">'+
+  '<span class="us-list-top"><strong class="us-list-ticker">스페이스X</strong><b class="us-list-price">'+text(price)+'</b></span>'+
+  '<span class="us-list-subtitle">토스 보유 미국 기타 종목 · 정식 티커 확인 전</span>'+
+  '<span class="us-list-source">'+text((r?.priceSource||'시세 미연결')+' · '+(r?.priceDate||'기준일 미확인'))+'</span>'+
+  '<div class="us-card-signal state-wait"><strong class="us-card-signal-action">보류</strong><span class="us-card-signal-note">정식 티커·독립 시세 확인 필요</span></div>'+
+  '<div class="us-card-holding">보유 '+text(qty)+' · 평단 '+text(avg)+
+  (has(r?.value)?'<div class="us-card-pnl">참고 평가금액 '+wonAmount(r.value)+'</div>':'')+
+  (pnl!==null?'<div class="us-card-pnl '+(pnl>=0?'us-positive':'us-negative')+'">평가손익 '+signedWon(pnl)+(rate===null?'':' ('+pct(rate)+')')+'</div>':'')+
+  '<small>상단 계좌 합계에 이미 포함 · 중복 합산하지 않음</small></div></div>';
+}
 function cards(){
  const host=$('us-cards');if(!host)return;
  // Match the vertical Korean ETF cards: price, source, MA20 reference, holdings and P/L.
@@ -240,7 +260,7 @@ function cards(){
    movingAverageCard(x,q)+holdingCard(f.id,px)+
    '<span class="us-list-foot">종목을 누르면 차트·분배금·매수 판단 상세 확인</span>'+
    '</div>';
- }).join('');
+ }).join('')+otherHoldingCard();
  host.querySelectorAll('[data-us]').forEach(btn=>{
   const select=()=>{selected=btn.dataset.us;render();};
   btn.addEventListener('click',select);
@@ -310,6 +330,8 @@ window.ISA_US_APP={
 };
 window.addEventListener('isa-personal-us-quote-refreshed',()=>render());
 document.addEventListener('isa-toss-broker-data',()=>render());
+document.addEventListener('isa-portfolio-holdings-updated',()=>render());
+window.addEventListener('pageshow',()=>render());
 function mount(){
  const p=$('us-panel');if(!p)return;
  const reload=$('reload');if(reload)reload.addEventListener('click',refresh);
