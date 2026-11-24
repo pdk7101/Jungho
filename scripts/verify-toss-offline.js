@@ -45,7 +45,8 @@ function browser(fetcher,localMap=local){
    value:'',checked:false,textContent:'',children:[],
    addEventListener(type,fn){this[type]=fn;},
    replaceChildren(){this.children=[];this.textContent='';},
-   append(...children){this.children.push(...children);}
+   append(...children){this.children.push(...children);},
+   appendChild(child){this.children.push(child);return child;}
   });
   return elements.get(id);
  };
