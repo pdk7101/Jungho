@@ -158,7 +158,7 @@ function pair(invested,value){
 }
 function manualTotals(id){
  const v=read(KEY)[id]||{},p=pair(v.invested,v.value);
- return p?{...p,date:v.date||null,source:'증권사 앱 기준 사용자 직접 입력'}:null;
+ return p?{...p,date:v.date||null,source:'증권사 앱 전체 금액 직접 기록 (자동 연결 아님)'}:null;
 }
 function snapshotToss(){
  const s=read(SNAP),options=[];
@@ -302,6 +302,30 @@ function render(){
    (latest?' 마지막 참고 계산: '+new Date(latest).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+'.':'')+
    ' 실제 증권사 잔고가 아니며 휴대폰·노트북 저장정보는 서로 동기화되지 않습니다.';
  }
+ const brokerNote=$('account-broker-compare');
+ if(brokerNote){
+  const broker=manualTotals('toss');
+  const estimate=tossComputed();
+  const explicit=read(MODE).toss==='manual';
+  if(broker){
+   if(estimate&&finite(estimate.value)&&finite(estimate.invested)){
+    const valueDelta=Math.round(estimate.value)-Math.round(broker.value);
+    const basisDelta=Math.round(estimate.invested)-Math.round(broker.invested);
+    const signed=v=>(v>0?'+':'')+money(v);
+    brokerNote.textContent='토스 앱 직접 입력 '+money(broker.value)+' ('+(broker.date||'날짜 미확인')+
+     ') · 14종목 참고 계산 '+money(estimate.value)+' · 평가금액 차이 '+signed(valueDelta)+
+     ' · 원금 차이 '+signed(basisDelta)+
+     (explicit?' · 상단은 토스 앱 입력값 우선 표시':' · 현재 자동 참고 모드 · 위 입력값으로 전환하려면 계좌 합계를 다시 저장')+
+     ' · 기준일·환율·가격 출처가 다르므로 차이는 실제 손익이 아닙니다.';
+   }else{
+    brokerNote.textContent='토스 앱에서 직접 기록한 전체 평가금액 '+money(broker.value)+
+     ' · 14종목 참고 계산은 일부 수량·평단·가격 미확인으로 비교 보류.'+
+     (explicit?' 상단은 직접 입력값을 표시합니다.':' 상단 자동 참고 모드.');
+   }
+  }else{
+   brokerNote.textContent='토스 앱의 실제 원금·전체 평가금액을 아직 입력하지 않았습니다. 14종목 계산값은 과거 사진·환산가격이 섞인 참고값입니다. 아래 실제 계좌금액 입력 버튼으로 대조하세요.';
+  }
+ }
  const combined=$('account-summary-total');if(!combined)return;
  const t=x.toss,k=x.kiwoom;
  if(finite(t?.invested)&&finite(k?.invested)){
@@ -382,6 +406,13 @@ function mount(){
  initEditor();
  initDividendEditor();
  applyPrivateDividendPhoto();
+ $('account-show-editor')?.addEventListener('click',()=>{
+  const outer=$('holdings-settings'),inner=$('account-edit');
+  if(outer)outer.open=true;
+  if(inner)inner.open=true;
+  if(inner?.scrollIntoView)inner.scrollIntoView({behavior:'smooth',block:'start'});
+  $('account-toss-invested')?.focus?.();
+ });
  $('account-summary-recalc')?.addEventListener('click',refreshReferenceTotals);
  document.addEventListener('isa-rendered',render);
  document.addEventListener('isa-portfolio-holdings-updated',render);
