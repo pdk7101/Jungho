@@ -1302,12 +1302,13 @@ const calcEnd=html.indexOf('window.ISA_KR_APP={',calcStart);
 truth(calcStart>=0&&calcEnd>calcStart,'domestic account aggregation function is accessible to local tests');
 const makeISA=(ps,prices,available={})=>{
  const funds=['reit','sol','robot','space','sofr','tr'].map(id=>({id}));
- const fn=new Function('FUNDS','positions','qtyValid','valid','freshQuote','verified','byId','day',
+ const fn=new Function('FUNDS','positions','qtyValid','valid','freshQuote','brokerLastPrice','verified','byId','day',
   html.slice(calcStart,calcEnd)+'\nreturn accountTotals;')(
   funds,ps,
   v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isInteger(Number(v))&&Number(v)>=0,
   v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0,
   id=>available[id]?{price:available[id]}:null,
+  ()=>null, // no authenticated Toss broker quote in synthetic ISA account fixture
   id=>id in prices,Object.fromEntries(Object.entries(prices).map(([id,close])=>[id,{close,date:'20261113'}])),
   s=>s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6)
  );
