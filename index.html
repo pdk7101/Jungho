@@ -1421,7 +1421,7 @@ function show(data){
    var alerts=[];
    if(typeof x.divergencePct==='number'&&Number.isFinite(x.divergencePct)&&Math.abs(x.divergencePct)>=1.5)alerts.push('참고 괴리율 1.5% 이상 · 시장가격/NAV 기준시점 확인');
    if(valid(x.tradingValueKRW)&&x.tradingValueKRW<50000000)alerts.push('거래대금 적음 · 실제 호가 확인');
-   if(x.shares5&&typeof x.shares5.value==='number'&&x.shares5.value<=-10)alerts.push('추정 발행좌수 5거래일 급감 · 실제 설정/환매 확인');
+   if(x.shares5&&typeof x.shares5.value==='number'&&x.shares5.value<=-10)alerts.push('KRX 상장좌수 5거래일 급감 · 실제 설정/환매 확인');
    var info=typeof x.priorCloseDifferencePct==='number'&&Math.abs(x.priorCloseDifferencePct)>1.8?
       '<p class="card-detail">전일 확정 종가 대비 KRX 확정 종가 차이 '+(x.priorCloseDifferencePct>=0?'+':'')+fmt(x.priorCloseDifferencePct,2)+'% · <b>비교 날짜가 달라 삭제하지 않고 구분 표시</b></p>':'';
    var navText=valid(x.nav)?fmt(x.nav,2)+'원':'확인 불가';
@@ -1433,7 +1433,7 @@ function show(data){
     '<p class="card-detail">KRX 상장좌수: '+(valid(x.impliedShares)?fmt(x.impliedShares):'미확인')+'좌</p>'+
     '<p class="card-detail">NAV: '+navText+' / 종가·NAV 차이: <b class="'+(Math.abs(x.divergencePct)>=1.5?'error':'')+'">'+divergenceText+'</b></p>'+
     '<p class="card-detail">거래량: '+(x.volume==null?'미확인':fmt(x.volume))+'좌 / 거래대금: '+formatKrw(x.tradingValueKRW)+'</p>'+
-    info+'<p class="sub">'+clean(x.comparisonNote||'시장가격과 NAV의 실제 기준시점은 제공되지 않음')+'</p>'+
+    info+'<p class="sub">'+clean(x.comparisonNote||'KRX 확인 기준일 미제공')+'</p>'+
     '<div class="divider"></div><p class="card-detail">시가총액: '+rate(x.cap5,'5거래일')+' · '+rate(x.cap20,'20거래일')+'</p>'+
     '<p class="card-detail">상장좌수: '+rate(x.shares5,'5거래일')+' · '+rate(x.shares20,'20거래일')+'</p>'+
     '<p class="sub">'+clean(x.historyNote||'자료 축적 상태 미확인')+'</p>'+
@@ -1445,15 +1445,26 @@ async function update(){
  var status=document.getElementById('etf-flow-status');
  if(status)status.textContent='ETF 규모·NAV 데이터 확인 중';
  try{
-  var r=await fetch('./metrics.json?noCache='+Date.now(),{cache:'no-store'});
-  if(!r.ok)throw Error('HTTP '+r.status);
-  show(await r.json());
+  if(window.ISA_PRIVATE_KRX?.configured?.()){
+   var personal=window.ISA_PRIVATE_KRX.metrics();
+   if(!personal){
+    if(status)status.textContent='개인 KRX 공식 규모·NAV 확인 대기';
+    var list=document.getElementById('etf-flow-list');if(list)list.innerHTML='';
+    return;
+   }
+   show(personal);
+  }else{
+   var r=await fetch('./metrics.json?noCache='+Date.now(),{cache:'no-store'});
+   if(!r.ok)throw Error('HTTP '+r.status);
+   show(await r.json());
+  }
  }catch(e){
   if(status)status.textContent='ETF 규모·NAV 정보 확인 실패: '+String(e.message||e);
  }
 }
 var reload=document.getElementById('reload');
 if(reload)reload.addEventListener('click',update);
+document.addEventListener('isa-kr-private-data',update);
 update();
 })();
 </script><script src="./insights.js" defer></script><script src="./personal-us-live.js" defer></script><script src="./us-dashboard.js?v=20261115-payout-card1" defer></script><script src="./us-krw.js?v=20261115-monthly-cony1" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script><script src="./portfolio-totals.js" defer></script><script src="./account-summary.js" defer></script><script src="./kr-dividends.js" defer></script></body></html>
