@@ -83,8 +83,15 @@ new Function('window','document','localStorage','sessionStorage','fetch',
  clientSource)(reopenedWindow,document,localStorage,sessionStorage,browserFetch);
 assert.equal(reopenedWindow.ISA_PRIVATE_KRX.configured(),true,
  'new browser visit automatically restores saved KRX connection');
-assert.equal((await reopenedWindow.ISA_PRIVATE_KRX.load()).items.filter(x=>x.ok).length,6,
+const beforeRecent=officialCalls;
+const reopened=await reopenedWindow.ISA_PRIVATE_KRX.load();
+assert.equal(reopened.items.filter(x=>x.ok).length,6,
  'new browser visit can retrieve official-shaped prices without retyping the token');
+assert.ok(officialCalls-beforeRecent>0&&officialCalls-beforeRecent<=20,
+ 'saved verified bars require only recent KRX page instead of all 100 calendar days');
+assert.match(reopened.latestExpected,/^\d{8}$/);
+assert.ok(reopened.items.every(x=>x.bars.length===40),
+ 'incremental refresh preserves 40-day analysis history');
 assert.ok(pageSource.includes('이 기기에 개인 접근 토큰 저장'),
  'UI must plainly explain persistent device storage');
 const cacheStamp=source('scripts/stamp-assets.js');
