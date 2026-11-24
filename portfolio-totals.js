@@ -135,7 +135,9 @@ function markAuto(account){
 function labelText(r){
  const p=r.invested!==null?'보유 매수원가 '+fmt(r.invested):'매수원가 미입력';
  const v=r.value!==null?' · 참고 평가 '+fmt(r.value):' · 평가액 미확인';
- return p+v+(r.priceMode==='photo'?' · 과거 사진가격 '+(r.priceDate||'날짜 미확인'):'');
+ const source=r.unitPrice!==null?' · 적용 단가 '+fmt(r.unitPrice)+
+  ' · '+(r.priceSource||'출처 미확인')+(r.priceDate?' · 기준 '+r.priceDate:' · 날짜 미확인'):'';
+ return p+v+source;
 }
 function renderEditor(containerId,market,ids){
  const place=$(containerId);if(!place)return;
