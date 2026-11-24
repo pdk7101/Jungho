@@ -316,7 +316,9 @@ details[open]>summary{margin-bottom:12px}
 .us-head-actions{display:flex;flex-wrap:wrap;gap:7px}
 .us-head-actions .us-header-button{white-space:nowrap}
 #us-live-badge{font-size:.84rem;font-weight:650;line-height:1.55}
-.account-summary h2{font-size:1rem;margin-bottom:0}.account-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}.account-head button{padding:7px 9px;font-size:.74rem;white-space:nowrap}
+.account-summary h2{font-size:1rem;margin-bottom:0}
+.account-actions{display:flex;flex-wrap:wrap;margin:6px 0 9px}.account-actions button{padding:8px 11px;font-size:.78rem}
+#account-broker-compare{line-height:1.6;margin:6px 0 12px;font-weight:600}.account-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}.account-head button{padding:7px 9px;font-size:.74rem;white-space:nowrap}
 .account-summary-table{width:100%;table-layout:fixed;border-collapse:collapse}
 .account-summary-table th,.account-summary-table td{padding:9px 6px;vertical-align:middle;min-width:0}
 .account-summary-table thead th{font-size:.75rem;font-weight:650;color:#b7c8df;text-align:right}
@@ -378,6 +380,8 @@ details[open]>summary{margin-bottom:12px}
   </tbody>
  </table>
  <p id="account-summary-total" class="account-summary-combined">계좌 합계 확인 중</p>
+ <div class="account-actions"><button id="account-show-editor" type="button" class="outline">토스 실제 계좌금액 입력·수정</button></div>
+ <p id="account-broker-compare" class="account-summary-foot" role="status">토스 실제 잔고와 계산 참고값의 차이를 확인합니다.</p>
  <p class="account-summary-foot" id="account-valuation-note">참고 평가액은 저장된 기준으로 표시합니다. 계좌·분배금 기록은 이 기기에만 저장되며 자동 동기화되지 않습니다.</p>
  <div class="account-dividend" aria-live="polite">
   <div class="account-dividend-title" id="account-dividend-label">누적 세후 배당·분배금</div>
@@ -426,7 +430,7 @@ details[open]>summary{margin-bottom:12px}
   <p id="positionMessage" class="fieldset-note" role="status">국내 ETF 보유정보 입력 대기</p>
   <h3>국내 주식 · 토스 일반계좌</h3>
   <div id="toss-domestic-positions"></div>
-  <p id="toss-domestic-message" class="fieldset-note" role="status">토스 국내주식 9종목의 수량·평단을 수정하면 토스 계좌 합계도 다시 계산합니다. 미입력 종목은 사진 참고값으로 구분합니다.</p>
+  <p id="toss-domestic-message" class="fieldset-note" role="status">토스 국내 9종목의 수량·평단과 원화 단가(선택)를 직접 보정할 수 있습니다. 과거 사진·KRX 참고가격은 실제 토스 잔고와 다를 수 있으며, 기록한 실제 계좌 합계는 덮어쓰지 않습니다.</p>
   <h3>미국 주식 · 토스 SCHD / AGNC / SPYM / CONY</h3>
   <div id="us-krw-editor"></div>
   <p id="us-holding-message" class="fieldset-note" role="status">미국 주식 보유정보 입력 대기</p>
@@ -446,7 +450,7 @@ details[open]>summary{margin-bottom:12px}
     <label>총투자금 (원)<input id="account-kiwoom-invested" type="number" min="0" step="1" placeholder="자동계산 또는 직접 입력"></label>
     <label>평가금액 (원)<input id="account-kiwoom-value" type="number" min="0" step="1" placeholder="자동계산 또는 직접 입력"></label>
    </div>
-   <p class="fieldset-note">계좌별 두 금액을 모두 입력해야 저장합니다. 빈 칸은 기존 스냅샷·시세 계산을 유지합니다. 계좌 합계를 직접 입력하면 수동 참고값으로 남습니다. 이후 보유정보를 수정하면 자동합계가 우선 적용되며, 수동 입력값은 삭제하지 않습니다.</p>
+   <p class="fieldset-note">계좌별 두 금액을 모두 입력해야 저장합니다. 빈 칸은 기존 스냅샷·시세 계산을 유지합니다. 계좌 합계를 직접 입력하면 토스 실제 잔고 기준값으로 남습니다. 이후 보유정보·시세를 수정해도 자동으로 덮어쓰지 않으며, 자동 참고 계산을 이용하려면 아래 버튼으로 전환합니다.</p>
    <div class="us-head-actions">
     <button type="button" id="account-total-save" class="us-header-button">입력한 계좌 합계 저장</button>
     <button type="button" id="account-total-auto" class="us-header-button outline">보유정보 자동합계 사용</button>
