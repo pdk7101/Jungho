@@ -491,7 +491,6 @@ function mount(){
  applyPrivateDividendPhoto();
  $('account-show-editor')?.addEventListener('click',()=>{
   const outer=$('holdings-settings'),inner=$('account-edit');if($('dashboard-settings'))$('dashboard-settings').open=true;
-  if($('cap-settings'))$('cap-settings').open=true;
   if(outer)outer.open=true;
   if(inner)inner.open=true;
   if(inner?.scrollIntoView)inner.scrollIntoView({behavior:'smooth',block:'start'});
