@@ -17,11 +17,12 @@ const num=v=>{
 };
 const nonneg=v=>{const n=num(v);return n!==null&&n>=0?n:null};
 const amount=v=>({krw:nonneg(v?.krw),usd:nonneg(v?.usd)});
-const sumBuckets=(list,path)=>{
+const sumBuckets=(list,path,signed=false)=>{
  const b={krw:0,usd:0};let count=0;
  for(const result of list){
   let v=result;for(const key of path)v=v?.[key];
-  const p=amount(v);if(p.krw===null)throw Error('토스 계좌 금액 형식 확인 실패');
+  const p=signed?{krw:num(v?.krw),usd:num(v?.usd)}:amount(v);
+  if(p.krw===null)throw Error('토스 계좌 금액 형식 확인 실패');
   b.krw+=p.krw;b.usd+=p.usd||0;count++;
  }
  return count?b:null;
@@ -41,7 +42,7 @@ function parsePortfolio(accounts,rateData,at=new Date().toISOString()){
  const invested=sumBuckets(accounts,['totalPurchaseAmount']);
  const valued=sumBuckets(accounts,['marketValue','amount']);
  const after=sumBuckets(accounts,['marketValue','amountAfterCost']);
- const profit=sumBuckets(accounts,['profitLoss','amount']);
+ const profit=sumBuckets(accounts,['profitLoss','amount'],true);
  const rows=[];
  for(const a of accounts){
   for(const item of a.items){
