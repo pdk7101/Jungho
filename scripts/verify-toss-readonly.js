@@ -58,13 +58,13 @@ const upstream=async(url,options)=>{
  throw Error('unexpected upstream request '+u.pathname);
 };
 const gateway=createGateway({clientId:'fake-id',clientSecret:'fake-secret',viewToken:password},upstream);
-async function invoke(method,site,key){
+async function invoke(method,site,key,target=gateway){
  const req={method,url:'/api/toss/holdings',headers:{
   origin:site,authorization:'Bearer '+key}};
  const res={status:null,headers:null,body:'',
   writeHead(code,headers){this.status=code;this.headers=headers;},
   end(body=''){this.body=body;}};
- await gateway.handle(req,res);return res;
+ await target.handle(req,res);return res;
 }
 assert.equal((await invoke('GET','https://untrusted.example',password)).status,403);
 assert.equal((await invoke('GET','https://pdk7101.github.io','bad')).status,401);
@@ -82,6 +82,20 @@ assert.ok(requests.every(x=>x.method==='GET'||x.path==='/oauth2/token'));
 assert.ok(requests.every(x=>x.redirect==='manual'));
 assert.equal((await invoke('GET','https://pdk7101.github.io',password)).status,200);
 assert.equal(requests.length,4,'short-lived server cache avoids repeated API traffic across mobile/PC');
+// Verify both authentication and IP failures are localized without exposing
+// the actual secret, token, account number or provider response body.
+const blocked=createGateway({clientId:'hidden-client-id',
+ clientSecret:'hidden-client-secret',viewToken:password},
+ async()=>new Response(JSON.stringify({error:'never-disclose-provider-payload'}),
+  {status:403}));
+const blockedResult=await invoke('GET','https://pdk7101.github.io',password,blocked);
+assert.equal(blockedResult.status,502);
+assert.deepEqual(JSON.parse(blockedResult.body),{
+ error:'토스 허용 IP 등록·접속 권한 확인',
+ stage:'토큰 발급',upstreamStatus:403
+});
+assert.equal(blockedResult.body.includes('hidden-client-secret'),false);
+assert.equal(blockedResult.body.includes('never-disclose-provider-payload'),false);
 const html=source('index.html'),account=source('account-summary.js'),
  client=source('personal-toss-client.js'),pages=source('.github/workflows/pages.yml'),
  stamps=source('scripts/stamp-assets.js');
