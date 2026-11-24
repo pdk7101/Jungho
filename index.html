@@ -1032,6 +1032,7 @@ function accountTotals(){
   value:missingHoldings.length||missingPrice.length?null:value,
   missingHoldings:missingHoldings,missingPrice:missingPrice,
   intraday:usedIntraday,close:usedClose,dates:dates,
+  holdingsKey:JSON.stringify(FUNDS.map(function(f){var h=positions[f.id]||{};return [f.id,h.qty??null,h.avg??null];})),
   count:FUNDS.length
  };
 }
