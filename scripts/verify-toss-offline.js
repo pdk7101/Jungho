@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const src=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const TOKEN='a'.repeat(64);
-const URL='https://sample-private-gateway.ts.net';
+const ENDPOINT='https://sample-private-gateway.ts.net';
 const CACHE='isa-toss-readonly-last-good-v1';
 const yesterday=new Date(Date.now()-24*60*60*1000).toISOString();
 const today=new Date().toISOString();
@@ -34,7 +34,7 @@ function storage(map){
  };
 }
 const local=new Map([
- ['isa-toss-readonly-url-v1',URL],
+ ['isa-toss-readonly-url-v1',ENDPOINT],
  ['isa-toss-readonly-view-v1',TOKEN]
 ]);
 const session=new Map();
@@ -110,9 +110,9 @@ assert.equal(third.api.snapshot(),null);
 assert.equal(third.api.snapshotMeta().state,'none');
 
 // Malformed and future-dated snapshots must not be displayed.
-newDevice.set('isa-toss-readonly-url-v1',URL);
+newDevice.set('isa-toss-readonly-url-v1',ENDPOINT);
 newDevice.set('isa-toss-readonly-view-v1',TOKEN);
-newDevice.set(CACHE,JSON.stringify({version:1,endpoint:URL,
+newDevice.set(CACHE,JSON.stringify({version:1,endpoint:ENDPOINT,
  data:brokerRecord(new Date(Date.now()+86400000).toISOString())}));
 const fourth=browser(async()=>{throw Error('offline');},newDevice);
 assert.equal(fourth.api.snapshot(),null,'future dated cached official snapshot rejected');
