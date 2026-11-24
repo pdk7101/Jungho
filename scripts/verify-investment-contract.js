@@ -1222,7 +1222,7 @@ truth(html.includes('id="account-summary"')&&
  html.includes('id="toss-total-invested"')&&html.includes('id="toss-total-value"')&&
  html.includes('id="kiwoom-total-invested"')&&html.includes('id="kiwoom-total-value"'),
  'both Toss/Kiwoom total-invested and valuation amounts sit at the top of the program');
-truth(html.indexOf('id="account-summary"')<html.indexOf('국내 ETF 공식 확정 종가 확인')&&
+truth(html.indexOf('id="account-summary"')<html.indexOf('id="krx-last-status"')&&
  html.indexOf('id="account-toss-invested"')>html.indexOf('id="holdings-settings"'),
  'account overview is above live quotes while editing remains inside existing holdings settings');
 truth(accountCode.includes("const US=['schd','spym','cony','agnc','spacex']")&&
