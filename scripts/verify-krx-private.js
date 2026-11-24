@@ -13,10 +13,15 @@ const funds=[['reit','329200'],['sol','0167B0'],['robot','469070'],
  ['space','0131V0'],['sofr','455030'],['tr','278530']];
 const token='T'.repeat(64),origin='https://pdk7101.github.io';
 const host='https://personal-krx-test.workers.dev';
-let officialCalls=0;
+let officialCalls=0,stockDenied=false;
 const officialFetch=async request=>{
  officialCalls++;
- const date=new URL(request).searchParams.get('basDd');
+ const url=new URL(request),date=url.searchParams.get('basDd');
+ if(url.pathname.includes('/sto/')){
+  if(stockDenied)return new Response('{}',{status:403});
+  const code=url.pathname.endsWith('/stk_bydd_trd')?'003280':'321370';
+  return new Response(JSON.stringify({OutBlock_1:[{BAS_DD:date,ISU_CD:code,TDD_CLSPRC:'1500'}]}),{status:200});
+ }
  assert.match(date,/^\d{8}$/);
  return new Response(JSON.stringify({OutBlock_1:[...funds,['biotech','0229F0'],['media','228810']].map(([id,code],i)=>{
   const price=3800+i*1350+Number(date.slice(-2))*5;
@@ -58,6 +63,9 @@ const snapshot=await window.ISA_PRIVATE_KRX.load();
 assert.equal(snapshot.items.length,6);
 assert.equal(snapshot.extraQuotes.biotech.code,'0229F0');
 assert.equal(snapshot.extraQuotes.media.code,'228810');
+assert.equal(snapshot.extraQuotes.hongah.code,'003280');
+assert.equal(snapshot.extraQuotes.sensor.code,'321370');
+assert.equal(snapshot.extraErrors.length,0);
 assert.equal(window.ISA_PRIVATE_KRX.extraQuote('biotech').date,snapshot.items[0].date);
 assert.equal(snapshot.items.some(x=>x.id==='biotech'||x.id==='media'),false,'Toss-only prices cannot change six ISA strategy items');
 for(const ticker of snapshot.items){
@@ -96,6 +104,12 @@ assert.ok(officialCalls-beforeRecent>0&&officialCalls-beforeRecent<=20,
 assert.match(reopened.latestExpected,/^\d{8}$/);
 assert.ok(reopened.items.every(x=>x.bars.length===40),
  'incremental refresh preserves 40-day analysis history');
+stockDenied=true;
+const denied=await reopenedWindow.ISA_PRIVATE_KRX.load();
+assert.ok(denied.items.every(x=>x.ok),'stock permission failure must not block ETFs');
+assert.equal(denied.extraErrors.length,2);
+assert.equal(denied.extraQuotes.hongah.close,1500,'last verified stock quote remains available');
+stockDenied=false;
 assert.ok(pageSource.includes('이 기기에 개인 접근 토큰 저장'),
  'UI must plainly explain persistent device storage');
 const cacheStamp=source('scripts/stamp-assets.js');
