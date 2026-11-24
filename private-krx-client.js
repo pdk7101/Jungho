@@ -10,6 +10,9 @@ const OFFICIAL='https://openapi.krx.co.kr/contents/OPP/USES/service/OPPUSES003_S
 const URL_KEY='isa-krx-private-worker-url-v1';
 const TOKEN_KEY='isa-krx-private-view-token-v1';
 const SESSION_ONLY_KEY='isa-krx-private-session-only-v1';
+// Private device-only copy of last successfully VERIFIED official daily close.
+// Never included in GitHub static Pages nor labeled as a live quote.
+const LAST_GOOD_KEY='isa-krx-last-good-device-v1';
 let workerUrl='',token='',snapshot=null,metricSnapshot=null,metricHistory=null,busy=false;
 const read=(storage,key)=>{try{return storage.getItem(key)||'';}catch(_){return ''}};
 const write=(storage,key,val)=>{try{storage.setItem(key,val);return true}catch(_){return false}};
@@ -25,6 +28,39 @@ token=savedDeviceToken||savedTabToken;
 // trusted-device persistence without exposing credentials to the public site.
 if(!savedDeviceToken&&savedTabToken.length>=20&&workerUrl&&read(sessionStorage,SESSION_ONLY_KEY)!=='1'){
  if(write(localStorage,TOKEN_KEY,savedTabToken))remove(sessionStorage,TOKEN_KEY);
+}
+function lastGood(){
+ if(!configured())return null;
+ try{
+  const saved=JSON.parse(read(localStorage,LAST_GOOD_KEY)||'null');
+  if(!saved||saved.version!==1||saved.worker!==workerUrl||
+   !saved.data||!Array.isArray(saved.data.items))return null;
+  const data=saved.data,stamp=Date.parse(data.fetchedAt);
+  if(!Number.isFinite(stamp)||stamp>Date.now()+300000||
+   Date.now()-stamp>12*86400000||data.officialConfirmed!==true||
+   !String(data.source||'').startsWith('KRX')||data.items.length!==6)return null;
+  for(const [id,code] of IDS){
+   const x=data.items.find(i=>i.id===id&&i.code===code);
+   if(!x||x.ok!==true||!iso(x.date)||!positive(x.close)||
+    !Array.isArray(x.bars)||x.bars.length<40||
+    !x.trend||!positive(x.trend.ma20)||!positive(x.trend.ma5))return null;
+  }
+  return data;
+ }catch(_){return null;}
+}
+function saveLastGood(data){
+ if(!configured()||data?.status!=='ok'||!Array.isArray(data.items)||
+  data.items.length!==6||data.items.some(i=>!i.ok))return false;
+ try{
+  const before=lastGood();
+  const oldLast=before?.items?.map(x=>x.date).sort().at(-1);
+  const newLast=data.items.map(x=>x.date).sort().at(-1);
+  if(oldLast&&newLast<oldLast)return false;
+  const value=JSON.stringify({version:1,worker:workerUrl,data});
+  if(value.length>200000)return false;
+  localStorage.setItem(LAST_GOOD_KEY,value);
+  return true;
+ }catch(_){return false;}
 }
 function endpoint(raw){
  const u=new URL(String(raw).trim());
@@ -165,6 +201,7 @@ async function load(){
   const computed=secondary(items,byId);
   metricSnapshot={...computed.metrics,fetchedAt:stamp};metricHistory=computed.history;
   const validCount=items.filter(x=>x.ok).length;
+  saveLastGood(snapshot);
   if(status)status.textContent='공식 KRX 개인 조회 '+validCount+'/6종목 · 기준일 '+String(items.filter(x=>x.ok).map(x=>x.date).sort().at(-1)||'미확인')+
    ' · 실제 체결가 아님 · 개인 브라우저에서만 표시';
   return snapshot;
@@ -178,6 +215,7 @@ function configured(){return !!(workerUrl&&token&&token.length>=20);}
 function setConnection(raw,secret,remember){
  const url=endpoint(raw),v=String(secret||'').trim();
  if(v.length<20)throw Error('접근 토큰은 20자 이상이어야 합니다.');
+ if(url!==workerUrl)remove(localStorage,LAST_GOOD_KEY);
  workerUrl=url;token=v;
  if(!write(localStorage,URL_KEY,url))throw Error('Worker 주소를 브라우저에 저장할 수 없습니다.');
  remove(localStorage,TOKEN_KEY);
@@ -194,7 +232,7 @@ function setConnection(raw,secret,remember){
 }
 function disconnect(){
  workerUrl='';token='';snapshot=null;metricSnapshot=null;metricHistory=null;
- remove(localStorage,URL_KEY);remove(localStorage,TOKEN_KEY);remove(sessionStorage,TOKEN_KEY);remove(sessionStorage,SESSION_ONLY_KEY);
+ remove(localStorage,URL_KEY);remove(localStorage,TOKEN_KEY);remove(localStorage,LAST_GOOD_KEY);remove(sessionStorage,TOKEN_KEY);remove(sessionStorage,SESSION_ONLY_KEY);
 }
 function mount(){
  const url=document.getElementById('krx-private-worker');
@@ -225,7 +263,7 @@ function mount(){
  };
 }
 window.ISA_PRIVATE_KRX={configured,load,snapshot:()=>snapshot,metrics:()=>metricSnapshot,
- metricHistory:()=>metricHistory,setConnection,disconnect,validate,calculate};
+ metricHistory:()=>metricHistory,lastGood,setConnection,disconnect,validate,calculate};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});
 else mount();
 })();
