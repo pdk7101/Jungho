@@ -144,8 +144,15 @@ function row(market,id){
    unitPrice=official.unitPrice;priceSource=official.source;priceDate=official.fetchedAt;priceMode='official-broker';
   }
  }
- if(unitPrice===null&&positive(oldQty)&&known(snap?.value)){
-  unitPrice=Number(snap.value)/oldQty;
+ // For domestic holdings, an older official close must not replace a more
+ // recent personally recorded Toss price. This is valuation only, never a
+ // new KRX bar or a buy/sell signal. Equal-date official quotes take priority.
+ const photoPrice=positive(oldQty)&&known(snap?.value)&&positive(Number(snap.value)/oldQty)?
+  Number(snap.value)/oldQty:null;
+ const olderKrClose=!us&&priceMode==='kr-reference'&&shot.date&&priceDate&&
+  String(priceDate).slice(0,10)<String(shot.date).slice(0,10);
+ if(photoPrice!==null&&(unitPrice===null||olderKrClose)){
+  unitPrice=photoPrice;
   priceSource='과거 증권사 사진 환산 단가';priceDate=shot.date;priceMode='photo';
  }
  const zero=qty===0,hasBasis=zero||(qty!==null&&avg!==null&&qty>=0);
