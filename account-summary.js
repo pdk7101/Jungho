@@ -315,7 +315,9 @@ function displayAccount(id,data){
   return;
  }
  let sourceText=data.source+(data.date?' · 기준 '+String(data.date).slice(0,16).replace('T',' '):' · 기준일 미확인');
- if(id==='toss'&&!data.brokerApi)sourceText='과거 저장·사진 참고액 (현재 토스 잔고 아님) · '+(data.date||'기준일 없음');
+ if(id==='toss'&&!data.brokerApi)sourceText=(!data.estimated?
+  '증권사 앱 전체 금액 직접 기록 (자동 연결 아님) · ':'과거 저장·사진 참고액 (현재 토스 잔고 아님) · ')+
+  (data.date||'기준일 없음');
  if(id==='kiwoom'&&!data.brokerApi)sourceText=data.source+' · 기준 '+(data.date||'미확인')+
   (data.locked?' · 마지막 검증값 보존':'');
  source.textContent=sourceText;
