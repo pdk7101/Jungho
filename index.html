@@ -357,6 +357,11 @@ details[open]>summary{margin-bottom:12px}
 .account-edit .grid label{font-size:.8rem}
 .account-edit input{font-size:.92rem}
 .account-edit .us-head-actions{margin-top:10px}
+.toss-broker-holdings{display:grid;gap:8px;margin-top:10px;max-height:440px;overflow:auto}
+.toss-broker-item{border:1px solid #425571;border-radius:9px;padding:9px 11px;line-height:1.6}
+.toss-broker-item strong{display:block;font-size:.83rem}
+.toss-broker-item small{display:block;color:#b7c8dd;overflow-wrap:anywhere}
+#toss-broker-remember{width:18px;min-width:18px;height:18px;margin-right:6px;vertical-align:middle}
 </style><script src="./live-prices.js"></script><script src="./private-krx-client.js"></script>
 </head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
@@ -380,7 +385,7 @@ details[open]>summary{margin-bottom:12px}
   </tbody>
  </table>
  <p id="account-summary-total" class="account-summary-combined">계좌 합계 확인 중</p>
- <div class="account-actions"><button id="account-show-editor" type="button" class="outline">토스 실제 계좌금액 입력·수정</button></div>
+ <div class="account-actions"><button id="account-show-editor" type="button" class="outline">토스 실제 계좌금액 수동 보정</button></div>
  <p id="account-broker-compare" class="account-summary-foot" role="status">토스 실제 잔고와 계산 참고값의 차이를 확인합니다.</p>
  <p class="account-summary-foot" id="account-valuation-note">참고 평가액은 저장된 기준으로 표시합니다. 계좌·분배금 기록은 이 기기에만 저장되며 자동 동기화되지 않습니다.</p>
  <div class="account-dividend" aria-live="polite">
@@ -390,6 +395,25 @@ details[open]>summary{margin-bottom:12px}
   <p class="account-dividend-source" id="account-dividend-source"></p>
  </div>
 </section>
+<details class="panel" id="toss-broker-config">
+ <summary><b>토스증권 공식 계좌 자동 조회 · 휴대폰/노트북 공용</b></summary>
+ <p class="fieldset-note">본인 전용 HTTPS 조회 서버에서 토스증권 공식 API를 호출합니다. 토스 Client ID·Client Secret을 이 화면이나 공개 GitHub에 입력하지 마세요. 계좌 조회만 지원하며 매매 주문은 하지 않습니다.</p>
+ <div class="grid">
+  <label>내 전용 조회 서버 HTTPS 주소<input id="toss-broker-url" type="url" autocomplete="off" placeholder="https://toss.나의개인도메인.example"></label>
+  <label>개인 조회 암호 (토스 API Secret 아님)<input id="toss-broker-view-token" type="password" autocomplete="off" placeholder="별도 생성한 32자 이상 조회 토큰"></label>
+ </div>
+ <label class="fieldset-note"><input id="toss-broker-remember" type="checkbox" checked> 이 개인 기기에 조회 암호 기억 · 다음 방문에도 자동 조회</label>
+ <div class="flex">
+  <button type="button" id="toss-broker-connect">공식 계좌 연결</button>
+  <button type="button" id="toss-broker-reload">잔고 다시 조회</button>
+  <button type="button" id="toss-broker-disconnect">연결 해제</button>
+ </div>
+ <p class="fieldset-note" id="toss-broker-status" role="status">토스 계좌 조회 서버 연결 전</p>
+ <details><summary>토스 보유 종목별 수량·평단·평가액 보기</summary>
+  <div id="toss-broker-holdings" class="toss-broker-holdings">계좌 연결 후 조회 가능합니다.</div>
+ </details>
+ <p class="fieldset-note">토스 공식 API의 원화·달러 금액은 각각 별도 합산됩니다. 표시 환율로 원화 합계를 환산한 값은 토스 앱 평가금액과 다를 수 있습니다. 인증서버는 고정 공인IP를 가진 본인 전용 서버에서 운영해야 합니다. <a href="https://github.com/pdk7101/Jungho/blob/main/TOSS_READONLY_SETUP.md" target="_blank" rel="noopener noreferrer">휴대폰·노트북 연결 안내</a></p>
+</details>
 <section class="panel flex"><div><b>국내 ETF 공식 확정 종가 확인 · 장 마감 후 다음 거래일 주문 준비</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">공식 KRX 확정 일봉 확인 중 · 인증된 장중 체결가 서비스는 미연결</div></div><button id="reload">↻ 공식 종가 조회</button></section>
 <div id="alert">KRX 공식 확정 일봉 기준 분석입니다. 실제 주문 및 체결은 증권사에서 확인하세요.</div>
 <details class="panel" id="krx-private-config">
@@ -1471,4 +1495,4 @@ if(reload)reload.addEventListener('click',update);
 document.addEventListener('isa-kr-private-data',update);
 update();
 })();
-</script><script src="./insights.js" defer></script><script src="./personal-us-live.js" defer></script><script src="./us-dashboard.js?v=20261115-payout-card1" defer></script><script src="./us-krw.js?v=20261115-monthly-cony1" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script><script src="./portfolio-totals.js" defer></script><script src="./account-summary.js" defer></script><script src="./kr-dividends.js" defer></script></body></html>
+</script><script src="./insights.js" defer></script><script src="./personal-us-live.js" defer></script><script src="./us-dashboard.js?v=20261115-payout-card1" defer></script><script src="./us-krw.js?v=20261115-monthly-cony1" defer></script><script src="./us-signals.js" defer></script><script src="./unattended-orders.js" defer></script><script src="./portfolio-import.js" defer></script><script src="./intraday-signals.js" defer></script><script src="./portfolio-totals.js" defer></script><script src="./personal-toss-client.js" defer></script><script src="./account-summary.js" defer></script><script src="./kr-dividends.js" defer></script></body></html>
