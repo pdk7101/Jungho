@@ -167,7 +167,8 @@ async function load(){
  if(status)status.textContent='KRX 공식 확정 일봉을 개인 연결로 확인 중입니다.';
  try{
   const origin=endpoint(workerUrl);
-  const pages=await Promise.all([0,1,2,3,4].map(async page=>{
+  const saved=lastGood();
+  const requestPage=async page=>{
    const controller=new AbortController();
    const timeout=setTimeout(()=>controller.abort(),45000);
    try{
@@ -179,12 +180,25 @@ async function load(){
     if(!response.ok)throw Error('개인 KRX 조회 실패 ('+response.status+'): '+String(body.error||'승인 확인 필요').slice(0,120));
     return body;
    }finally{clearTimeout(timeout);}
-  }));
-  const expected=pages[0]?.latestExpected;
+  };
+  const recent=await requestPage(0),expected=recent?.latestExpected;
   if(!iso(expected))throw Error('KRX 기준 거래일 확인 실패');
-  const rows=pages.flatMap((p,index)=>validate(p,index,expected)),group={};
+  const recentRows=validate(recent,0,expected),group={};
   for(const [id] of IDS)group[id]=new Map();
-  for(const x of rows)group[x.id].set(x.date,x);
+  const savedDates=saved?.items?.map(x=>x.date)||[];
+  const cutoff=new Date(expected.slice(0,4)+'-'+expected.slice(4,6)+'-'+expected.slice(6)+'T12:00:00Z');
+  cutoff.setUTCDate(cutoff.getUTCDate()-10);
+  const cutoffDay=cutoff.toISOString().slice(0,10).replace(/-/g,'');
+  const canReuse=savedDates.length===6&&savedDates.every(d=>d>=cutoffDay&&d<=expected)&&
+   IDS.every(([id])=>recentRows.some(x=>x.id===id));
+  if(canReuse){
+   for(const item of saved.items)for(const bar of item.bars)
+    group[item.id].set(bar.date,{...bar,id:item.id,code:item.code});
+  }else{
+   const pages=await Promise.all([1,2,3,4].map(requestPage));
+   for(const x of pages.flatMap((p,index)=>validate(p,index+1,expected)))group[x.id].set(x.date,x);
+  }
+  for(const x of recentRows)group[x.id].set(x.date,x);
   const byId={};
   const items=IDS.map(([id,code])=>{
    const bars=[...group[id].values()].sort((a,b)=>a.date.localeCompare(b.date));
@@ -196,7 +210,7 @@ async function load(){
   // A connected but stale market-day response must never be displayed as today's close.
   const stamp=new Date().toISOString();
   snapshot={fetchedAt:stamp,source:'KRX OPEN API · ETF 일별매매정보 (개인 인증 조회)',
-   sourceUrl:OFFICIAL,officialConfirmed:true,status:items.every(x=>x.ok)?'ok':'partial',
+   sourceUrl:OFFICIAL,officialConfirmed:true,latestExpected:expected,status:items.every(x=>x.ok)?'ok':'partial',
    items,errors:items.filter(x=>!x.ok).map(x=>x.id+': '+x.error)};
   const computed=secondary(items,byId);
   metricSnapshot={...computed.metrics,fetchedAt:stamp};metricHistory=computed.history;
