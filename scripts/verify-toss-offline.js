@@ -117,7 +117,7 @@ newDevice.set(CACHE,JSON.stringify({version:1,endpoint:ENDPOINT,
  data:brokerRecord(new Date(Date.now()+86400000).toISOString())}));
 const fourth=browser(async()=>{throw Error('offline');},newDevice);
 assert.equal(fourth.api.snapshot(),null,'future dated cached official snapshot rejected');
-assert.ok(src('account-summary.js').includes('마지막 저장 잔고'));
+assert.ok(src('account-summary.js').includes('마지막 토스 공식 잔고'));
 assert.ok(src('account-summary.js').includes('!data.brokerApi'),
  'cached real broker data is not rewritten by the mixed-source reference lock');
 assert.ok(src('index.html').includes('마지막 잔고를 이 기기에 자동 저장'));
