@@ -154,13 +154,16 @@ function row(market,id){
  // For domestic holdings, an older official close must not replace a more
  // recent personally recorded Toss price. This is valuation only, never a
  // new KRX bar or a buy/sell signal. Equal-date official quotes take priority.
- const photoPrice=positive(oldQty)&&known(snap?.value)&&positive(Number(snap.value)/oldQty)?
-  Number(snap.value)/oldQty:null;
- const olderKrClose=!us&&priceMode==='kr-reference'&&shot.date&&priceDate&&
-  String(priceDate).slice(0,10)<String(shot.date).slice(0,10);
+ const displayedPhoto=!us&&positive(snap?.current)&&/^\d{4}-\d{2}-\d{2}$/.test(String(snap?.priceDate||''));
+ const photoDay=displayedPhoto?snap.priceDate:shot.date;
+ const photoPrice=displayedPhoto?Number(snap.current):
+  positive(oldQty)&&known(snap?.value)&&positive(Number(snap.value)/oldQty)?Number(snap.value)/oldQty:null;
+ const olderKrClose=!us&&priceMode==='kr-reference'&&photoDay&&priceDate&&
+  String(priceDate).slice(0,10)<String(photoDay).slice(0,10);
  if(photoPrice!==null&&(unitPrice===null||olderKrClose)){
   unitPrice=photoPrice;
-  priceSource='과거 증권사 사진 환산 단가';priceDate=shot.date;priceMode='photo';
+  priceSource=displayedPhoto?'토스 사진 표시 단가 (참고·실시간 아님)':'과거 증권사 사진 환산 단가';
+  priceDate=photoDay;priceMode='photo';
  }
  const zero=qty===0,hasBasis=zero||(qty!==null&&avg!==null&&qty>=0);
  const hasPrice=zero||hasBasis&&unitPrice!==null;
