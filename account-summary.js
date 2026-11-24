@@ -498,7 +498,7 @@ function mount(){
  $('account-summary-recalc')?.addEventListener('click',refreshAll);
  const auto=()=>{if(document.visibilityState!=='hidden'&&Date.now()-lastAuto>=5*60000)refreshAll().catch(()=>{});};
  lastAuto=Date.now();
- setInterval(auto,60000);
+ if(typeof setInterval==='function')setInterval(auto,60000);
  document.addEventListener('visibilitychange',auto);
  window.addEventListener('pageshow',auto);
  window.addEventListener('online',()=>{lastAuto=0;auto();});
