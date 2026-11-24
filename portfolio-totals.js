@@ -255,5 +255,5 @@ function renderEditors(){
 window.ISA_PORTFOLIO_TOTALS={totals,row,markAuto,renderEditors,getMode:()=>read(MODE)};
 renderEditors();
 window.addEventListener('pageshow',()=>renderEditors());
-document.addEventListener('isa-toss-broker-data',()=>renderEditors());
+document.addEventListener?.('isa-toss-broker-data',()=>renderEditors());
 })();
