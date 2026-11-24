@@ -25,7 +25,10 @@ function fx(){
  return {rate:Number(r.usdKrw),source:'공개 비공식 참고 환율',when:r.observedAt,manual:false};
 }
 function priceKrw(id,priceUsd){
- const p=holdings()[id]||{},rate=fx(),privateQuote=window.ISA_PERSONAL_US?.quote?.(id);
+ const p=holdings()[id]||{};
+ if(finitePositive(p.krwCurrent)&&p.krwDay===day())
+  return {amount:Number(p.krwCurrent),manual:true,source:'토스 현재가 직접 입력',stamp:p.krwDay};
+ const rate=fx(),privateQuote=window.ISA_PERSONAL_US?.quote?.(id);
  const broker=window.ISA_TOSS_BROKER?.snapshot?.(),brokerState=window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state,
   brokerAt=Date.parse(broker?.fetchedAt||''),brokerAge=Date.now()-brokerAt;
  const bar=window.ISA_US_APP?.getData?.()?.items?.find(x=>x.id===id);
@@ -52,8 +55,6 @@ function priceKrw(id,priceUsd){
  if(rate&&finitePositive(priceUsd))return {amount:Number(priceUsd)*rate.rate,manual:false,kind:'usd-close',
   usd:Number(priceUsd),fxRate:rate.rate,fxAt:rate.when,fxSource:rate.source,fxManual:rate.manual,
   source:'미국장 USD 종가 × '+rate.source,stamp:closeDate||null};
- if(finitePositive(p.krwCurrent)&&p.krwDay===day())
-  return {amount:Number(p.krwCurrent),manual:true,source:'토스 현재가 직접 입력',stamp:p.krwDay};
  return null;
 }
 
