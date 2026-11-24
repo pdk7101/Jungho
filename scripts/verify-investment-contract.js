@@ -1351,7 +1351,7 @@ equal(aggStore.read('isa-account-totals-v1').toss.invested,5000,
  'explicit user-entered Toss whole-account total is saved only to the browser');
 equal(accountWindow.ISA_ACCOUNT_SUMMARY.getTotals().toss.value,4300,
  'manual Toss total overrides older screenshots without modifying any stock holdings');
-truth(cards['toss-total-source'].textContent.includes('사용자 직접 입력'),
+truth(cards['toss-total-source'].textContent.includes('증권사 앱 전체 금액 직접 기록'),
  'manually entered account value is labeled with its source');
 handlers['account-total-reset:click']();
 equal(aggStore.read('isa-account-totals-v1'),null,
