@@ -362,7 +362,7 @@ details[open]>summary{margin-bottom:12px}
 .account-edit .grid label{font-size:.8rem}
 .account-edit input{font-size:.92rem}
 .account-edit .us-head-actions{margin-top:10px}
-</style><script src="./live-prices.js"></script>
+</style><script src="./live-prices.js"></script><script src="./private-krx-client.js"></script>
 </head><body><main>
 <header><div><small>내 ISA · 무료 웹앱</small><h1>ETF 6종목 매수판단</h1><div class="sub">5일·20일 이동평균선 및 교차 확인 · 같은 주소에서 확인</div></div><span class="pill" id="signal">조회 전</span></header>
 <section class="panel account-summary" id="account-summary" aria-labelledby="account-summary-title">
@@ -394,6 +394,21 @@ details[open]>summary{margin-bottom:12px}
 </section>
 <section class="panel flex"><div><b>국내 ETF 공식 확정 종가 확인 · 장 마감 후 다음 거래일 주문 준비</b><div id="updated">마지막 자료 수집 시각 확인 중</div><div id="checked" class="sub">현재 화면 확인 전</div><div id="liveStatus" class="sub">공식 KRX 확정 일봉 확인 중 · 인증된 장중 체결가 서비스는 미연결</div></div><button id="reload">↻ 지금 가격 조회</button></section>
 <div id="alert">한국거래소(KRX) 확정 일봉만 판단에 사용합니다. 공식 장중 체결가가 없으면 임의로 매수 신호를 생성하지 않습니다.</div>
+<details class="panel" id="krx-private-config">
+ <summary><b>내 전용 KRX 공식 종가 연결 (선택)</b></summary>
+ <p class="fieldset-note">한국거래소 ETF 일별매매정보를 본인만 확인하는 연결입니다. 공식 가격·NAV는 공개 GitHub에 저장하지 않습니다. Worker에는 KRX 인증키를 Secret으로 저장하고, 이 화면에는 별도의 개인 접근 토큰만 입력하세요.</p>
+ <div class="grid">
+  <label>개인 Cloudflare Worker HTTPS 주소<input id="krx-private-worker" type="url" autocomplete="off" placeholder="https://내-krx-연결.workers.dev"></label>
+  <label>개인 접근 토큰 (KRX 인증키 아님)<input id="krx-private-token" type="password" autocomplete="off" placeholder="Worker KRX_VIEW_TOKEN · 20자 이상"></label>
+ </div>
+ <label class="fieldset-note"><input id="krx-private-remember" type="checkbox" checked> 이 브라우저 탭에서만 접근 토큰 기억 (탭 세션 종료까지)</label>
+ <div class="flex">
+  <button type="button" id="krx-private-connect">연결 및 공식 확정 종가 조회</button>
+  <button type="button" id="krx-private-disconnect">개인 연결 해제</button>
+ </div>
+ <p class="fieldset-note" id="krx-private-status" role="status">개인 KRX 연결 확인 전</p>
+ <p class="fieldset-note"><a href="https://github.com/pdk7101/Jungho/blob/main/PRIVATE_KRX_SETUP.md" target="_blank" rel="noopener noreferrer">개인 전용 시세 연결 안내</a> · 원화 가격은 확정 거래일 기준이며 실시간 호가가 아닙니다.</p>
+</details>
 <section class="panel" id="cap-settings">
  <h2>국내 ETF 매수상한 · 방식 선택</h2>
  <label>매수상한 방식<select id="capMode">
@@ -1027,6 +1042,7 @@ function accountTotals(){
 window.ISA_KR_APP={
  accountTotals:accountTotals,
  renderCards:function(){return render();},
+ refresh:function(){return refresh();},
  pairPlan:pairPlan,
  solDailyEntry:solDailyEntry,
  effectiveCap:effectiveCap,
@@ -1257,7 +1273,7 @@ function render(){
  }else costText='<p class="sub">보유 평단가와 수량을 입력하면 평단 인하 여부 및 예상 매수 후 평단을 계산합니다. 수량 0이면 미보유로 처리합니다.</p>';
  var vol=valid(t.avgVolume20)&&t.avgVolume20>0&&Number.isFinite(t.volumeToday)?(t.volumeToday/t.avgVolume20).toFixed(2)+'배':'미확인';
  d.innerHTML='<div class="divider"></div><div class="flex"><strong>'+money(p)+'</strong><span class="status state-'+v.type+'">'+(prepared&&v.type==='wait'?'보류':actionLabel(v.type))+'</span></div>'+
- '<p class="sub">'+(freshQuote(f.id)?'현재 표시 가격은 비공식 당일 조회가 · 5·20일선 및 박스권은 '+day(x.date)+' 확정 일봉 기준':'게시 일봉 종가 '+day(x.date))+' · 20거래일 '+day(x.rangeStart)+'~'+day(x.rangeEnd)+'</p>'+
+ '<p class="sub">'+(freshQuote(f.id)?'현재 표시 가격은 비공식 당일 조회가 · 5·20일선 및 박스권은 '+day(x.date)+' 확정 일봉 기준':'KRX 공식 확정 종가 '+day(x.date))+' · 20거래일 '+day(x.rangeStart)+'~'+day(x.rangeEnd)+'</p>'+
  chart(x.bars)+
  '<div class="leg20"><span><i class="legend-dot" style="background:#f87171"></i>종가</span><span><i class="legend-dot" style="background:#24bf9a"></i>5일선</span><span><i class="legend-dot" style="background:#eab308"></i>20일선</span><span><i class="legend-dot" style="background:#6b829f;height:8px;width:5px"></i>거래량</span></div>'+
  '<div class="metrics"><div><small>20거래일 저가</small><strong>'+money(low)+'</strong></div><div><small>20거래일 고가</small><strong>'+money(high)+'</strong></div><div><small>하단 30% 기준</small><strong>'+money(b.b30)+'</strong></div><div><small>하단 20% 기준</small><strong>'+money(b.b20)+'</strong></div><div><small>5일 이동평균</small><strong>'+avgMoney(t.ma5)+'</strong></div><div><small>20일 이동평균</small><strong>'+avgMoney(t.ma20)+'</strong></div></div>'+
@@ -1270,6 +1286,11 @@ function render(){
  el('manual').onchange=function(ev){if(valid(ev.target.value))manual[f.id]=Number(ev.target.value);else delete manual[f.id];render();};
 }
 async function refreshLiveQuotes(){
+ if(window.ISA_livePriceFetch?.officialOnly){
+  var status=el('liveStatus');
+  if(status)status.textContent='실시간 체결가 미연결 · KRX 공식 확정 일봉만 분석';
+  return;
+ }
  if(liveBusy)return;
  liveBusy=true;
  var target=el('liveStatus');
@@ -1300,9 +1321,16 @@ async function refresh(){
  var button=el('reload'),oldSignature=dataSignature,oldFetchedAt=loadTime;
  button.disabled=true;button.textContent='현재가 조회 중...';el('signal').textContent='일봉 및 당일 시세 조회 중';
  try{
-  var res=await fetch('./quotes.json?nocache='+Date.now(),{cache:'no-store'});
-  if(!res.ok)throw Error('HTTP '+res.status);
-  var data=await res.json();if(!Array.isArray(data.items))throw Error('잘못된 자료 형식');
+  var privateMode=window.ISA_PRIVATE_KRX?.configured?.();
+  var data;
+  if(privateMode){
+   data=await window.ISA_PRIVATE_KRX.load();
+  }else{
+   var res=await fetch('./quotes.json?nocache='+Date.now(),{cache:'no-store'});
+   if(!res.ok)throw Error('HTTP '+res.status);
+   data=await res.json();
+  }
+  if(!Array.isArray(data.items))throw Error('잘못된 자료 형식');
   var next={};data.items.forEach(function(x){if(FUNDS.some(function(f){return f.id===x.id;}))next[x.id]=x;});
   if(!FUNDS.every(function(f){return !!next[f.id];}))throw Error('일부 종목 데이터 누락');
   var newSignature=JSON.stringify(FUNDS.map(function(f){var x=next[f.id];return [x.ok,x.date,x.close,x.low20,x.high20,x.trend&&x.trend.ma5,x.trend&&x.trend.ma20];}));
@@ -1326,7 +1354,12 @@ async function refresh(){
    el('alert').appendChild(guide);
   }
   manual={};render();
+  document.dispatchEvent(new Event('isa-kr-private-data'));
  }catch(err){
+  if(window.ISA_PRIVATE_KRX?.configured?.()){
+   byId={};loadTime=null;dataSignature=null;
+   render();document.dispatchEvent(new Event('isa-kr-private-data'));
+  }
   el('signal').textContent='자료 확인 실패';
   el('checked').textContent='화면 확인 실패: '+new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'});
   el('alert').textContent='조회 실패: '+String(err.message||err)+'. 기존 게시 자료를 최신 종가로 간주하지 마세요.';
