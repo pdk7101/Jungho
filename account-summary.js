@@ -211,11 +211,19 @@ function kiwoomComputed(){
 function tossOfficial(){
  const data=window.ISA_TOSS_BROKER?.snapshot?.();
  if(!data?.ok||!data.totals||!data.amounts)return null;
- const i=data.totals.investedKRW,v=data.totals.valueKRW;
+ const basis=data.totals.investedKRW,valuation=data.totals.valueKRW;
  const native=data.amounts.valued||{};
  const usd=Number(native.usd||0),krw=Number(native.krw||0);
- const note='토스 공식 API · 보유 '+data.holdingCount+'종목 · '+
-  '국내 '+money(krw)+' / 미국 
+ const source='토스 공식 API · 보유 '+data.holdingCount+'종목 · 국내 '+money(krw)+
+  ' / 미국 USD '+usd.toLocaleString('ko-KR',{maximumFractionDigits:2})+
+  (data.fx?.usdKrw?' · 공식 참고환율 '+data.fx.usdKrw:' · 환율 미확인')+
+  ' · 실제 토스 앱 전체 원화액과 환율 및 비용 차이 가능';
+ return {invested:finite(basis)?Number(basis):null,
+  value:finite(valuation)?Number(valuation):null,
+  date:data.fetchedAt||null,source,
+  complete:finite(basis)&&finite(valuation),estimated:true,brokerApi:true};
+}
+function totals(){
  const mode=read(MODE),tossManual=manualTotals('toss'),
   kiwoomManual=manualTotals('kiwoom'),
   tossAutomatic=tossComputed(),kiwoomAutomatic=kiwoomComputed();
