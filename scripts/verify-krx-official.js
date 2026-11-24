@@ -78,12 +78,9 @@ assert.ok(!insights.includes('DIST_URL'),'unsupported third-party distribution s
 assert.ok(page.includes('KRX 공식 종가 확인 보류'),'data failure reason shown on cards');
 const workflow=read('.github/workflows/pages.yml');
 const privateCheck=read('.github/workflows/check-krx-connection.yml');
-assert.ok(privateCheck.includes('KRX_AUTH_KEY: '+ '
-console.log('PASS: Korean official KRX price parser, snapshot, indicators, no unofficial trade signals');
-+'{{ secrets.KRX_AUTH_KEY }}'),
+const secretReference='KRX_AUTH_KEY: '+String.fromCharCode(36)+'{{ secrets.KRX_AUTH_KEY }}';
+assert.ok(privateCheck.includes(secretReference),
  'official KRX secret is used only in the private manual diagnostic');
-assert.ok(!workflow.includes('KRX_AUTH_KEY: '+ '
-console.log('PASS: Korean official KRX price parser, snapshot, indicators, no unofficial trade signals');
-+'{{ secrets.KRX_AUTH_KEY }}'),
+assert.ok(!workflow.includes(secretReference),
  'public Pages deployment cannot fetch or publish licensed KRX data');
 console.log('PASS: Korean official KRX price parser, snapshot, indicators, no unofficial trade signals');
