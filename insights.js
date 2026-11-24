@@ -279,6 +279,13 @@ function mount(){
 }
 async function reloadAll(){
  if(!loaded)return; // only bootstrap after mount
+ if(window.ISA_PRIVATE_KRX?.configured?.()){
+  quotes=window.ISA_PRIVATE_KRX.snapshot();
+  metrics=window.ISA_PRIVATE_KRX.metrics();
+  metricHistory=window.ISA_PRIVATE_KRX.metricHistory();
+  updateAlerts();updateSol();
+  return;
+ }
  try{
   const files=await Promise.allSettled(['quotes.json','metrics.json','metric-history.json'].map(async file=>{
    const r=await fetch('./'+file+'?t='+Date.now(),{cache:'no-store'});
@@ -300,6 +307,7 @@ async function reloadAll(){
 }
 mount();loaded=true;
 document.addEventListener('isa-rendered',()=>{updateAlerts();updateSol();});
+document.addEventListener('isa-kr-private-data',()=>reloadAll());
 const btn=$('reload');if(btn)btn.addEventListener('click',()=>reloadAll());
 const controls=$('positions');if(controls)controls.addEventListener('change',()=>{simShares=null;updateAlerts();updateSol();});
 ['robotCap','spaceCap','solCap','trBase'].forEach(id=>{const el=$(id);if(el)el.addEventListener('change',()=>updateAlerts());});
