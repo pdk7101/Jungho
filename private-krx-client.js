@@ -184,6 +184,12 @@ async function load(){
   const recent=await requestPage(0),expected=recent?.latestExpected;
   if(!iso(expected))throw Error('KRX 기준 거래일 확인 실패');
   const recentRows=validate(recent,0,expected),group={};
+  const extraQuotes={};
+  const extraCodes={biotech:'0229F0',media:'228810'};
+  for(const q of [...Object.values(saved?.extraQuotes||{}),...(Array.isArray(recent.extraQuotes)?recent.extraQuotes:[])]){
+   if(!q||!Object.hasOwn(extraCodes,q.id)||q.code!==extraCodes[q.id]||!iso(q.date)||q.date>expected||!positive(q.close))continue;
+   if(!extraQuotes[q.id]||q.date>=extraQuotes[q.id].date)extraQuotes[q.id]={id:q.id,code:q.code,date:q.date,close:Number(q.close)};
+  }
   for(const [id] of IDS)group[id]=new Map();
   const savedDates=saved?.items?.map(x=>x.date)||[];
   const cutoff=new Date(expected.slice(0,4)+'-'+expected.slice(4,6)+'-'+expected.slice(6)+'T12:00:00Z');
@@ -211,7 +217,7 @@ async function load(){
   const stamp=new Date().toISOString();
   snapshot={fetchedAt:stamp,source:'KRX OPEN API · ETF 일별매매정보 (개인 인증 조회)',
    sourceUrl:OFFICIAL,officialConfirmed:true,latestExpected:expected,status:items.every(x=>x.ok)?'ok':'partial',
-   items,errors:items.filter(x=>!x.ok).map(x=>x.id+': '+x.error)};
+   items,extraQuotes,errors:items.filter(x=>!x.ok).map(x=>x.id+': '+x.error)};
   const computed=secondary(items,byId);
   metricSnapshot={...computed.metrics,fetchedAt:stamp};metricHistory=computed.history;
   const validCount=items.filter(x=>x.ok).length;
@@ -277,7 +283,9 @@ function mount(){
  };
 }
 window.ISA_PRIVATE_KRX={configured,load,snapshot:()=>snapshot,metrics:()=>metricSnapshot,
- metricHistory:()=>metricHistory,lastGood,setConnection,disconnect,validate,calculate};
+ metricHistory:()=>metricHistory,lastGood,
+ extraQuote:id=>snapshot?.extraQuotes?.[id]||lastGood()?.extraQuotes?.[id]||null,
+ setConnection,disconnect,validate,calculate};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});
 else mount();
 })();
