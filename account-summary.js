@@ -184,7 +184,16 @@ function snapshotToss(){
 function tossComputed(){
  const data=window.ISA_PORTFOLIO_TOTALS?.totals?.();
  if(!data)return null;
- return {invested:data.invested,value:data.value,date:data.date,
+ const dates=(data.rows||[]).filter(r=>r.qty>0&&r.priceDate).map(r=>{
+  const t=String(r.priceDate);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(t))return t;
+  const n=Date.parse(t);
+  if(!Number.isFinite(n))return null;
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(n)).map(x=>[x.type,x.value]));
+  return parts.year+'-'+parts.month+'-'+parts.day;
+ }).filter(Boolean).sort();
+ const priceRange=dates.length?(dates[0]===dates.at(-1)?dates[0]:dates[0]+' ~ '+dates.at(-1)):null;
+ return {invested:data.invested,value:data.value,date:data.date,priceRange,photoCount:data.prices?.photo||0,
   source:data.source+(data.mixedDates?' · 가격 기준일 혼합·미확인':'')+
    (data.invested===null?' · 확인된 일부 매수원가 '+money(data.knownInvested):''),
   complete:data.completeBasis&&data.completeValue,estimated:true};
@@ -323,8 +332,10 @@ function displayAccount(id,data){
  }
  let sourceText=data.source+(data.date?' · 기준 '+String(data.date).slice(0,16).replace('T',' '):' · 기준일 미확인');
  if(id==='toss'&&!data.brokerApi)sourceText=(!data.estimated?
-  '증권사 앱 전체 금액 직접 기록 (자동 연결 아님) · ':'자동 참고평가 / 저장자료 (토스 공식 잔고 아님) · ')+
-  (data.date||'기준일 없음');
+  '증권사 앱 전체 금액 직접 기록 (자동 연결 아님) · ':'저장 보유정보 × 확인된 가격 (실계좌 아님) · ')+
+  (data.locked?'마지막 정상 계산 보존 · ':'')+
+  (data.locked?(data.date||'가격 기준일 혼합'):(data.priceRange||data.date||'가격 기준일 미확인'))+
+  (!data.locked&&data.photoCount?' · 과거 사진 '+data.photoCount+'종목 포함':'');
  if(id==='kiwoom'&&!data.brokerApi)sourceText=data.source+' · 기준 '+(data.date||'미확인')+
   (data.locked?' · 마지막 검증값 보존':'');
  source.textContent=sourceText;
@@ -345,7 +356,7 @@ function render(){
    (own?.state==='cached'?'토스 마지막 성공 조회 '+format(official?.fetchedAt)+(x.toss.revalued?' · 저장 수량으로 참고 평가 갱신 · 새 매매 미반영':' · 현재 잔고 아님')+(own.diagnosis?' · '+own.diagnosis:'')+'. ':
     '토스 공식 계좌 '+(official?.holdingCount||0)+'종목 자동 반영 · 조회 '+format(official?.fetchedAt)+'. ')+
    (x.kiwoom?.date?'키움 참고 기준 '+String(x.kiwoom.date).slice(0,10):'키움 가격 확인 중'):
-   connected?(own?.diagnosis?'토스 조회 실패: '+own.diagnosis+' · 과거 참고값':own?.loading?'토스 공식 잔고 확인 중 · 과거 참고값':'토스 연결 설정 저장됨 · 정상 잔고 아직 없음'):
+   connected?(own?.diagnosis?(x.toss?.estimated&&x.toss.complete?'저장 보유정보로 참고 평가 자동 갱신 · 실제 신규 매매 미반영 · ':'')+'토스 실계좌 조회 실패: '+own.diagnosis:own?.loading?'토스 공식 잔고 확인 중 · 과거 참고값':'토스 연결 설정 저장됨 · 정상 잔고 아직 없음'):
    '현재 브라우저는 토스 연결 전 · 과거 계산액은 실제 잔고가 아닙니다. 아래 버튼으로 처음 한 번만 연결하세요.';
  }
  const note=$('account-valuation-note');
@@ -354,7 +365,7 @@ function render(){
    .filter(Boolean).sort().at(-1);
   note.textContent=(x.toss?.revalued?'노트북 연결 없이 저장된 보유수량과 최근 확인 가격으로 재평가합니다. 실제 새 매매는 반영되지 않습니다. ':x.toss?.brokerApi?
    '토스의 공식 API 원화·USD 통화별 합계를 현재 환율로 환산한 참고액입니다. 토스 앱의 비용·환율 산식과 다를 수 있습니다. ':
-   '공식 토스 연결이 없으면 마지막 저장된 사진/가격만 표시합니다. ')+
+   '공식 토스 연결이 없으면 저장된 보유정보와 확인된 시세로 참고 평가합니다. 새 매매는 반영되지 않습니다. ')+
    (latest?' 마지막 참고 계산: '+new Date(latest).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+'. ':'')+
    '기기·브라우저마다 기록이 별도 저장됩니다. 데이터 삭제는 피하세요.';
  }
