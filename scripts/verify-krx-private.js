@@ -18,7 +18,7 @@ const officialFetch=async request=>{
  officialCalls++;
  const date=new URL(request).searchParams.get('basDd');
  assert.match(date,/^\d{8}$/);
- return new Response(JSON.stringify({OutBlock_1:funds.map(([id,code],i)=>{
+ return new Response(JSON.stringify({OutBlock_1:[...funds,['biotech','0229F0'],['media','228810']].map(([id,code],i)=>{
   const price=3800+i*1350+Number(date.slice(-2))*5;
   return {BAS_DD:date,ISU_SRT_CD:code,ISU_CD:'KR'+code+'xxxx',
    TDD_OPNPRC:String(price),TDD_HGPRC:String(price+120),
@@ -56,6 +56,10 @@ new Function('window','document','localStorage','sessionStorage','fetch',
 window.ISA_PRIVATE_KRX.setConnection(host,token,true);
 const snapshot=await window.ISA_PRIVATE_KRX.load();
 assert.equal(snapshot.items.length,6);
+assert.equal(snapshot.extraQuotes.biotech.code,'0229F0');
+assert.equal(snapshot.extraQuotes.media.code,'228810');
+assert.equal(window.ISA_PRIVATE_KRX.extraQuote('biotech').date,snapshot.items[0].date);
+assert.equal(snapshot.items.some(x=>x.id==='biotech'||x.id==='media'),false,'Toss-only prices cannot change six ISA strategy items');
 for(const ticker of snapshot.items){
  assert.equal(ticker.ok,true,'ticker requires 40 completed verified bars');
  assert.equal(ticker.bars.length,40);
