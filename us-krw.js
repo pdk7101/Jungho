@@ -34,6 +34,20 @@ function priceKrw(id,priceUsd){
   return {amount:privateQuote.usd*rate.rate,manual:false,kind:'finnhub-private',
    usd:Number(privateQuote.usd),fxRate:rate.rate,fxAt:rate.when,fxSource:rate.source,fxManual:rate.manual,
    source:'Finnhub 개인 체결가 USD × '+rate.source,stamp:privateQuote.tradeAt};
+ const broker=window.ISA_TOSS_BROKER?.snapshot?.(),
+  brokerState=window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state,
+  brokerAt=Date.parse(broker?.fetchedAt||''),brokerAge=Date.now()-brokerAt;
+ const match=brokerState==='live'&&broker?.ok&&Array.isArray(broker.holdings)&&
+  Number.isFinite(brokerAge)&&brokerAge>=0&&brokerAge<=10*60000?
+  broker.holdings.find(h=>h?.marketCountry==='US'&&h.currency==='USD'&&
+   String(h.symbol||'').toUpperCase()===id.toUpperCase()):null;
+ // The broker's last displayed USD price has no trade timestamp: it may
+ // reflect the previous session. It is NOT a certified live trade or EOD bar.
+ if(rate&&finitePositive(match?.lastPrice))
+  return {amount:Number(match.lastPrice)*rate.rate,manual:false,kind:'toss-broker-last',
+   usd:Number(match.lastPrice),fxRate:rate.rate,fxAt:rate.when,fxSource:rate.source,fxManual:rate.manual,
+   source:'토스 공식 잔고 조회 최종 표시 단가 (체결 시각 미제공) USD × '+rate.source,
+   stamp:broker.fetchedAt};
  if(rate&&finitePositive(priceUsd))return {amount:Number(priceUsd)*rate.rate,manual:false,kind:'usd-close',
   usd:Number(priceUsd),fxRate:rate.rate,fxAt:rate.when,fxSource:rate.source,fxManual:rate.manual,
   source:'미국장 USD 종가 × '+rate.source,stamp:rate.when};
