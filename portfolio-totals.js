@@ -47,7 +47,7 @@ function officialHolding(market,id){
  const norm=x=>String(x||'').toUpperCase().replace(/[^0-9A-Z가-힣]/g,'');
  const names=market==='us'?{
   schd:['SCHD'],spym:['SPYM'],cony:['CONY'],agnc:['AGNC'],
-  spacex:['스페이스X','SPACEX']
+  spacex:['SPCX','스페이스X','SPACEX']
  }:{
   tsofr:['KODEX미국달러SOFR','미국달러SOFR'],
   treit:['TIGER리츠부동산인프라'],
@@ -112,7 +112,7 @@ function row(market,id){
   priceDate=stored.krwDay;
   priceMode='broker-manual';
  }
- if(unitPrice===null&&us&&id!=='spacex'){
+ if(unitPrice===null&&us){
   try{
    const usd=window.ISA_US_APP?.getPrice?.(id);
    const q=window.ISA_US_KRW?.priceKrw?.(id,usd);
