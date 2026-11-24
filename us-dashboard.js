@@ -113,6 +113,9 @@ function priceSource(f,x,wonQuote){
    ' · '+new Date(time).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',
     month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'')};
  }
+ if(wonQuote?.kind==='toss-broker-last')return {type:'broker',short:
+  '토스 공식 잔고 조회 마지막 단가 · '+new Date(wonQuote.stamp).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+
+  ' · 체결시각 미제공 · 실시간 보장 아님'};
  if(wonQuote?.manual)return {type:'manual',short:'토스 원화 현재가 직접 입력 · 당일만 유효'};
  const reason=state?.fetching?'장중 시세 확인 중':
   !state?.configured?'장중 시세 미연결':
@@ -159,10 +162,23 @@ function holdingCard(id,usdPx){
     receipt.unlinked?'기존 누적 기준 지급일 확인 필요':'기준일까지 직접 입력 누적액')+'</small>'+
     latestPayment+'</div>':
    '<div class="us-card-dividend">누적 세후 배당·분배금 미확인 · 입력값 필요'+latestPayment+'</div>';
+ const official=window.ISA_TOSS_BROKER?.snapshot?.(),
+  candidate=official?.ok&&Array.isArray(official.holdings)?
+   official.holdings.find(x=>x?.marketCountry==='US'&&
+    String(x.symbol||'').toUpperCase()===id.toUpperCase()):null;
+ const stamp=Date.parse(official?.fetchedAt||'');
+ const remote=candidate&&Number.isFinite(stamp)&&stamp<=Date.now()+60000&&
+  window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state==='live'?candidate:null;
+ const officialLine=remote?
+  '<div class="us-card-pnl">토스 공식 보유 '+fmtQty(remote.quantity)+
+  ' · USD 평단 '+(valid(remote.averagePurchasePrice)?usd(remote.averagePurchasePrice):'미확인')+
+  ' · USD 평가 '+(valid(remote.marketValue)?usd(remote.marketValue):'미확인')+
+  ' · 조회 '+new Date(stamp).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+
+  ' · 원화 평단 기록과 별개</div>':'';
  const holdings='보유 '+(qty===null?'미입력':fmtQty(qty))+
   ' · 평단 '+(avg===null?'미입력':wonAmount(avg,2));
- if(qty===0)return '<div class="us-card-holding">'+holdings+' · 현재 미보유'+receiptLine+'</div>';
- if(!position)return '<div class="us-card-holding">'+holdings+
+ if(qty===0)return '<div class="us-card-holding">'+holdings+officialLine+' · 현재 미보유'+officialLine+receiptLine+'</div>';
+ if(!position)return '<div class="us-card-holding">'+holdings+officialLine+
   '<div class="us-card-pnl">평가손익 계산 대기 · 보유정보와 원화 참고가격 확인</div>'+
   receiptLine+'</div>';
  return '<div class="us-card-holding">'+holdings+
@@ -186,6 +202,7 @@ function cards(){
   const selectedClass=selected===f.id?'us-selected':'';
   const priceMeaning=q?.manual?'토스 직접 입력 · 오늘 가격':
    q?.kind==='finnhub-private'?'개인 체결가 · 원화 환산':
+   q?.kind==='toss-broker-last'?'토스 공식 잔고 최종 표시 단가 · 실시간 보장 아님':
    q?.kind==='usd-close'?'확정 종가 '+date(x?.date)+' × 참고환율 · 현재가 아님':
    '원화 참고가격 미확인';
   return '<div role="button" tabindex="0" class="us-card us-list-row '+selectedClass+'" data-us="'+f.id+
@@ -269,6 +286,7 @@ window.ISA_US_APP={
  rerender:()=>render()
 };
 window.addEventListener('isa-personal-us-quote-refreshed',()=>render());
+document.addEventListener('isa-toss-broker-data',()=>render());
 function mount(){
  const p=$('us-panel');if(!p)return;
  const reload=$('reload');if(reload)reload.addEventListener('click',refresh);
