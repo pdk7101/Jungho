@@ -185,7 +185,7 @@ async function load(){
   if(!iso(expected))throw Error('KRX 기준 거래일 확인 실패');
   const recentRows=validate(recent,0,expected),group={};
   const extraQuotes={};
-  const extraCodes={biotech:'0229F0',media:'228810'};
+  const extraCodes={biotech:'0229F0',media:'228810',hongah:'003280',sensor:'321370'};
   for(const q of [...Object.values(saved?.extraQuotes||{}),...(Array.isArray(recent.extraQuotes)?recent.extraQuotes:[])]){
    if(!q||!Object.hasOwn(extraCodes,q.id)||q.code!==extraCodes[q.id]||!iso(q.date)||q.date>expected||!positive(q.close))continue;
    if(!extraQuotes[q.id]||q.date>=extraQuotes[q.id].date)extraQuotes[q.id]={id:q.id,code:q.code,date:q.date,close:Number(q.close)};
@@ -217,13 +217,17 @@ async function load(){
   const stamp=new Date().toISOString();
   snapshot={fetchedAt:stamp,source:'KRX OPEN API · ETF 일별매매정보 (개인 인증 조회)',
    sourceUrl:OFFICIAL,officialConfirmed:true,latestExpected:expected,status:items.every(x=>x.ok)?'ok':'partial',
-   items,extraQuotes,errors:items.filter(x=>!x.ok).map(x=>x.id+': '+x.error)};
+   items,extraQuotes,extraErrors:(Array.isArray(recent.extraErrors)?recent.extraErrors:[])
+    .filter(x=>x&&['hongah','sensor'].includes(x.id)).map(x=>({id:x.id,error:String(x.error||'조회 실패').slice(0,100)})),
+   errors:items.filter(x=>!x.ok).map(x=>x.id+': '+x.error)};
   const computed=secondary(items,byId);
   metricSnapshot={...computed.metrics,fetchedAt:stamp};metricHistory=computed.history;
   const validCount=items.filter(x=>x.ok).length;
   saveLastGood(snapshot);
   if(status)status.textContent='공식 KRX 개인 조회 '+validCount+'/6종목 · 기준일 '+String(items.filter(x=>x.ok).map(x=>x.date).sort().at(-1)||'미확인')+
-   ' · 실제 체결가 아님 · 개인 브라우저에서만 표시';
+   ' · 추가 종목 '+Object.keys(extraQuotes).length+'/4 · '+(snapshot.extraErrors.length?
+    snapshot.extraErrors.map(x=>(x.id==='hongah'?'흥아해운':'센서뷰')+' '+x.error).join(' / ')+' · ':'')+
+   '실제 체결가 아님 · 개인 브라우저에서만 표시';
   return snapshot;
  }catch(error){
   snapshot=null;metricSnapshot=null;metricHistory=null;
