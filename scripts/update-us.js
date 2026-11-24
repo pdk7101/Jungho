@@ -94,6 +94,9 @@ async function readFx(){
 const fx=await readFx();
 const items=[];
 for(const f of funds)items.push(await eachFund(f));
-await fs.writeFile(out,JSON.stringify({fetchedAt:now.toISOString(),market:'US',currency:'USD',isRealtime:false,fx,
+const extra=await eachFund(['spacex','SPCX']);
+// The symbol previously belonged to a different security: only post-IPO bars are eligible.
+const spcx=extra.ok&&extra.bars.every(b=>b.date>='20260612')?extra:null;
+await fs.writeFile(out,JSON.stringify({fetchedAt:now.toISOString(),market:'US',currency:'USD',isRealtime:false,fx,extraQuotes:spcx?{spacex:spcx}:{},
  sourceNote:'미국장 확정 일봉만 사용하며 실시간 호가가 아닙니다. 조회 실패 시 가격을 만들어 표시하지 않습니다.',items},null,2)+'\n');
 console.log('US 유효 종목',items.filter(x=>x.ok).length+'/4');
