@@ -46,9 +46,20 @@ equal(app.defaults.capMode,'ma','moving-average-only is the default buy cap mode
 truth(app.FUNDS.find(f=>f.id==='reit').plan.includes('1·2·3·4주'),
  'REIT card description accurately covers SOL-rejected 4-share fallback');
 truth(html.includes('직전 확정 종가 참고 (오늘 종가 미확인)')&&
- html.includes('과거 매수 검토')&&
+ html.includes('function cardDecision(f,prepared,priorPlan)')&&
  html.includes('오늘 주문 신호가 아니며'),
- 'current-order cards distinguish last-close historical insight from a fresh order signal');
+ 'one card decision distinguishes last-close reference from a fresh order signal');
+const cardDisplaySource=html.slice(html.indexOf('function cardDecision(f,prepared,priorPlan)'),html.indexOf('var initialPrepDisplay=true;'));
+const cardDisplay=new Function('verdict','freshQuote','valid','day',cardDisplaySource+'\nreturn {cardDecision,cardDecisionLabel};')(
+ ()=>({type:'wait',title:'당일 시세 미확인'}),()=>null,n=>Number.isFinite(n)&&n>0,d=>d);
+const refDisplay=cardDisplay.cardDecision({id:'robot'},null,{asOf:'20261102',rows:{robot:{type:'buy',qty:1,close:9300}}});
+equal(cardDisplay.cardDecisionLabel(refDisplay),'종가 참고 · 매수 검토 1주','reference decision occupies the existing single status label');
+truth(refDisplay.reference&&refDisplay.basis.includes('오늘 주문 신호 아님'),'historical signal is explicitly marked');
+const stopDisplay=cardDisplay.cardDecision({id:'robot'},{rows:{robot:{type:'stop',close:10000}}},null);
+equal(cardDisplay.cardDecisionLabel(stopDisplay),'중지','confirmed decision replaces reference label');
+const cardsMarkup=html.slice(html.indexOf('list.innerHTML=FUNDS.map'),html.indexOf("document.dispatchEvent(new Event('isa-rendered'))",html.indexOf('list.innerHTML=FUNDS.map')));
+equal(cardsMarkup.split('class="status state-').length-1,1,'one decision status per domestic ETF card');
+truth(!html.includes('당일 시세 판단 보류</div>')&&!html.includes('class="eod-checklist"'),'duplicated reference status and expanded per-symbol plan lists removed');
 truth(html.includes('국내 ETF 매수계획 · 거래일 조건 점검')&&
  html.includes('function renderPlan(prepared,priorPlan){')&&
  html.includes('var prepared=nextSessionPlan();')&&
