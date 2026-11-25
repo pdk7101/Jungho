@@ -60,6 +60,12 @@ details[open]>summary{margin-bottom:12px}
 .small-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .fieldset-note{font-size:.78rem;color:#b7c5da;line-height:1.55}
 #summary{line-height:1.6}
+.eod-checklist{display:grid;gap:6px;margin:10px 0}
+.eod-check-row{border-top:1px solid #40526d;padding:8px 0}
+.eod-check-row>div{display:flex;justify-content:space-between;gap:8px;align-items:baseline;font-size:.82rem}
+.eod-check-row>div>span{font-weight:750;flex-shrink:0}
+.eod-check-row small{display:block;color:#b3c5dd;font-size:.74rem;line-height:1.5;margin-top:4px}
+#funds .fund>small{display:block;margin:3px 0}
 .card-detail{font-size:.77rem;color:#abbdd7;margin-top:5px}
 .fund-holding{font-size:.83rem;font-weight:650;line-height:1.5;overflow-wrap:anywhere;margin-top:8px}
 .fund-holding.avg-down{color:#78b0ff}.fund-holding.avg-up{color:#f4b6ba}
@@ -392,7 +398,7 @@ details[open]>summary{margin-bottom:12px}
 @media(min-width:760px){#us-panel .us-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style><script src="./live-prices.js"></script><script src="./private-krx-client.js"></script>
 </head><body><main>
-<header><div><small>내 투자 · 무료 대시보드 · 11/25 v7</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
+<header><div><small>내 투자 · 무료 대시보드 · 11/25 v8</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
 <section class="panel account-summary" id="account-summary" aria-labelledby="account-summary-title">
  <div class="account-head"><h2 id="account-summary-title">전체 계좌 현황</h2><button type="button" id="account-summary-recalc" title="연결된 토스·KRX·미국 주식 시세를 한 번에 확인합니다.">↻ 전체 최신정보 조회</button></div>
  <p id="account-live-state" role="status">토스·KRX·미국 시세 자동 확인 중…</p>
@@ -1272,7 +1278,13 @@ function renderPlan(prepared,priorPlan){
      (valid(d.cap)?'적용 상한 '+money(d.cap):'상한 미설정 · 종가 '+money(d.close)+' 참고');
    }).join(' / ')+'</p>';
   else eodText+='<p><b>매수 검토:</b> 없음 · 아래 카드에서 중지·보류 사유 확인</p>';
-  eodText+='<p><b>중지 '+stopped+'종목 · 보류 '+held+'종목</b> · 카드를 누르면 상세 근거 확인</p>';
+  eodText+='<p><b>중지 '+stopped+'종목 · 보류 '+held+'종목</b></p>'+
+   '<div class="eod-checklist">'+FUNDS.map(function(f){
+    var d=prepared.rows[f.id];
+    return '<div class="eod-check-row"><div><b>'+safe(f.name)+'</b><span class="state-'+d.type+'">'+
+     (d.type==='buy'?'매수 검토 '+d.qty+'주':d.type==='stop'?'중지':'보류')+'</span></div>'+
+     '<small>'+safe(d.title)+' · '+safe(d.info)+'</small></div>';
+   }).join('')+'</div>';
   if(candidates.length)eodText+='<p class="sub">마감 종가 기준 예상 비용 '+money(prepared.estimated)+
    ' · 시초가 변동·지정가 미체결 가능. 상한 초과 시 추격매수하지 마세요.</p>';
   if(prepared.overBudget)eodText+='<p class="error">일일 예산보다 예상 매수액이 높아 신규매수를 전부 보류했습니다. 계획 기준 '+money(prepared.estimated)+'.</p>';
@@ -1349,8 +1361,11 @@ function renderPlan(prepared,priorPlan){
  }else message+='<p class="sub">하루 예산 미입력. SOFR 매주 월요일 1주 · KODEX 200TR -5% 감시는 기존대로 별도 관리합니다.</p>';
  el('plan').innerHTML=message;
 }
+var initialPrepDisplay=true;
 function render(){
  var prepared=nextSessionPlan();
+ // Open the next-session plan once on first evening/pre-open render; respect later manual collapse.
+ if(initialPrepDisplay){initialPrepDisplay=false;if(prepared&&el('summary'))el('summary').open=true;}
  var priorPlan=prepared&&prepared.available<6?nextSessionPlan(undefined,true):null;
  renderCaps();
  renderPlan(prepared,priorPlan);
