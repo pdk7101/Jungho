@@ -398,7 +398,7 @@ details[open]>summary{margin-bottom:12px}
 @media(min-width:760px){#us-panel .us-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style><script src="./live-prices.js"></script><script src="./private-krx-client.js"></script>
 </head><body><main>
-<header><div><small>내 투자 · 무료 대시보드 · 11/25 v8</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
+<header><div><small>내 투자 · 무료 대시보드 · 11/25 v9</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
 <section class="panel account-summary" id="account-summary" aria-labelledby="account-summary-title">
  <div class="account-head"><h2 id="account-summary-title">전체 계좌 현황</h2><button type="button" id="account-summary-recalc" title="연결된 토스·KRX·미국 주식 시세를 한 번에 확인합니다.">↻ 전체 최신정보 조회</button></div>
  <p id="account-live-state" role="status">토스·KRX·미국 시세 자동 확인 중…</p>
@@ -1029,12 +1029,15 @@ function completedClose(id,phase,latestDate){
 }
 function nextSessionPlan(now,referenceOnly){
  now=now||new Date();
- var phase=orderPrepPhase(now);if(!phase)return null;
+ var phase=orderPrepPhase(now),duringSession=!phase;
+ if(!phase&&referenceOnly){var clock=kstClock(now);phase={stage:'장중 직전 종가 참고',asOf:clock.date,nextDay:clock.iso,expectedDate:previousWeekday(clock.iso),requireToday:false};}
+ if(!phase)return null;
  var published=FUNDS.map(function(f){var x=byId[f.id];return verified(f.id)?x.date:null;}).filter(Boolean).sort();
  var latestDate=published.length?published[published.length-1]:null;
  if(referenceOnly){
   // Historical classification never replaces the latest-day action signal.
-  if(!latestDate||latestDate===phase.expectedDate)return null;
+  if(!latestDate||(!duringSession&&latestDate===phase.expectedDate))return null;
+  if(duringSession&&latestDate>=phase.asOf)return null;
   phase=Object.assign({},phase,{expectedDate:latestDate,requireToday:false,historicalReference:true});
  }
  var checked={};
@@ -1324,6 +1327,9 @@ function renderPlan(prepared,priorPlan){
   }
  });
  let message='<p><b>현재 시세 확인:</b> '+marketText+' · 검증된 당일 체결가 '+todayCount+'/6</p>';
+ if(priorPlan&&priorPlan.available&&todayCount<6){
+  message+='<p><b>'+day(priorPlan.asOf)+' 확정 종가 참고 판단</b> · 당일 시세와 별도 · 실제 주문 전 가격 확인</p><div class="eod-checklist">'+FUNDS.map(function(f){var d=priorPlan.rows[f.id];return '<div class="eod-check-row"><div><b>'+safe(f.name)+'</b><span class="state-'+d.type+'">'+(d.type==='buy'?'참고 매수 '+d.qty+'주':d.type==='stop'?'참고 중지':'참고 보류')+'</span></div><small>'+safe(d.title)+' · '+safe(d.info)+'</small></div>';}).join('')+'</div>';
+ }
  if(!pair.known){
   const reit=byId.reit;
   const lastClose=verified('reit')?' (직전 확정 종가 '+money(reit.close)+' · 오늘 거래가격 아님)':' (최근 가격 확인 대기)';
@@ -1366,7 +1372,7 @@ function render(){
  var prepared=nextSessionPlan();
  // Open the next-session plan once on first evening/pre-open render; respect later manual collapse.
  if(initialPrepDisplay){initialPrepDisplay=false;if(prepared&&el('summary'))el('summary').open=true;}
- var priorPlan=prepared&&prepared.available<6?nextSessionPlan(undefined,true):null;
+ var priorPlan=(!prepared||prepared.available<6)?nextSessionPlan(undefined,true):null;
  renderCaps();
  renderPlan(prepared,priorPlan);
  var list=el('funds');
@@ -1375,7 +1381,8 @@ function render(){
   outside=displayPrice(f.id),broker=outside&&outside.source?.includes('토스 공식')?outside:null,
   p=outside?.price??(prepared?(valid(v.close)?v.close:hasBars(x)?Number(x.close):null):hasBars(x)?current(x,f.id):(live?live.price:null)),
   isReference=prepared&&!valid(v.close)&&hasBars(x),
-  past=priorPlan&&isReference?priorPlan.rows[f.id]:null,
+  past=priorPlan&&(isReference||(!prepared&&v.type==='wait'&&!live&&['robot','space','sol','reit'].includes(f.id)))?priorPlan.rows[f.id]:null,
+  refShown=past&&valid(past.close)&&v.type==='wait',
   h=p?holding(f.id,p):null,b=hasBars(x)&&p?band(x,p):null;
   var tag=b?'<span class="band-tag '+(b.name==='하단 20%'?'band20':'')+'">'+b.name+'</span>':'';
   var avgText=renderHoldingInCard(f.id,p);
@@ -1384,9 +1391,8 @@ function render(){
     (hasBars(x)?day(x.date):'확인 불가'):
    (prepared?'주문준비 참고 종가 · ':'KRX 확정 종가 · ')+(hasBars(x)?day(x.date):'확인 불가')))+'</small>':'')+
   (['robot','space','sol'].includes(f.id)?'<small>매수 적용상한 '+(valid(effectiveCap(f.id).value)?money(effectiveCap(f.id).value):'확인 대기')+' · '+safe(effectiveCap(f.id).reason)+'</small>':'')+avgText+renderMa20InCard(f.id)+tag+(window.ISA_KR_DIVIDENDS?.cardLine?.(f.id,p)||'')+
-  (past&&valid(past.close)?'<small class="eod-reason">직전 '+day(priorPlan.asOf)+' 참고 분류: '+
-    (past.type==='buy'?'매수 검토':past.type==='stop'?'중지':'보류')+
-    ' · 오늘 주문 신호 아님</small>':'')+'<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+(prepared&&v.type==='wait'?'보류':actionLabel(v.type))+'</div>'+
+  (refShown?'<div class="status state-'+past.type+'">종가 참고 · '+(past.type==='buy'?'매수 검토':past.type==='stop'?'중지':'보류')+'</div><small class="eod-reason">'+day(priorPlan.asOf)+' · '+safe(past.title)+' · '+safe(past.info)+' · 오늘 주문 신호 아님</small>':'')+
+  '<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+(refShown?'당일 시세 판단 보류':prepared&&v.type==='wait'?'보류':actionLabel(v.type))+'</div>'+
   (prepared?'<small class="eod-reason">'+safe(v.title)+'</small>':'')+'</div>';
  }).join('');
  document.dispatchEvent(new Event('isa-rendered'));
