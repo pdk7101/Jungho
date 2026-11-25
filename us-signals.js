@@ -30,13 +30,33 @@ function brokerHolding(id){
   String(h.symbol||'').toUpperCase()===NAMES[id]);
  return q&&Number.isFinite(q.quantity)&&q.quantity>=0?q:null;
 }
+// Published NYSE holiday calendar 2026–2028; unknown years fail conservatively on weekdays.
+// https://www.nyse.com/trade/hours-calendars
+const US_HOLIDAYS=new Set('20260101 20260119 20260216 20260403 20260525 20260619 20260703 20260907 20261126 20261225 20270101 20270118 20270215 20270326 20270531 20270618 20270705 20270906 20271125 20271224 20280117 20280221 20280414 20280529 20280619 20280704 20280904 20281123 20281225'.split(' '));
+const US_EARLY=new Set('20261127 20261224 20271126 20280703 20281124'.split(' '));
+function usSession(now=new Date()){
+ const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now).map(x=>[x.type,x.value]));
+ const today=p.year+p.month+p.day,t=Number(p.hour)*60+Number(p.minute);
+ const d=new Date(p.year+'-'+p.month+'-'+p.day+'T12:00:00Z');
+ const key=z=>z.toISOString().slice(0,10).replace(/-/g,'');
+ const trading=z=>![0,6].includes(z.getUTCDay())&&!US_HOLIDAYS.has(key(z));
+ const close=US_EARLY.has(today)?780:960;
+ const open=trading(d)&&t>=570&&t<close;
+ if(!trading(d)||t<close){do{d.setUTCDate(d.getUTCDate()-1);}while(!trading(d));}
+ return {open,expected:key(d),today,calendarKnown:['2026','2027','2028'].includes(p.year)};
+}
 function quote(id){
- const x=item(id),v=x?.close,kr=window.ISA_US_KRW?.priceKrw?.(id,v);
+ const x=item(id),v=x?.close,session=usSession();
+ let kr=window.ISA_US_KRW?.priceKrw?.(id,v);
+ if(!session.open||kr?.kind==='toss-broker-last'){
+  const fx=window.ISA_US_KRW?.fx?.();
+  kr=valid(v)&&valid(Number(fx?.rate))?{amount:v*Number(fx.rate),usd:v,manual:false,kind:'usd-close',source:'확정 USD 종가 × '+fx.source}:null;
+ }
  const p=read('isa-us-holdings-v1')?.[id]||{},actual=brokerHolding(id);
  const qty=actual?.quantity??num(p.qty),avg=num(p.krwAvg);
  const live=kr?.kind==='finnhub-private'&&valid(Number(kr.usd));
  const brokerRef=kr?.kind==='toss-broker-last'&&valid(Number(kr.usd));
- return {x,krw:kr,qty:qty!==null&&Number.isFinite(qty)&&qty>=0?qty:null,
+ return {x,krw:kr,session,qty:qty!==null&&Number.isFinite(qty)&&qty>=0?qty:null,
   avg:valid(avg)?avg:null,usdClose:valid(v)?v:null,
   usdPrice:live||brokerRef?Number(kr.usd):valid(v)?Number(v):null,
   priceKind:live?'finnhub-private':brokerRef?'toss-broker-last':kr?.kind||'missing',
@@ -94,6 +114,8 @@ function evaluate(id,source,cap){
  const basic=(type,title,reason,extra={})=>({
   type,title,reason,qty:0,amountKRW:null,sourceDate:x?.date||null,rule:'US closed daily candle',...extra});
  if(!NAMES[id])return basic('wait','종목 미확인','미국장 관리 대상 4종목이 아닙니다.');
+ if(source?.session&&(!source.session.calendarKnown||x?.date!==source.session.expected))
+  return basic('wait','최신 미국장 확정 종가 확인 보류','필요한 확정 일봉 '+source.session.expected+' · 현재 자료 '+(x?.date||'없음')+' · 이전 일봉으로 새 주문을 판단하지 않습니다.',{priceKind:source.priceKind,session:source.session});
  if(!latest(x))return basic('wait','시세 확인 대기','최근 미국장 확정 일봉 40개 및 5·20일선이 검증되지 않아 매수 판단을 보류합니다.');
  if(!kr||!valid(kr.amount))return basic('wait','원화가격 미확인 · 대기','참고 USD/KRW 환율과 원화 현재가 모두 확인되지 않아 매수 상한 및 원화 평단을 검증할 수 없습니다.');
  const t=x.trend,ma20=Number(t.ma20),ma5=Number(t.ma5);
@@ -116,7 +138,7 @@ function evaluate(id,source,cap){
  const extras={priceKRW:kr.amount,ma20USD:ma20,ma5USD:ma5,low,healthy,down,steep,
   graphLevel:graph.level,volumeRatio:graph.ratio,
   quoteSource:kr.source,quoteManual:!!kr.manual,
-  priceKind:source?.priceKind||'usd-close',brokerQtySource:!!source?.brokerQtySource,
+  session:source?.session,priceKind:source?.priceKind||'usd-close',brokerQtySource:!!source?.brokerQtySource,
   notes:reasons.concat([
    source?.priceKind==='finnhub-private'?
     '최근 미국 체결가에 직전 완료 일봉 5·20일선 적용 · 당일 확정 종가 아님':
@@ -203,7 +225,7 @@ function cardStatus(id){
  return '<div class="us-card-signal state-'+kind+'" aria-label="'+
   esc(NAMES[id]||id)+' 매수 판단 '+label+' · '+esc(note)+'">'+
   '<strong class="us-card-signal-action">'+label+'</strong>'+
-  '<span class="us-card-signal-note">'+esc(note)+'</span>'+
+  '<span class="us-card-signal-note">'+esc(note)+(v.session&&!v.session.open?' · 확정 종가 기준':'')+'</span>'+
   '</div>';
 }
 function cardLine(id){
@@ -263,7 +285,7 @@ function refreshSummary(){
  '<div><b class="state-stop">추가매수 중지 '+counts.stop+'</b></div>'+
  '<div><b class="state-wait">매도 검토 '+counts.sell+'</b></div>'+
  '<div><b class="state-wait">보류 '+counts.wait+'</b></div></div>'+
- '<p class="us-small">이 숫자는 이동평균·저가 등 기술적 참고 분석이며 토스의 실제 매수중·일시중지 종목 수가 아닙니다. 실제 주문상태는 사용자 확인 기록으로 별도 표시합니다.</p>';
+ '<p class="us-small">'+(usSession().open?'미국 정규장 · 최근 가격 참고':'다음 미국 거래 준비 · 최신 확정 종가 기준')+' · 실제 주문 상태와 별도입니다.</p>';
 }
 function mount(){
  const container=$('us-panel');if(!container)return;
