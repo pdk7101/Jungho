@@ -83,12 +83,17 @@ async function sync(choice=null){
   if(!equal(snapshot(),original)||editing())return;
   const final=server.revision===0||!equal(data,server.data)?await api(config,'PUT',{revision:server.revision,data}):server;
   if(!equal(snapshot(),original)||editing())return status('추가 입력 감지 · 다음 조회에서 다시 비교합니다');
-  const changed=apply(final.data,original,initial);
-  save(BASE,{url:config.url,revision:final.revision,data:final.data});
+  const nextBase={url:config.url,revision:final.revision,data:final.data};
+  // If browser storage is full, stop before changing editor records.
+  const oldBase=localStorage.getItem(BASE);
+  save(BASE,nextBase);
+  let changed;
+  try{changed=apply(final.data,original,initial);}
+  catch(e){try{if(oldBase===null)localStorage.removeItem(BASE);else localStorage.setItem(BASE,oldBase)}catch(_){}throw e;}
   conflict=false;choices(false);
   lastSeen=JSON.stringify(snapshot());lastEdit=0;
   status('자동 동기화 완료 · '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}));
-  if(changed)location.reload(); // Reload existing in-memory editors; no modification to their logic.
+  if(changed){try{sessionStorage.setItem('isa-portfolio-sync-scroll-v1',String(window.scrollY||0));}catch(_){}location.reload();} // Reload existing in-memory editors.
  }catch(e){status(String(e.message||e)+' · 기기 기록은 유지됩니다.');}
  finally{busy=false;}
 }
@@ -99,6 +104,7 @@ function mount(){
  root.appendChild(panel);
  const c=read(CONFIG);if(c){$('portfolio-sync-url').value=c.url;$('portfolio-sync-token').value=c.token;status('자동 동기화 연결 확인 중');}
  $('portfolio-sync-connect').onclick=()=>{
+  if(busy)return status('동기화 진행 중 · 완료 후 연결 변경');
   const url=endpoint($('portfolio-sync-url').value),token=$('portfolio-sync-token').value.trim();
   if(!url||token.length<32)return status('정확한 workers.dev 주소 및 32자 이상 전용 비밀키를 입력하세요.');
   try{const prev=read(CONFIG);if(prev&&(prev.url!==url||prev.token!==token))localStorage.removeItem(BASE);save(CONFIG,{url,token});conflict=false;choices(false);sync();}
@@ -107,6 +113,7 @@ function mount(){
  $('portfolio-sync-disconnect').onclick=()=>{if(busy)return status('동기화 진행 중 · 완료 후 해제');localStorage.removeItem(CONFIG);localStorage.removeItem(BASE);conflict=false;choices(false);$('portfolio-sync-token').value='';status('연결 해제 · 기기 기록 유지');};
  $('portfolio-sync-local').onclick=()=>sync('local');
  $('portfolio-sync-cloud').onclick=()=>sync('cloud');
+ try{const y=sessionStorage.getItem('isa-portfolio-sync-scroll-v1');if(y!==null){sessionStorage.removeItem('isa-portfolio-sync-scroll-v1');window.addEventListener('load',()=>window.scrollTo(0,Number(y)||0),{once:true});}}catch(_){}
  lastSeen=JSON.stringify(snapshot());
  setInterval(()=>{
   if(document.visibilityState==='hidden'||!read(CONFIG))return;
