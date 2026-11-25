@@ -398,7 +398,7 @@ details[open]>summary{margin-bottom:12px}
 @media(min-width:760px){#us-panel .us-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style><script src="./live-prices.js"></script><script src="./private-krx-client.js"></script>
 </head><body><main>
-<header><div><small>내 투자 · 무료 대시보드 · 11/25 v9</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
+<header><div><small>내 투자 · 무료 대시보드 · 11/25 v10</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
 <section class="panel account-summary" id="account-summary" aria-labelledby="account-summary-title">
  <div class="account-head"><h2 id="account-summary-title">전체 계좌 현황</h2><button type="button" id="account-summary-recalc" title="연결된 토스·KRX·미국 주식 시세를 한 번에 확인합니다.">↻ 전체 최신정보 조회</button></div>
  <p id="account-live-state" role="status">토스·KRX·미국 시세 자동 확인 중…</p>
@@ -1266,28 +1266,9 @@ function renderPlan(prepared,priorPlan){
    ' · 해당일 판단 가능 '+prepared.available+'/6</p>';
   if(prepared.available!==6){
    eodText+='<p class="sub">오늘 필요한 확정 종가가 미확인인 종목은 현재 매수판단을 보류합니다. 과거 종가를 오늘 종가로 간주하지 않습니다.</p>';
-   if(priorPlan&&priorPlan.available){
-    var past=FUNDS.filter(function(f){return valid(priorPlan.rows[f.id]?.close);});
-    eodText+='<p class="sub"><b>'+day(priorPlan.asOf)+' 직전 확정 종가 참고 분석 ('+past.length+'/6):</b> '+
-     past.map(function(f){var v=priorPlan.rows[f.id];
-      return safe(f.name)+' '+(v.type==='buy'?'과거 매수 검토':v.type==='stop'?'과거 중지':'과거 보류');
-     }).join(' · ')+
-     '. <b>오늘 주문 신호가 아니며</b> 최신 KRX 확정 종가가 확인되면 다시 계산합니다.</p>';
-   }
+   if(priorPlan&&priorPlan.available)eodText+='<p class="sub">'+day(priorPlan.asOf)+' 종가 참고 분석은 아래 기존 카드에서 확인 · 오늘 주문 신호가 아니며 최신 종가 수신 시 자동 갱신됩니다.</p>';
   }
-  if(candidates.length)eodText+='<p><b>매수 검토 ('+candidates.length+'종목):</b> '+
-   candidates.map(function(f){
-    var d=prepared.rows[f.id];return safe(f.name)+' <b>'+d.qty+'주</b> · '+
-     (valid(d.cap)?'적용 상한 '+money(d.cap):'상한 미설정 · 종가 '+money(d.close)+' 참고');
-   }).join(' / ')+'</p>';
-  else eodText+='<p><b>매수 검토:</b> 없음 · 아래 카드에서 중지·보류 사유 확인</p>';
-  eodText+='<p><b>중지 '+stopped+'종목 · 보류 '+held+'종목</b></p>'+
-   '<div class="eod-checklist">'+FUNDS.map(function(f){
-    var d=prepared.rows[f.id];
-    return '<div class="eod-check-row"><div><b>'+safe(f.name)+'</b><span class="state-'+d.type+'">'+
-     (d.type==='buy'?'매수 검토 '+d.qty+'주':d.type==='stop'?'중지':'보류')+'</span></div>'+
-     '<small>'+safe(d.title)+' · '+safe(d.info)+'</small></div>';
-   }).join('')+'</div>';
+  eodText+='<p><b>매수 검토 ('+candidates.length+'종목) · 중지 '+stopped+'종목 · 보류 '+held+'종목</b> · 종목별 수량·근거는 아래 카드</p>';
   if(candidates.length)eodText+='<p class="sub">마감 종가 기준 예상 비용 '+money(prepared.estimated)+
    ' · 시초가 변동·지정가 미체결 가능. 상한 초과 시 추격매수하지 마세요.</p>';
   if(prepared.overBudget)eodText+='<p class="error">일일 예산보다 예상 매수액이 높아 신규매수를 전부 보류했습니다. 계획 기준 '+money(prepared.estimated)+'.</p>';
@@ -1327,9 +1308,8 @@ function renderPlan(prepared,priorPlan){
   }
  });
  let message='<p><b>현재 시세 확인:</b> '+marketText+' · 검증된 당일 체결가 '+todayCount+'/6</p>';
- if(priorPlan&&priorPlan.available&&todayCount<6){
-  message+='<p><b>'+day(priorPlan.asOf)+' 확정 종가 참고 판단</b> · 당일 시세와 별도 · 실제 주문 전 가격 확인</p><div class="eod-checklist">'+FUNDS.map(function(f){var d=priorPlan.rows[f.id];return '<div class="eod-check-row"><div><b>'+safe(f.name)+'</b><span class="state-'+d.type+'">'+(d.type==='buy'?'참고 매수 '+d.qty+'주':d.type==='stop'?'참고 중지':'참고 보류')+'</span></div><small>'+safe(d.title)+' · '+safe(d.info)+'</small></div>';}).join('')+'</div>';
- }
+ if(priorPlan&&priorPlan.available&&todayCount<6)
+  message+='<p class="sub">'+day(priorPlan.asOf)+' 확정 종가 참고 판단은 아래 종목 카드에서 확인 · 실제 주문 전 가격 확인</p>';
  if(!pair.known){
   const reit=byId.reit;
   const lastClose=verified('reit')?' (직전 확정 종가 '+money(reit.close)+' · 오늘 거래가격 아님)':' (최근 가격 확인 대기)';
@@ -1367,6 +1347,18 @@ function renderPlan(prepared,priorPlan){
  }else message+='<p class="sub">하루 예산 미입력. SOFR 매주 월요일 1주 · KODEX 200TR -5% 감시는 기존대로 별도 관리합니다.</p>';
  el('plan').innerHTML=message;
 }
+// One display decision per card; reference-only analysis does not alter order or alert logic.
+function cardDecision(f,prepared,priorPlan){
+ var v=prepared?prepared.rows[f.id]:verdict(f),live=freshQuote(f.id);
+ var canReference=v.type==='wait'&&(prepared?!valid(v.close):!live&&['robot','space','sol','reit'].includes(f.id));
+ var past=canReference?priorPlan?.rows?.[f.id]:null;
+ if(past&&valid(past.close))return {v:past,reference:true,basis:day(priorPlan.asOf)+' 종가 참고 · 오늘 주문 신호 아님'};
+ return {v:v,reference:false,basis:prepared?'다음 거래일 준비':live?'당일 조회 시세':'기존 계획·자료 기준'};
+}
+function cardDecisionLabel(z){
+ var v=z.v;
+ return (z.reference?'종가 참고 · ':'')+(v.type==='buy'?'매수 검토'+(v.qty>0?' '+v.qty+'주':''):v.type==='stop'?'중지':'보류');
+}
 var initialPrepDisplay=true;
 function render(){
  var prepared=nextSessionPlan();
@@ -1377,12 +1369,10 @@ function render(){
  renderPlan(prepared,priorPlan);
  var list=el('funds');
  list.innerHTML=FUNDS.map(function(f){
-  var x=byId[f.id],v=prepared?prepared.rows[f.id]:verdict(f),live=freshQuote(f.id),
+  var x=byId[f.id],z=cardDecision(f,prepared,priorPlan),v=z.v,live=freshQuote(f.id),
   outside=displayPrice(f.id),broker=outside&&outside.source?.includes('토스 공식')?outside:null,
   p=outside?.price??(prepared?(valid(v.close)?v.close:hasBars(x)?Number(x.close):null):hasBars(x)?current(x,f.id):(live?live.price:null)),
-  isReference=prepared&&!valid(v.close)&&hasBars(x),
-  past=priorPlan&&(isReference||(!prepared&&v.type==='wait'&&!live&&['robot','space','sol','reit'].includes(f.id)))?priorPlan.rows[f.id]:null,
-  refShown=past&&valid(past.close)&&v.type==='wait',
+  isReference=z.reference&&prepared,
   h=p?holding(f.id,p):null,b=hasBars(x)&&p?band(x,p):null;
   var tag=b?'<span class="band-tag '+(b.name==='하단 20%'?'band20':'')+'">'+b.name+'</span>':'';
   var avgText=renderHoldingInCard(f.id,p);
@@ -1391,18 +1381,17 @@ function render(){
     (hasBars(x)?day(x.date):'확인 불가'):
    (prepared?'주문준비 참고 종가 · ':'KRX 확정 종가 · ')+(hasBars(x)?day(x.date):'확인 불가')))+'</small>':'')+
   (['robot','space','sol'].includes(f.id)?'<small>매수 적용상한 '+(valid(effectiveCap(f.id).value)?money(effectiveCap(f.id).value):'확인 대기')+' · '+safe(effectiveCap(f.id).reason)+'</small>':'')+avgText+renderMa20InCard(f.id)+tag+(window.ISA_KR_DIVIDENDS?.cardLine?.(f.id,p)||'')+
-  (refShown?'<div class="status state-'+past.type+'">종가 참고 · '+(past.type==='buy'?'매수 검토':past.type==='stop'?'중지':'보류')+'</div><small class="eod-reason">'+day(priorPlan.asOf)+' · '+safe(past.title)+' · '+safe(past.info)+' · 오늘 주문 신호 아님</small>':'')+
-  '<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(v.title)+'">'+(refShown?'당일 시세 판단 보류':prepared&&v.type==='wait'?'보류':actionLabel(v.type))+'</div>'+
-  (prepared?'<small class="eod-reason">'+safe(v.title)+'</small>':'')+'</div>';
+  '<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(z.basis)+'">'+safe(cardDecisionLabel(z))+'</div>'+
+  '<small class="eod-reason">'+safe(z.reference?z.basis+' · '+v.title:v.title)+'</small></div>';
  }).join('');
  document.dispatchEvent(new Event('isa-rendered'));
  Array.from(list.querySelectorAll('[data-id]')).forEach(function(node){
   node.onclick=function(){selected=node.dataset.id;el('selection').value=selected;el('detail').open=true;render();};
   node.onkeydown=function(ev){if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selected=node.dataset.id;el('selection').value=selected;el('detail').open=true;render();}};
  });
- var f=FUNDS.find(function(x){return x.id===selected;}),x=byId[f.id],v=prepared?prepared.rows[f.id]:verdict(f),d=el('details');
+ var f=FUNDS.find(function(x){return x.id===selected;}),x=byId[f.id],z=cardDecision(f,prepared,priorPlan),v=z.v,d=el('details');
  if(!hasBars(x)){d.innerHTML='<p class="sub">정확한 일봉이 확인되지 않아 이동평균과 평단 인하 효과를 계산하지 않습니다.</p>';return;}
- var p=prepared&&valid(v.close)?v.close:current(x,f.id),b=band(x,p),h=holding(f.id,p);
+ var p=(prepared||z.reference)&&valid(v.close)?v.close:current(x,f.id),b=band(x,p),h=holding(f.id,p);
  var t=x.trend,low=Number(x.low20),high=Number(x.high20);
  var pos=Math.max(0,Math.min(100,(p-low)/(high-low)*100));
  var ratio=(p/Number(t.ma20)-1)*100;
@@ -1419,7 +1408,7 @@ function render(){
   }
  }else costText='<p class="sub">보유 평단가와 수량을 입력하면 평단 인하 여부 및 예상 매수 후 평단을 계산합니다. 수량 0이면 미보유로 처리합니다.</p>';
  var vol=valid(t.avgVolume20)&&t.avgVolume20>0&&Number.isFinite(t.volumeToday)?(t.volumeToday/t.avgVolume20).toFixed(2)+'배':'미확인';
- d.innerHTML='<div class="divider"></div><div class="flex"><strong>'+money(p)+'</strong><span class="status state-'+v.type+'">'+(prepared&&v.type==='wait'?'보류':actionLabel(v.type))+'</span></div>'+
+ d.innerHTML='<div class="divider"></div><div class="flex"><strong>'+money(p)+'</strong><span class="status state-'+v.type+'">'+safe(cardDecisionLabel(z))+'</span></div>'+
  '<p class="sub">'+(freshQuote(f.id)?'현재 표시 가격은 비공식 당일 조회가 · 5·20일선 및 박스권은 '+day(x.date)+' 확정 일봉 기준':'KRX 공식 확정 종가 '+day(x.date))+' · 20거래일 '+day(x.rangeStart)+'~'+day(x.rangeEnd)+'</p>'+
  chart(x.bars)+
  '<div class="leg20"><span><i class="legend-dot" style="background:#f87171"></i>종가</span><span><i class="legend-dot" style="background:#24bf9a"></i>5일선</span><span><i class="legend-dot" style="background:#eab308"></i>20일선</span><span><i class="legend-dot" style="background:#6b829f;height:8px;width:5px"></i>거래량</span></div>'+
@@ -1427,7 +1416,7 @@ function render(){
  '<p class="context">현재 '+safe(b.name)+' · 종가와 20일선 차이 '+(ratio>=0?'+':'')+ratio.toFixed(2)+'% · 거래량(이전 20일 평균 대비) '+vol+'</p>'+
  '<p class="context"><b>이동평균 해석:</b> '+safe(trend(x))+' · 5일선 '+(t.ma5Rising?'상승·횡보':'하락')+' / 20일선 '+(t.maRising?'상승·횡보':'하락')+'</p>'+
  '<div class="range"><span class="low" style="width:30%"></span><span class="point" style="left:'+pos+'%"></span></div>'+
- '<div class="notice-block">'+safe(v.info)+'</div>'+costText+
+ '<div class="notice-block">'+safe(z.basis)+' · '+safe(v.info)+'</div>'+costText+
  '<div class="divider"></div><label>키움 확인 가격 직접 입력 (선택)<input type="number" id="manual" min="1" step="1" placeholder="입력하면 참고 계산, 5·20일선은 기존 종가" value="'+(valid(manual[f.id])?manual[f.id]:'')+'"></label>'+
  '<p class="fieldset-note">수동 가격은 5·20일선 계산을 바꾸지 않습니다. 수동 가격 입력 시 신규 매수 신호는 보수적으로 대기 처리합니다.</p>';
  el('manual').onchange=function(ev){if(valid(ev.target.value))manual[f.id]=Number(ev.target.value);else delete manual[f.id];render();};
