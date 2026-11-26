@@ -259,15 +259,14 @@ function cards(){
     '<b class="us-list-price">'+text(krwPrice)+'</b>'+
     '<span class="us-list-arrow" aria-hidden="true">›</span></span>'+
    '<span class="us-list-subtitle">'+text(f.type)+'</span>'+
-   '<span class="us-price-meaning">'+text(priceMeaning)+'</span>'+
-   '<span class="us-list-source '+source.type+'">'+text(source.short)+'</span>'+
+   '<span class="us-list-source '+source.type+'">'+text(source.short+(q?.kind==='usd-close'?' · 참고환율 · 현재가 아님':q?.kind==='finnhub-private'?' · 원화 환산':''))+'</span>'+
    (window.ISA_US_SIGNAL?.cardStatus?.(f.id)||'<div class="us-card-signal state-wait"><strong class="us-card-signal-action">대기</strong><span class="us-card-signal-note">매수 판단 로딩 중</span></div>')+
    movingAverageCard(x,q)+holdingCard(f.id,px)+
-   '<span class="us-list-foot">종목을 누르면 차트·분배금·매수 판단 상세 확인</span>'+
+
    '</div>';
  }).join('')+otherHoldingCard();
  host.querySelectorAll('[data-us]').forEach(btn=>{
-  const select=()=>{selected=btn.dataset.us;render();};
+  const select=()=>{selected=btn.dataset.us;render();const detail=$('us-chart-panel');if(detail)detail.open=true;};
   btn.addEventListener('click',select);
   btn.addEventListener('keydown',e=>{
    if(e.key==='Enter'||e.key===' '){e.preventDefault();select();}
