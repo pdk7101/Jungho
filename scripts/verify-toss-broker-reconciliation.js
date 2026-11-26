@@ -121,4 +121,24 @@ assert.equal(portfolio.row('domestic','sensor').value,300,'missing new quote ret
 assert.equal(account.getTotals().toss.revalued,true,'complete cached holdings produce automatic offline reference estimate');
 assert.equal(account.getTotals().toss.cached,true,'revalued snapshot must never be described as current actual account');
 assert.equal(saved.totals.valueKRW,12000,'original official snapshot remains intact');
+// Confirmed sync makes owner-entered KRW records the common basis, regardless
+// of whether the device has an official snapshot (including a live snapshot).
+const endpoint='https://example.test.workers.dev/sync';
+localStorage.setItem('isa-portfolio-sync-config-v1',JSON.stringify({url:endpoint,token:'synthetic-not-a-secret'}));
+assert.equal(portfolio.sharedBasis(),false,'unconfirmed sync does not alter account basis');
+localStorage.setItem('isa-portfolio-sync-base-v1',JSON.stringify({url:endpoint,revision:1,data:{}}));
+assert.equal(portfolio.sharedBasis(),true);
+assert.equal(account.getTotals().toss.value,2800,'explicit synchronized manual total is preserved');
+localStorage.setItem('isa-account-calculation-mode-v1',JSON.stringify({toss:'auto',kiwoom:'auto'}));
+const withCache=portfolio.totals(),withCacheAccount=account.getTotals().toss;
+assert.equal(withCache.rows.some(r=>r.official),false,'private cache cannot override shared holdings');
+window.ISA_TOSS_BROKER.snapshotMeta=()=>({state:'live'});
+assert.equal(portfolio.totals().invested,withCache.invested,'live device cannot change shared reference cost basis');
+delete window.ISA_TOSS_BROKER;
+assert.equal(portfolio.totals().invested,withCache.invested,'same owner holdings give identical principal without broker cache');
+assert.equal(portfolio.totals().value,withCache.value,'same source quotes give identical estimated valuation');
+assert.equal(account.getTotals().toss.invested,withCacheAccount.invested);
+assert.equal(account.getTotals().toss.value,withCacheAccount.value);
+assert.equal(saved.totals.valueKRW,12000,'official snapshot never modified');
+console.log('PASS: synchronized KRW cost basis is independent of device-only official balance');
 console.log('PASS: Toss actual broker total authority, discrepancy, 14-price provenance, same-day override, explicit auto mode');
