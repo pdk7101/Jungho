@@ -400,7 +400,7 @@ details[open]>summary{margin-bottom:12px}
 @media(min-width:760px){#us-panel .us-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style><script src="./live-prices.js"></script><script src="./private-krx-client.js"></script>
 </head><body><main>
-<header><div><small>내 투자 · 무료 대시보드 · 11/26 v15</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
+<header><div><small>내 투자 · 무료 대시보드 · 11/26 v16</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
 <section class="panel account-summary" id="account-summary" aria-labelledby="account-summary-title">
  <div class="account-head"><h2 id="account-summary-title">전체 계좌 현황</h2><button type="button" id="account-summary-recalc" title="연결된 토스·KRX·미국 주식 시세를 한 번에 확인합니다.">↻ 전체 최신정보 조회</button></div>
  <p id="account-live-state" role="status">토스·KRX·미국 시세 자동 확인 중…</p>
@@ -1025,6 +1025,18 @@ function orderPrepPhase(now){
   asOf:t.date,nextDay:working&&t.minute<540?t.iso:nextWeekday(t.iso),
   requireToday:closedToday,expectedDate:closedToday?t.date:previousWeekday(t.iso)};
 }
+// A valid historical chart is not necessarily the latest required trading day.
+function quoteReadiness(now){
+ var t=kstClock(now||new Date()),phase=orderPrepPhase(now||new Date());
+ var expected=phase?phase.expectedDate:previousWeekday(t.iso);
+ var dates=FUNDS.map(function(f){return verified(f.id)?byId[f.id].date:null;}).filter(Boolean).sort();
+ var ready=dates.filter(function(d){return d===expected;}).length;
+ var newest=dates.length?dates[dates.length-1]:null;
+ var oldest=dates.length?dates[0]:null;
+ return {expected:expected,ready:ready,count:dates.length,newest:newest,oldest:oldest,
+  intraday:!phase,awaiting:ready<6,
+  retry:phase&&phase.requireToday?'다음 영업일 오전 8시 이후 재조회':'개장 전 최신 자료 재조회'};
+}
 function completedClose(id,phase,latestDate){
  var x=byId[id],stamp=loadTime?new Date(loadTime):null;
  if(!verified(id)||!stamp||!isFinite(stamp.getTime()))return null;
@@ -1393,6 +1405,7 @@ function render(){
    isReference?'직전 확정 종가 참고 (오늘 종가 미확인) · '+
     (hasBars(x)?day(x.date):'확인 불가'):
    (prepared?'주문준비 참고 종가 · ':'KRX 확정 종가 · ')+(hasBars(x)?day(x.date):'확인 불가')))+'</small>':'')+
+  (outside?.source?.includes('공통 평가')?'<small>평가가격 기준 '+safe(String(outside.date||'미확인').slice(0,10))+' · 매매 판단 일봉 '+(hasBars(x)?day(x.date):'미확인')+'</small>':'')+
   (['robot','space','sol'].includes(f.id)?'<small>매수 적용상한 '+(valid(effectiveCap(f.id).value)?money(effectiveCap(f.id).value):'확인 대기')+' · '+safe(effectiveCap(f.id).reason)+'</small>':'')+avgText+renderMa20InCard(f.id)+tag+(window.ISA_KR_DIVIDENDS?.cardLine?.(f.id,p)||'')+
   '<div class="status state-'+v.type+'" data-reason="'+safe(v.info)+'" data-basis="'+safe(z.basis)+'">'+safe(cardDecisionLabel(z))+'</div>'+
   '<small class="eod-reason">'+safe(z.reference?z.basis+' · '+v.title:v.title)+'</small></div>';
@@ -1430,6 +1443,7 @@ function render(){
  '<p class="context"><b>이동평균 해석:</b> '+safe(trend(x))+' · 5일선 '+(t.ma5Rising?'상승·횡보':'하락')+' / 20일선 '+(t.maRising?'상승·횡보':'하락')+'</p>'+
  '<div class="range"><span class="low" style="width:30%"></span><span class="point" style="left:'+pos+'%"></span></div>'+
  '<div class="notice-block">'+safe(z.basis)+' · '+safe(v.info)+'</div>'+costText+
+ '<p class="sub"><a href="https://data.krx.co.kr/" target="_blank" rel="noopener noreferrer">KRX 종가 확인</a> · <a href="https://finance.naver.com/item/main.naver?code='+encodeURIComponent(f.code)+'" target="_blank" rel="noopener noreferrer">종목 최신가격 직접 확인</a></p>'+
  '<div class="divider"></div><label>키움 확인 가격 직접 입력 (선택)<input type="number" id="manual" min="1" step="1" placeholder="입력하면 참고 계산, 5·20일선은 기존 종가" value="'+(valid(manual[f.id])?manual[f.id]:'')+'"></label>'+
  '<p class="fieldset-note">수동 가격은 5·20일선 계산을 바꾸지 않습니다. 수동 가격 입력 시 신규 매수 신호는 보수적으로 대기 처리합니다.</p>';
  el('manual').onchange=function(ev){if(valid(ev.target.value))manual[f.id]=Number(ev.target.value);else delete manual[f.id];render();};
@@ -1466,7 +1480,13 @@ async function refreshLiveQuotes(){
   if(el('alert'))el('alert').textContent='오늘 현재가를 검증하지 못했습니다. 오래된 일봉을 오늘 가격이라고 표시하지 않으며, 장중 신규 매수 신호를 대기합니다.';
  }finally{liveBusy=false;render();}
 }
-async function refresh(){
+var refreshInFlight=null;
+function refresh(){
+ if(refreshInFlight)return refreshInFlight;
+ refreshInFlight=refreshOnce().finally(function(){refreshInFlight=null;});
+ return refreshInFlight;
+}
+async function refreshOnce(){
  var button=el('reload'),oldSignature=dataSignature,oldFetchedAt=loadTime;
  button.disabled=true;button.textContent='공식 종가 확인 중...';el('signal').textContent='KRX 확정 일봉 확인 중';
  try{
@@ -1492,17 +1512,19 @@ async function refresh(){
   var checkedTime=new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour12:false});
   var fetchedTime=loadTime?new Date(loadTime).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour12:false}):'미확인';
   var expected=String(data.latestExpected||'');
-  var missingRequested=privateMode&&/^\d{8}$/.test(expected)&&lastDates.length&&
-   lastDates[lastDates.length-1]<expected;
-  el('signal').textContent=count+'/6 유효'+(missingRequested?' · '+day(expected)+' 미배포':'');
+  var readiness=quoteReadiness(new Date());
+  var missingRequested=privateMode&&readiness.awaiting;
+  el('signal').textContent=readiness.awaiting?'최신 종가 '+readiness.ready+'/6 · '+(readiness.newest?day(readiness.newest).slice(5)+' 참고':'미확인'):
+   (readiness.intraday?'전일 종가 6/6 · 장중 미연결':'최신 종가 6/6 · '+day(readiness.expected).slice(5));
   el('updated').textContent=(privateMode?'개인 조회: ':'게시 자료: ')+fetchedTime+
    ' · 마지막 공식 종가 '+lastDay+
-   (missingRequested?' · 요청 거래일 '+day(expected)+' (KRX 원본 미제공)':'');
+   (missingRequested?' · 필요한 거래일 '+day(readiness.expected)+' · 최신 '+readiness.ready+'/6종목':'');
   el('checked').textContent='화면 확인: '+checkedTime+' · '+(priceChanged?'새 가격 반영':collectionChanged?'재수집 확인':'새 가격 없음');
   el('alert').textContent=(missingRequested?
-   'KRX에 '+day(expected)+' 종가를 조회했으나 아직 배포되지 않았습니다. 마지막 공식 종가 '+lastDay+
-   '는 참고로 보존하며 '+day(expected)+' 매수·중지 판단은 보류합니다. KRX 공식 자료 공개 후 재조회하세요.':
-   count===6?'6종목의 공식 확정 종가가 확인되었습니다.':
+   '필요한 '+day(readiness.expected)+' 종가 '+readiness.ready+'/6종목 확인. 마지막 공식 종가 '+lastDay+
+   '는 참고용입니다. KRX 일별 API는 일반적으로 다음 영업일 오전 8시 이후 갱신됩니다. '+readiness.retry+
+   ' · 최신 종가 미확인 종목의 신규 주문 판단은 보류합니다.':
+   count===6?(readiness.intraday?'전일 공식 종가 6종목 확인 · 장중 체결가는 미연결입니다.':'6종목의 필요한 거래일 공식 확정 종가가 확인되었습니다.'):
    count+'/6종목 공식 종가 확인 · 미확인 '+(6-count)+'종목은 매수 판단 보류.')+
    (priceChanged?' 새 확정 일봉 반영.':first?' 첫 확인 완료.':'')+
    (Array.isArray(data.errors)&&data.errors.length?' 수집 진단: '+data.errors.slice(0,2).join(' / ')+'.':'')+
