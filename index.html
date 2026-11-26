@@ -400,7 +400,7 @@ details[open]>summary{margin-bottom:12px}
 @media(min-width:760px){#us-panel .us-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style><script src="./live-prices.js"></script><script src="./private-krx-client.js"></script>
 </head><body><main>
-<header><div><small>내 투자 · 무료 대시보드 · 11/26 v14</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
+<header><div><small>내 투자 · 무료 대시보드 · 11/26 v15</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
 <section class="panel account-summary" id="account-summary" aria-labelledby="account-summary-title">
  <div class="account-head"><h2 id="account-summary-title">전체 계좌 현황</h2><button type="button" id="account-summary-recalc" title="연결된 토스·KRX·미국 주식 시세를 한 번에 확인합니다.">↻ 전체 최신정보 조회</button></div>
  <p id="account-live-state" role="status">토스·KRX·미국 시세 자동 확인 중…</p>
@@ -713,6 +713,10 @@ function brokerLastPrice(id){
   cached:meta?.state==='cached',source:'토스 공식 보유잔고 최종 표시단가 (체결시각 미제공)'};
 }
 function displayPrice(id){
+ if(window.ISA_SHARED_QUOTES?.valuationEnabled?.()){
+  var c=window.ISA_SHARED_QUOTES.valuationPrice('kr',id);
+  return c?{price:c.amount,source:c.source+' · 공통 평가',date:c.date}:null;
+ }
  var q=freshQuote(id);if(q)return {price:Number(q.price),source:'확인된 국내 거래가격',date:q.tradeAt};
  var b=brokerLastPrice(id);if(b)return b;
  var x=byId[id];return hasBars(x)?{price:Number(x.close),source:'마지막 KRX 확정 종가',date:x.date}:null;
@@ -1143,7 +1147,11 @@ function accountTotals(){
   if(!valid(h.avg)){missingHoldings.push(f.id+' 평단');return;}
   principal+=qty*Number(h.avg);
   var q=freshQuote(f.id),b=!q?brokerLastPrice(f.id):null,x=byId[f.id],price=null;
-  if(q){price=Number(q.price);usedIntraday++;}
+  if(window.ISA_SHARED_QUOTES?.valuationEnabled?.()){
+   var common=window.ISA_SHARED_QUOTES.valuationPrice('kr',f.id);
+   if(common){price=common.amount;usedClose++;dates.push(common.date);}
+  }
+  else if(q){price=Number(q.price);usedIntraday++;}
   else if(b){price=b.price;usedBroker++;dates.push(day(b.asOf));}
   else if(verified(f.id)){price=Number(x.close);usedClose++;dates.push(day(x.date));}
   if(price!==null&&Number.isFinite(price)&&price>0)value+=qty*price;
