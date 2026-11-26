@@ -230,8 +230,9 @@ function cards(){
  host.innerHTML=FUNDS.map(f=>{
   const x=market(f),px=price(f),
    q=window.ISA_US_KRW?.priceKrw?.(f.id,px);
-  const krwPrice=valid(q?.amount)?wonAmount(q.amount):'원화 가격 미확인';
-  const source=priceSource(f,x,q);
+  const common=window.ISA_SHARED_QUOTES?.valuationEnabled?.()?window.ISA_PORTFOLIO_TOTALS?.row?.('us',f.id):null;
+  const krwPrice=common?(valid(common.unitPrice)?wonAmount(common.unitPrice):'공통 평가가격 미확인'):(valid(q?.amount)?wonAmount(q.amount):'원화 가격 미확인');
+  const source=common?{short:(common.priceSource||'공통 평가가격 확인 중')+(common.priceDate?' · '+common.priceDate:''),type:''}:priceSource(f,x,q);
   const selectedClass=selected===f.id?'us-selected':'';
   const priceMeaning=q?.manual?'토스 직접 입력 · 오늘 가격':
    q?.kind==='finnhub-private'?'개인 체결가 · 원화 환산':
@@ -245,7 +246,7 @@ function cards(){
     '<b class="us-list-price">'+text(krwPrice)+'</b>'+
     '<span class="us-list-arrow" aria-hidden="true">›</span></span>'+
    '<span class="us-list-subtitle">'+text(f.type)+'</span>'+
-   '<span class="us-list-source '+source.type+'">'+text(source.short+(q?.kind==='usd-close'?' · 참고환율 · 현재가 아님':q?.kind==='finnhub-private'?' · 원화 환산':''))+'</span>'+
+   '<span class="us-list-source '+source.type+'">'+text(source.short+(common?'':q?.kind==='usd-close'?' · 참고환율 · 현재가 아님':q?.kind==='finnhub-private'?' · 원화 환산':''))+'</span>'+
    (window.ISA_US_SIGNAL?.cardStatus?.(f.id)||'<div class="us-card-signal state-wait"><strong class="us-card-signal-action">대기</strong><span class="us-card-signal-note">매수 판단 로딩 중</span></div>')+
    movingAverageCard(x,q)+holdingCard(f.id,px)+
 
