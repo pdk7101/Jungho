@@ -45,21 +45,6 @@ function renderSignals(){
    prior.delete(id);
   }
  }
- // 종전의 '체결 후 같은 날 중복매수 금지' 안내는 로봇 카드에 보존한다.
- // 별도 한국 ETF 매수의견 표를 다시 만들지 않는다.
- const robotCard=document.querySelector('#funds [data-id="robot"]');
- if(robotCard){
-  const v=byId.robot,flag=v?.type||'wait';
-  const note=flag==='buy'?
-   '오늘 이미 체결됐다면 같은 조건으로 재매수하지 않고 다음 거래일 최신 시세로 다시 판단합니다.':
-   flag==='stop'?
-   '추가매수는 보류하고 다음 거래일 가격 상한과 추세를 확인합니다.':
-   '다음 거래일의 가격·평단·추세를 확인한 뒤 추가매수를 판단합니다.';
-  const target=robotCard.querySelector('.change-mini')||robotCard;
-  let after=target.querySelector('[data-after-fill-note]');
-  if(!after){after=document.createElement('div');after.className='change-mini-events';after.setAttribute('data-after-fill-note','');target.appendChild(after);}
-  after.innerHTML='<b>체결 이후:</b> '+safe(note)+' (키움 실제 체결 여부와 독립된 분석 · 주문 실행 아님)';
- }
  initialized=true;
  for(const item of alertItems)notice(item);
  if(alertItems.length){
@@ -70,15 +55,15 @@ function renderSignals(){
 }
 function mount(){
  const base=$('summary');if(!base)return;
- const section=document.createElement('section');section.className='panel';section.id='intraday-signals';
- section.innerHTML='<h2>한국장 시세 검증 · 변경 알림</h2>'+
+ const section=document.createElement('details');section.className='panel';section.id='intraday-signals';
+ section.innerHTML='<summary>국내 시세 변경 알림 (선택)</summary>'+
  '<p class="sub" id="intraday-signal-status">당일 시세 확인 전</p>'+
- '<p class="sub">이 영역에서는 현재가 검증 상태와 변경 알림만 표시합니다. 종목별 매수·중지 의견은 아래 ETF 카드에 한 번만 표시됩니다.</p>'+
+
 
  '<p id="intraday-signal-changes" class="intraday-signal-changes" role="status" aria-live="polite"></p>'+
  '<button type="button" class="outline" id="intraday-enable-notifications">이 페이지가 열려 있을 때 변경 알림 사용</button>'+
  '<p class="sub" id="intraday-permission-note">알림 허용이 가능한 브라우저에서만 새 신호에 대한 알림을 표시합니다. 앱을 닫으면 자동 감시·푸시가 지속되지 않습니다. 가격 조회 실패 시 매수 신호를 내지 않습니다.</p>';
- base.insertAdjacentElement('beforebegin',section);
+ const settings=$('krx-last-status');if(settings)settings.appendChild(section);else base.appendChild(section);
  $('intraday-enable-notifications').onclick=async()=>{
   const note=$('intraday-permission-note');
   if(!('Notification' in window)){note.textContent='이 브라우저에서는 알림이 지원되지 않습니다. 앱 내부 신호표를 확인하세요.';return;}
