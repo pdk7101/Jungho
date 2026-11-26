@@ -29,6 +29,13 @@ function read(key){
  try{const v=JSON.parse(localStorage.getItem(key)||'null');return v&&typeof v==='object'&&!Array.isArray(v)?v:{};}
  catch(_){return {};}
 }
+// A confirmed cloud connection makes the shared, owner-entered KRW cost basis
+// authoritative on both devices. Keep official snapshots separate and intact.
+function sharedBasis(){
+ const c=read('isa-portfolio-sync-config-v1'),b=read('isa-portfolio-sync-base-v1');
+ return typeof c.url==='string'&&c.url===b.url&&Number.isSafeInteger(b.revision)&&b.revision>0&&
+  !!b.data&&typeof b.data==='object';
+}
 function seoulDay(){
  const v=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{
   timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'
@@ -87,7 +94,7 @@ function row(market,id){
  const us=market==='us',idOk=us?TOSS_US.includes(id):TOSS_KR.some(x=>x[0]===id);
  if(!idOk)return null;
  const key=us?US:TD,stored=read(key)[id]||{},shot=snapshotInfo(market,id);
- const official=officialHolding(market,id);
+ const official=sharedBasis()?null:officialHolding(market,id);
  const cached=!!official&&window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state==='cached';
  const snap=shot.row,oldQty=snap&&known(snap.qty)?Number(snap.qty):null;
  const qty=official?official.qty:known(stored.qty)?Number(stored.qty):oldQty;
@@ -281,7 +288,7 @@ function renderEditors(){
  renderEditor('toss-domestic-positions','domestic',TOSS_KR.map(([id,name])=>[id,name]));
  renderEditor('toss-other-us-positions','us',[['spacex','토스 미국 기타 1종목 (스페이스X 사진 기록)']]);
 }
-window.ISA_PORTFOLIO_TOTALS={totals,row,markAuto,renderEditors,getMode:()=>read(MODE)};
+window.ISA_PORTFOLIO_TOTALS={totals,row,sharedBasis,markAuto,renderEditors,getMode:()=>read(MODE)};
 renderEditors();
 window.addEventListener('pageshow',()=>renderEditors());
 document.addEventListener?.('isa-toss-broker-data',()=>renderEditors());
