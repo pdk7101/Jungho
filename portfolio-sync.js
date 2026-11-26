@@ -24,6 +24,23 @@ function endpoint(raw){
  try{const u=new URL(raw.trim());return u.protocol==='https:'&&u.hostname.endsWith('.workers.dev')&&!u.username&&!u.password&&!u.port&&!u.search&&!u.hash&&(u.pathname==='/'||u.pathname==='/sync')?u.origin+'/sync':null}catch(_){return null}
 }
 let busy=false,conflict=false,lastSeen=null,lastEdit=0,checkingAt=0;
+let quoteFlags={krx:false,us:false},quoteIdentity=null;
+function quoteConnection(kind){
+ const c=read(CONFIG),b=read(BASE);
+ if(!quoteFlags[kind]||!c||!b||c.url!==b.url||b.revision<1||
+  quoteIdentity!==c.url||!endpoint(c.url)||typeof c.token!=='string'||c.token.length<32)return null;
+ return {url:new URL(c.url).origin+'/quote/'+kind,token:c.token};
+}
+window.ISA_SHARED_QUOTES={connection:quoteConnection};
+function setQuoteCapabilities(config,result){
+ const next={krx:result?.quoteCapabilities?.krx===true,us:result?.quoteCapabilities?.us===true};
+ const changed=quoteIdentity!==config.url||next.krx!==quoteFlags.krx||next.us!==quoteFlags.us;
+ quoteFlags=next;quoteIdentity=config.url;
+ const label=$('portfolio-sync-quote-status');
+ if(label)label.textContent='공통 시세: 국내 '+(next.krx?'설정됨':'미설정')+' · 미국 '+(next.us?'설정됨':'미설정');
+ return changed;
+}
+
 function status(message){if($('portfolio-sync-status'))$('portfolio-sync-status').textContent=message;}
 function choices(show,initial=false){
  $('portfolio-sync-choices').hidden=!show;
@@ -90,18 +107,19 @@ async function sync(choice=null){
   let changed;
   try{changed=apply(final.data,original,initial);}
   catch(e){try{if(oldBase===null)localStorage.removeItem(BASE);else localStorage.setItem(BASE,oldBase)}catch(_){}throw e;}
+  const quotesChanged=setQuoteCapabilities(config,final);
   conflict=false;choices(false);
   lastSeen=JSON.stringify(snapshot());lastEdit=0;
   status('자동 동기화 완료 · '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}));
   if(changed){try{sessionStorage.setItem('isa-portfolio-sync-scroll-v1',String(window.scrollY||0));}catch(_){}location.reload();} // Reload existing in-memory editors.
-  else if(initial){window.ISA_KR_APP?.renderCards?.();window.ISA_US_APP?.rerender?.();window.ISA_ACCOUNT_SUMMARY?.refresh?.();}
+  else if(initial||quotesChanged){window.ISA_KR_APP?.renderCards?.();window.ISA_US_APP?.rerender?.();window.ISA_ACCOUNT_SUMMARY?.refresh?.();if(quoteFlags.krx)Promise.resolve(window.ISA_KR_APP?.refresh?.()).catch(()=>{});if(quoteFlags.us)Promise.resolve(window.ISA_PERSONAL_US?.refresh?.()).catch(()=>{});}
  }catch(e){status(String(e.message||e)+' · 기기 기록은 유지됩니다.');}
  finally{busy=false;}
 }
 function mount(){
  const root=$('dashboard-settings');if(!root)return;
  const panel=document.createElement('details');panel.id='portfolio-sync-panel';panel.className='panel';
- panel.innerHTML='<summary><b>개인 투자기록 자동 동기화 · 노트북 / 휴대폰</b></summary><p class="sub">기존 수량·평단·분배금·개인 설정을 비공개 저장소로 연결합니다. 시세·증권사 연결키는 공유하지 않습니다.</p><label>동기화 Worker 주소<input id="portfolio-sync-url" type="url" placeholder="https://…workers.dev" autocomplete="off"></label><label>동기화 전용 비밀키<input id="portfolio-sync-token" type="password" autocomplete="off" placeholder="32자 이상 · 두 기기 동일"></label><button type="button" id="portfolio-sync-connect">연결</button> <button type="button" id="portfolio-sync-disconnect" class="outline">연결 해제</button><p id="portfolio-sync-status" class="sub" role="status">미연결 · 기기별 기록 유지</p><div id="portfolio-sync-choices" hidden><button type="button" id="portfolio-sync-local">이 기기 기록 사용</button> <button type="button" id="portfolio-sync-cloud" class="outline">클라우드 기록 가져오기</button><p class="sub">최초 연결 또는 동시 수정 시에만 선택합니다. 가져오기 전 기존 기기 기록을 백업합니다.</p></div>';
+ panel.innerHTML='<summary><b>개인 투자기록 자동 동기화 · 노트북 / 휴대폰</b></summary><p class="sub">기존 수량·평단·분배금·개인 설정을 비공개 저장소로 연결합니다. 시세·증권사 연결키는 공유하지 않습니다.</p><label>동기화 Worker 주소<input id="portfolio-sync-url" type="url" placeholder="https://…workers.dev" autocomplete="off"></label><label>동기화 전용 비밀키<input id="portfolio-sync-token" type="password" autocomplete="off" placeholder="32자 이상 · 두 기기 동일"></label><button type="button" id="portfolio-sync-connect">연결</button> <button type="button" id="portfolio-sync-disconnect" class="outline">연결 해제</button><p id="portfolio-sync-status" class="sub" role="status">미연결 · 기기별 기록 유지</p><p class="sub" id="portfolio-sync-quote-status">공통 시세 연결 확인 전</p><div id="portfolio-sync-choices" hidden><button type="button" id="portfolio-sync-local">이 기기 기록 사용</button> <button type="button" id="portfolio-sync-cloud" class="outline">클라우드 기록 가져오기</button><p class="sub">최초 연결 또는 동시 수정 시에만 선택합니다. 가져오기 전 기존 기기 기록을 백업합니다.</p></div>';
  root.appendChild(panel);
  const c=read(CONFIG);if(c){$('portfolio-sync-url').value=c.url;$('portfolio-sync-token').value=c.token;status('자동 동기화 연결 확인 중');}
  $('portfolio-sync-connect').onclick=()=>{
@@ -111,7 +129,7 @@ function mount(){
   try{const prev=read(CONFIG);if(prev&&(prev.url!==url||prev.token!==token))localStorage.removeItem(BASE);save(CONFIG,{url,token});conflict=false;choices(false);sync();}
   catch(_){status('기기 저장 실패 · 기존 기록 유지');}
  };
- $('portfolio-sync-disconnect').onclick=()=>{if(busy)return status('동기화 진행 중 · 완료 후 해제');localStorage.removeItem(CONFIG);localStorage.removeItem(BASE);conflict=false;choices(false);$('portfolio-sync-token').value='';status('연결 해제 · 기기 기록 유지');window.ISA_KR_APP?.renderCards?.();window.ISA_US_APP?.rerender?.();window.ISA_ACCOUNT_SUMMARY?.refresh?.();};
+ $('portfolio-sync-disconnect').onclick=()=>{if(busy)return status('동기화 진행 중 · 완료 후 해제');localStorage.removeItem(CONFIG);localStorage.removeItem(BASE);quoteFlags={krx:false,us:false};quoteIdentity=null;conflict=false;choices(false);$('portfolio-sync-token').value='';status('연결 해제 · 기기 기록 유지');window.ISA_KR_APP?.renderCards?.();window.ISA_US_APP?.rerender?.();window.ISA_ACCOUNT_SUMMARY?.refresh?.();};
  $('portfolio-sync-local').onclick=()=>sync('local');
  $('portfolio-sync-cloud').onclick=()=>sync('cloud');
  try{const y=sessionStorage.getItem('isa-portfolio-sync-scroll-v1');if(y!==null){sessionStorage.removeItem('isa-portfolio-sync-scroll-v1');window.addEventListener('load',()=>window.scrollTo(0,Number(y)||0),{once:true});}}catch(_){}
