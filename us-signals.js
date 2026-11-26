@@ -22,6 +22,7 @@ function item(id){
  return d?.items?.find(x=>x.id===id)||null;
 }
 function brokerHolding(id){
+ if(window.ISA_PORTFOLIO_TOTALS?.sharedBasis?.())return null;
  const b=window.ISA_TOSS_BROKER?.snapshot?.(),meta=window.ISA_TOSS_BROKER?.snapshotMeta?.();
  const fetched=Date.parse(b?.fetchedAt||''),age=Date.now()-fetched;
  if(!b?.ok||!Array.isArray(b.holdings)||meta?.state!=='live'||
