@@ -168,7 +168,7 @@ function holdingCard(id,usdPx){
     String(x.symbol||'').toUpperCase()===id.toUpperCase()):null;
  const stamp=Date.parse(official?.fetchedAt||'');
  const recordState=window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state;
- const remote=candidate&&Number.isFinite(stamp)&&stamp<=Date.now()+60000&&
+ const remote=!window.ISA_PORTFOLIO_TOTALS?.sharedBasis?.()&&candidate&&Number.isFinite(stamp)&&stamp<=Date.now()+60000&&
   ['live','cached'].includes(recordState)?candidate:null;
  const officialLine=remote?'<small>토스 공식 보유 '+fmtQty(remote.quantity)+' · 원화 자료 확인 필요</small>':'';
  // Keep the main card in KRW, using the same position basis as the account summary.
