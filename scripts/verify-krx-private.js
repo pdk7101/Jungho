@@ -115,8 +115,11 @@ assert.ok(pageSource.includes('이 기기에 개인 접근 토큰 저장'),
 const cacheStamp=source('scripts/stamp-assets.js');
 assert.ok(cacheStamp.includes("'private-krx-client.js'"),
  'the one-time-token update must be cache-busted on deployment');
-assert.ok(pageSource.includes('내 전용 KRX 공식 종가 연결')&&
- pageSource.includes('private-krx-client.js'));
+assert.ok(pageSource.includes('<details class="panel" id="krx-private-config">')&&
+ pageSource.includes('<summary><b>국내 KRX 시세 연결</b></summary>')&&
+ pageSource.includes('id="krx-private-connect"')&&
+ pageSource.includes('id="krx-private-token"')&&
+ pageSource.includes('private-krx-client.js'), 'private KRX connection remains available in the compact settings menu');
 assert.ok(workflow.includes('private-krx-client.js')&&
  !workflow.includes('cp private-krx-etf-worker.js')&&
  !workflow.includes('KRX_AUTH_KEY: '+ '$'+'{{ secrets.KRX_AUTH_KEY }}'),
