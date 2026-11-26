@@ -166,4 +166,24 @@ assert.equal((await relay.fetch(request('/quote/us',undefined,'https://wrong.exa
 assert.equal((await relay.fetch(request('/quote/us',undefined,undefined,'PUT'),relayEnv)).status,405);
 assert.equal((await relay.fetch(request('/quote/us'),{...relayEnv,US_QUOTE_URL:'https://external.example'})).status,503);
 assert.equal(relayCalls.length,2,'unauthorized or invalid requests never contact a quote server');
+const serviceCalls=[];
+const service={fetch:async req=>{
+ serviceCalls.push(req);return new Response(JSON.stringify({items:[]}));
+}};
+const boundEnv={...relayEnv,KRX_SERVICE:service,US_SERVICE:service};
+assert.equal((await relay.fetch(request('/quote/krx?page=2'),boundEnv)).status,200);
+assert.equal(new URL(serviceCalls[0].url).pathname,'/api/krx-history');
+assert.equal(new URL(serviceCalls[0].url).searchParams.get('page'),'2');
+assert.equal(serviceCalls[0].headers.get('Authorization'),'Bearer '+relayEnv.KRX_QUOTE_TOKEN);
+assert.equal((await relay.fetch(request('/quote/us'),boundEnv)).status,200);
+assert.equal(new URL(serviceCalls[1].url).pathname,'/quotes');
+assert.equal(serviceCalls[1].headers.get('Authorization'),'Bearer '+relayEnv.US_QUOTE_TOKEN);
+assert.equal(relayCalls.length,2,'bound services bypass public worker HTTP');
+assert.equal((await relay.fetch(request('/quote/us','wrong'),boundEnv)).status,401);
+assert.equal(serviceCalls.length,2);
+const badService={fetch:async()=>new Response('failure',{status:401})};
+const denied=await relay.fetch(request('/quote/us'),{...boundEnv,US_SERVICE:badService});
+assert.equal(denied.status,401);
+assert.equal((await denied.json()).error,'시세 원본 접근 토큰 확인 필요');
+console.log('PASS: private service bindings bypass same-account HTTP and preserve upstream authentication');
 console.log('PASS: authenticated shared quote relay, no D1 access or arbitrary redirects');
