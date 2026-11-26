@@ -187,3 +187,50 @@ assert.equal(denied.status,401);
 assert.equal((await denied.json()).error,'시세 원본 접근 토큰 확인 필요');
 console.log('PASS: private service bindings bypass same-account HTTP and preserve upstream authentication');
 console.log('PASS: authenticated shared quote relay, no D1 access or arbitrary redirects');
+
+// Shared valuation is sourced once per refresh interval, not from either device.
+const marketRows=new Map();
+const marketDB={prepare(sql){let args=[];return {
+ bind(...v){args=v;return this},
+ async first(){return marketRows.get(args[0])||null},
+ async run(){if(sql.startsWith('INSERT INTO market_valuation')){
+  const [id,slot,payload,updated_at]=args;
+  if(!marketRows.has(id)||marketRows.get(id).slot<slot)marketRows.set(id,{slot,payload,updated_at});
+ }return {meta:{changes:1}}}
+}}};
+const recent=new Date().toISOString(),recentDay=recent.slice(0,10).replace(/-/g,'');
+let quoteReads=0;
+const krService={fetch:async()=>{quoteReads++;return new Response(JSON.stringify({
+ ok:true,page:0,latestExpected:recentDay,rows:[{id:'reit',code:'329200',date:recentDay,close:4000}],
+ extraQuotes:[{id:'hongah',code:'003280',date:recentDay,close:2000},{id:'sensor',code:'wrong',date:recentDay,close:123}]
+}))}};
+const usService={fetch:async()=>{quoteReads++;return new Response(JSON.stringify({source:'Finnhub personal use',fetchedAt:recent,quotes:{}}))}};
+const valRelay=new Function('fetch','crypto',read('private-portfolio-sync-worker.js').replace('export default','return'))(
+ async(url,options)=>{quoteReads++;assert.equal(url,'https://pdk7101.github.io/Jungho/us-quotes.json');return new Response(JSON.stringify({
+ market:'US',currency:'USD',fx:{ok:true,usdKrw:1400,observedAt:recent},
+ items:[{id:'schd',ticker:'SCHD',ok:true,date:recentDay,close:20}],
+ extraQuotes:{spacex:{id:'spacex',ticker:'SPCX',ok:true,date:recentDay,close:10}}
+ }));},globalThis.crypto);
+const valEnv={...relayEnv,DB:marketDB,KRX_SERVICE:krService,US_SERVICE:usService};
+const valA=await (await valRelay.fetch(request('/quote/valuation'),valEnv)).json();
+const valB=await (await valRelay.fetch(request('/quote/valuation'),valEnv)).json();
+assert.deepEqual(valA,valB,'devices get the same common snapshot in one interval');
+assert.equal(quoteReads,3,'common snapshot avoids repeated upstream requests');
+assert.equal(valA.kr.reit.amount,4000);
+assert.equal(valA.kr.hongah.amount,2000);
+assert.equal(valA.kr.sensor,undefined,'wrong code not cached');
+assert.equal(valA.us.schd.amount,28000);
+assert.equal(valA.us.spacex.amount,14000);
+assert.equal(valA.us.schd.fxRate,valA.us.spacex.fxRate);
+for(const row of marketRows.values())row.slot--;
+const failedEnv={...valEnv,KRX_SERVICE:{fetch:async()=>new Response('failure',{status:502})}};
+const afterFailure=await (await valRelay.fetch(request('/quote/valuation'),failedEnv)).json();
+assert.deepEqual(afterFailure.kr,valA.kr,'common KR last-good prices survive upstream failure');
+assert.equal((await valRelay.fetch(request('/quote/valuation','wrong'),valEnv)).status,401);
+window.ISA_SHARED_QUOTES={valuationEnabled:()=>true,valuationPrice:(m,id)=>({amount:m==='kr'?4000:28000,date:recent.slice(0,10),source:'synthetic common quote'})};
+window.ISA_US_KRW.priceKrw=()=>({amount:999999,stamp:recent});
+assert.equal(portfolio.row('us','schd').unitPrice,28000,'shared valuation takes priority over device-only quote');
+assert.equal(portfolio.row('domestic','treit').unitPrice,4000);
+window.ISA_SHARED_QUOTES.valuationPrice=()=>null;
+assert.equal(portfolio.row('us','schd').unitPrice,100,'missing common price falls back only to shared recorded photo, never device quote');
+console.log('PASS: common valuation snapshot, shared FX, source validation, last-good fallback, no device-only price override');
