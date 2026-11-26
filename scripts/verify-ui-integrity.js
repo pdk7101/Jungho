@@ -30,7 +30,7 @@ const required=[
  'id="funds"','id="plan"','id="etf-flow-list"'
 ];
 for(const control of required)assert.ok(markup.includes(control),'existing control must remain: '+control);
-assert.ok(markup.includes('계좌·분배금 기록은 이 브라우저에만 저장')&&
+assert.ok(markup.includes('계좌·분배금 기록은 이 기기에 저장되며 개인 동기화 연결 시 다른 기기에도 반영')&&
  markup.includes('id="account-summary-recalc"')&&
  markup.includes('↻ 전체 최신정보 조회')&&
  markup.includes('id="account-live-state"')&&
@@ -67,4 +67,7 @@ assert.ok(workflow.includes('private-krx-client.js')&&
 const quotes=JSON.parse(read('quotes.json')),metrics=JSON.parse(read('metrics.json'));
 assert.ok(quotes.items.every(x=>!x.ok)&&metrics.items.every(x=>!x.ok),
  'public static site cannot redistribute KRX prices or NAV');
+assert.ok(markup.includes('<details id="us-chart-panel">')&&markup.indexOf('id="personal-us-live"')<markup.indexOf('id="holdings-settings"'),'US connection grouped in settings and chart collapsed by default');
+assert.ok(markup.indexOf('id="watch-budget-settings"')<markup.indexOf('id="holdings-settings"'),'watch and budget settings grouped with other controls');
+assert.ok(!read('us-dashboard.js').includes('class="us-price-meaning"')&&!read('us-dashboard.js').includes('class="us-list-foot"'),'single price source per US card and no repeated tap instructions');
 console.log('PASS: unique UI ids / JS imports, script syntax, preserved holdings and dividend panels, deduplicated official-data labels, private KRX publication');
