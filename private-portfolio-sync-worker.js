@@ -96,6 +96,20 @@ function usValuation(body,previous,now){
  }
  return out;
 }
+function withRecentTrades(body,base,now){
+ const out=Object.fromEntries(Object.entries(base||{}).map(([id,q])=>[id,{...q}]));
+ for(const [id,q] of Object.entries(out)){
+  delete q.liveAmount;delete q.liveAt;
+  const trade=body?.quotes?.[id];
+  if(!String(body?.source||'').includes('Finnhub')||!within(body.fetchedAt,5*60000,now)||
+   trade?.symbol!==US_CODES[id]||!validPositive(trade.usd)||!within(trade.tradeAt,45*60000,now)||
+   !validPositive(q.fxRate))continue;
+  const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(trade.tradeAt)).map(x=>[x.type,x.value]));
+  if(p.year+'-'+p.month+'-'+p.day<=q.date)continue;
+  q.liveAmount=trade.usd*q.fxRate;q.liveAt=trade.tradeAt;
+ }
+ return out;
+}
 async function sharedValuation(request,env){
  if(request.method!=='GET')return response(405,{error:'method'});
  try{
@@ -120,8 +134,17 @@ async function sharedValuation(request,env){
     return r.ok?krValuation(await r.json(),before,now):before;
    }),
    update('us',5*60000,async before=>{
-    const r=await fetch(ORIGIN+'/Jungho/us-quotes.json',{redirect:'manual',headers:{Accept:'application/json'},cache:'no-store'});
-    return r.ok?usValuation(await r.json(),before,now):before;
+    let base=before,live=null;
+    try{
+     const r=await fetch(ORIGIN+'/Jungho/us-quotes.json',{redirect:'manual',headers:{Accept:'application/json'},cache:'no-store'});
+     if(r.ok)base=usValuation(await r.json(),before,now);
+    }catch(_){}
+    try{
+     const u=new URL(request.url);u.pathname='/quote/us';u.search='';
+     const r=await forwardQuote(new Request(u.toString(),{method:'GET'}),env,'us');
+     if(r.ok)live=await r.json();
+    }catch(_){}
+    return withRecentTrades(live,base,now);
    })
   ]);
   // Old quotes remain dated and are never passed off as today's prices.
