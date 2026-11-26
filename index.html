@@ -1147,7 +1147,7 @@ function accountTotals(){
   if(!valid(h.avg)){missingHoldings.push(f.id+' 평단');return;}
   principal+=qty*Number(h.avg);
   var q=freshQuote(f.id),b=!q?brokerLastPrice(f.id):null,x=byId[f.id],price=null;
-  if(window.ISA_SHARED_QUOTES?.valuationEnabled?.()){
+  if(typeof window!=='undefined'&&window.ISA_SHARED_QUOTES?.valuationEnabled?.()){
    var common=window.ISA_SHARED_QUOTES.valuationPrice('kr',f.id);
    if(common){price=common.amount;usedClose++;dates.push(common.date);}
   }
