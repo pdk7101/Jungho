@@ -81,9 +81,10 @@ function renderDiagnostics(){
  host.textContent='시세 서버 코드 '+(workerVersion||'버전 표기 없음(구버전 Worker 가능)')+
   ' / '+[...IDS,'spacex'].map(id=>(id==='spacex'?'SPCX':id.toUpperCase())+': '+(diagnostics[id]||'미확인')).join(' / ');
 }
+ function sharedConnection(){return window.ISA_SHARED_QUOTES?.connection?.('us')||null;}
  function connectionState(){
   // Public UI diagnostics only. Never return the access token or a secret-bearing URL.
-  return {configured:Boolean(endpoint&&password),fetching:busy,
+  return {configured:Boolean(sharedConnection()||endpoint&&password),fetching:busy,
    count:IDS.filter(id=>quote(id)).length,
    error:lastError?'시세 서버 조회 실패':'',
    lastChecked:fetchedAt||null};
@@ -97,7 +98,7 @@ function renderDiagnostics(){
   const label=fetchedAt?new Date(fetchedAt).toLocaleTimeString('ko-KR',
    {timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit'}):'없음';
   const msg=lastMessage?
-   lastMessage+' · ':endpoint?'개인용 무료 시세 연결됨 · ':'아직 연결되지 않음 · ';
+   lastMessage+' · ':sharedConnection()?'공통 시세 연결됨 · ':endpoint?'개인용 무료 시세 연결됨 · ':'아직 연결되지 않음 · ';
   const line=validCount?
    '유효한 최근 체결 '+validCount+'/4 · 마지막 확인 '+label+' · 원화 평가에 사용':
    '유효한 장중 체결가격 없음 · 기존 확정 종가로 계산';
@@ -105,16 +106,17 @@ function renderDiagnostics(){
   renderDiagnostics();
   if($('us-live-badge'))$('us-live-badge').textContent=validCount?
    'Finnhub 개인 장중 체결 '+validCount+'/4 · '+label+' 조회 · SPCX '+(quote('spacex')?'연결':'미확인')+' · 거래소 전체 체결가와 다를 수 있음':
-   '개인 장중시세 '+(endpoint?'조회 대기/만료':'미설정')+' · 기본 미국장 확정 종가 참고';
+   '개인 장중시세 '+((sharedConnection()||endpoint)?'조회 대기/만료':'미설정')+' · 기본 미국장 확정 종가 참고';
  }
  async function refresh(){
-  if(!endpoint||!password||busy||document.hidden)return;
+  const shared=sharedConnection();
+  if((!shared&&(!endpoint||!password))||busy||document.hidden)return;
   busy=true;lastRequestAt=Date.now();lastError='';
   status('현재가 조회 중');
   try{
-   const r=await fetch(endpoint+'/quotes',{
+   const r=await fetch(shared?shared.url:endpoint+'/quotes',{
     method:'GET',
-    headers:{Authorization:'Bearer '+password,Accept:'application/json'},
+    headers:{Authorization:'Bearer '+(shared?shared.token:password),Accept:'application/json'},
     cache:'no-store',
     signal:AbortSignal.timeout(12000)});
    if(!r.ok)throw Error('개인 시세 서버 오류 '+r.status);
@@ -192,7 +194,7 @@ function renderDiagnostics(){
  if(connectButton)connectButton.addEventListener('click',connect);
  if(stopButton)stopButton.addEventListener('click',disconnect);
  if(quickRefresh)quickRefresh.addEventListener('click',function(){
-  if(!endpoint||!password){
+  if(!sharedConnection()&&(!endpoint||!password)){
    if($('personal-us-live'))$('personal-us-live').open=true;
    status('시세 연결을 먼저 설정해 주세요');
    return;
@@ -225,7 +227,7 @@ function renderDiagnostics(){
  function refreshOnReturn(){
   // Mobile in-app browsers may restore a tab without a visibilitychange event.
   // Recheck on focus/pageshow while throttling duplicate lifecycle events.
-  if(document.hidden||!endpoint||!password||busy||Date.now()-lastRequestAt<15000)return;
+  if(document.hidden||(!sharedConnection()&&(!endpoint||!password))||busy||Date.now()-lastRequestAt<15000)return;
   refresh();
  }
  document.addEventListener('visibilitychange',refreshOnReturn);
