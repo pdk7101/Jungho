@@ -142,3 +142,28 @@ assert.equal(account.getTotals().toss.value,withCacheAccount.value);
 assert.equal(saved.totals.valueKRW,12000,'official snapshot never modified');
 console.log('PASS: synchronized KRW cost basis is independent of device-only official balance');
 console.log('PASS: Toss actual broker total authority, discrepancy, 14-price provenance, same-day override, explicit auto mode');
+
+// Cloud-only quote relay uses a separate authenticated route, not the portfolio DB.
+const relayCalls=[];
+const relay=new Function('fetch','crypto',read('private-portfolio-sync-worker.js').replace('export default','return'))(
+ async(url,options)=>{relayCalls.push({url,options});return new Response(JSON.stringify({items:[]}));},
+ globalThis.crypto);
+const relayEnv={PORTFOLIO_SYNC_TOKEN:'s'.repeat(32),
+ KRX_QUOTE_URL:'https://mock-krx.pdk7101.workers.dev',KRX_QUOTE_TOKEN:'k'.repeat(20),
+ US_QUOTE_URL:'https://mock-us.pdk7101.workers.dev',US_QUOTE_TOKEN:'u'.repeat(20)};
+const request=(path,token=relayEnv.PORTFOLIO_SYNC_TOKEN,origin='https://pdk7101.github.io',method='GET')=>
+ new Request('https://jungho-portfolio-sync.pdk7101.workers.dev'+path,{method,headers:{Origin:origin,Authorization:'Bearer '+token}});
+assert.equal((await relay.fetch(request('/quote/krx?page=0'),relayEnv)).status,200);
+assert.equal(relayCalls[0].url,relayEnv.KRX_QUOTE_URL+'/api/krx-history?page=0');
+assert.equal(relayCalls[0].options.headers.Authorization,'Bearer '+relayEnv.KRX_QUOTE_TOKEN);
+assert.equal(relayCalls[0].options.redirect,'manual');
+assert.equal((await relay.fetch(request('/quote/us'),relayEnv)).status,200);
+assert.equal(relayCalls[1].url,relayEnv.US_QUOTE_URL+'/quotes');
+assert.equal(relayCalls[1].options.headers.Authorization,'Bearer '+relayEnv.US_QUOTE_TOKEN);
+assert.equal((await relay.fetch(request('/quote/krx?page=5'),relayEnv)).status,400);
+assert.equal((await relay.fetch(request('/quote/us','wrong'),relayEnv)).status,401);
+assert.equal((await relay.fetch(request('/quote/us',undefined,'https://wrong.example'),relayEnv)).status,403);
+assert.equal((await relay.fetch(request('/quote/us',undefined,undefined,'PUT'),relayEnv)).status,405);
+assert.equal((await relay.fetch(request('/quote/us'),{...relayEnv,US_QUOTE_URL:'https://external.example'})).status,503);
+assert.equal(relayCalls.length,2,'unauthorized or invalid requests never contact a quote server');
+console.log('PASS: authenticated shared quote relay, no D1 access or arbitrary redirects');
