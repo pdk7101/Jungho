@@ -400,7 +400,7 @@ details[open]>summary{margin-bottom:12px}
 @media(min-width:760px){#us-panel .us-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style><script src="./live-prices.js"></script><script src="./private-krx-client.js"></script>
 </head><body><main>
-<header><div><small>내 투자 · 무료 대시보드 · 11/26 v12</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
+<header><div><small>내 투자 · 무료 대시보드 · 11/26 v13</small><h1>토스·키움 투자 현황</h1><div class="sub">보유금액 · 최신 조회가격 · 매수·중지·보류</div></div><span class="pill" id="signal">확인 중</span></header>
 <section class="panel account-summary" id="account-summary" aria-labelledby="account-summary-title">
  <div class="account-head"><h2 id="account-summary-title">전체 계좌 현황</h2><button type="button" id="account-summary-recalc" title="연결된 토스·KRX·미국 주식 시세를 한 번에 확인합니다.">↻ 전체 최신정보 조회</button></div>
  <p id="account-live-state" role="status">토스·KRX·미국 시세 자동 확인 중…</p>
@@ -690,6 +690,7 @@ function freshQuote(id){
  return q;
 }
 function brokerLastPrice(id){
+ if(window.ISA_PORTFOLIO_TOTALS?.sharedBasis?.())return null;
  // Recent, read-only Toss official holdings: quote is the LAST reported unit
  // price at fetch time. It has NO verified trade timestamp or final-close flag.
  var broker=window.ISA_TOSS_BROKER?.snapshot?.(),meta=window.ISA_TOSS_BROKER?.snapshotMeta?.();
