@@ -114,8 +114,8 @@ function priceSource(f,x,wonQuote){
     month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'')};
  }
  if(wonQuote?.kind==='toss-broker-last')return {type:'broker',short:
-  '토스 공식 잔고 조회 마지막 단가 · '+new Date(wonQuote.stamp).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+
-  ' · 체결시각 미제공 · 실시간 보장 아님'};
+  '토스 마지막 조회 단가 · '+new Date(wonQuote.stamp).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+
+  ' · 실시간 아님'};
  if(wonQuote?.manual)return {type:'manual',short:'토스 원화 현재가 직접 입력 · 당일만 유효'};
  const reason=state?.fetching?'장중 시세 확인 중':
   !state?.configured?'장중 시세 미연결':
@@ -139,7 +139,7 @@ function movingAverageCard(x,wonQuote){
   '<div class="us-ma-comparison">비교가격 '+wonAmount(wonQuote.amount)+' · 20일선 대비 '+
   '<b class="'+(diff>=0?'us-positive':'us-negative')+'">'+signedWon(diff)+' ('+pct(relative)+')</b></div>'+
   '<div class="us-ma-foot">5일선 '+wonAmount(m5,2)+' · 기준 '+date(x.date)+' 확정 일봉</div>'+
-  '<div class="us-ma-foot">달러 이동평균에 동일 참고환율을 곱한 값 · 실제 원화 이평선 아님</div>'+
+  '<div class="us-ma-foot">달러 이평선의 원화 환산값</div>'+
   '</div>';
 }
 function holdingCard(id,usdPx){
@@ -170,32 +170,18 @@ function holdingCard(id,usdPx){
  const recordState=window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state;
  const remote=candidate&&Number.isFinite(stamp)&&stamp<=Date.now()+60000&&
   ['live','cached'].includes(recordState)?candidate:null;
- const officialLine=remote?
-  '<div class="us-card-pnl">토스 공식 보유 '+fmtQty(remote.quantity)+
-  ' · USD 평단 '+(valid(remote.averagePurchasePrice)?usd(remote.averagePurchasePrice):'미확인')+
-  ' · USD 평가 '+(valid(remote.marketValue)?usd(remote.marketValue):'미확인')+
-  ' · 조회 '+new Date(stamp).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+
-  ' · 원화 평단 기록과 별개</div>':'';
- if(remote&&Number.isFinite(remote.marketValue)&&
-  Number.isFinite(remote.purchaseAmount)&&Number.isFinite(remote.quantity)){
-  const fx=Number(window.ISA_US_KRW?.priceKrw?.(id,usdPx)?.fxRate??official.fx?.usdKrw);
-  const quote=window.ISA_US_KRW?.priceKrw?.(id,usdPx);
-  const latest=valid(quote?.usd)?Number(quote.usd):null;
-  const value=latest!==null?remote.quantity*latest:remote.marketValue,purchase=remote.purchaseAmount,delta=value-purchase;
-  const rate=purchase>0?100*delta/purchase:null;
-  const recorded=new Date(stamp).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'});
-  const source=recordState==='cached'?'마지막 저장된 토스 잔고 · 현재 잔고 아님':
-   '토스 공식 API 보유자료';
-  const rateLine=Number.isFinite(fx)&&fx>0?
-   '<div class="us-card-pnl">적용 USD 가격 × 참고환율 · 원화 평가 약 '+
-    wonAmount(value*fx)+' · 토스 앱 원화금액과 다를 수 있음</div>':'';
-  return '<div class="us-card-holding"><b>'+source+' · 보유 '+fmtQty(remote.quantity)+'</b>'+
-   '<div class="us-card-pnl">USD 평단 '+usd(remote.averagePurchasePrice)+
-   ' · USD 참고 평가 '+usd(value)+' · 적용 단가 '+usd(latest??remote.lastPrice)+'</div>'+
-   '<div class="us-card-pnl '+(delta>=0?'us-positive':'us-negative')+'">USD 참고 평가손익 '+
-   (delta>=0?'+':'')+usd(delta)+(rate===null?'':' ('+pct(rate)+')')+'</div>'+
-   rateLine+'<small>조회 '+recorded+' · 체결시각 미제공</small>'+
-   receiptLine+'</div>';
+ const officialLine=remote?'<small>토스 공식 보유 '+fmtQty(remote.quantity)+' · 원화 자료 확인 필요</small>':'';
+ // Keep the main card in KRW, using the same position basis as the account summary.
+ const row=window.ISA_PORTFOLIO_TOTALS?.row?.('us',id);
+ if(remote&&row?.official&&Number.isFinite(row.qty)&&Number.isFinite(row.invested)&&Number.isFinite(row.value)){
+  const pnl=row.value-row.invested,rate=row.invested>0?100*pnl/row.invested:null;
+  const net=receipt&&receipt.amount!==null&&receipt.amount!==undefined&&Number.isFinite(Number(receipt.amount))?Number(receipt.amount):null;
+  const inclusive=net===null?null:pnl+net;
+  return '<div class="us-card-holding">보유 '+fmtQty(row.qty)+' · 평단 '+(valid(row.avg)?wonAmount(row.avg,2):'미확인')+
+   '<div class="us-card-pnl '+(pnl>=0?'us-positive':'us-negative')+'">평가손익 '+signedWon(pnl)+(rate===null?'':' ('+pct(rate)+')')+'</div>'+
+   receiptLine+
+   (inclusive===null?'':'<div class="us-card-inclusive '+(inclusive>=0?'us-positive':'us-negative')+'">분배금 포함 총손익 '+signedWon(inclusive)+(row.invested>0?' ('+pct(100*inclusive/row.invested)+')':'')+'</div>')+
+   '<small>'+(row.cachedHolding?'저장된 토스 보유자료 · 새 매매 미반영':'토스 공식 보유자료')+' · 원화 환산 참고</small></div>';
  }
  const holdings='보유 '+(qty===null?'미입력':fmtQty(qty))+
   ' · 평단 '+(avg===null?'미입력':wonAmount(avg,2));
