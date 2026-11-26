@@ -1,6 +1,6 @@
 // Isolated v17 collector. Not yet wired to live routes or cron.
 // All prices and attempts are private. Existing portfolio keys are untouched.
-export const BATCH=10, INTERVAL=60000, FRESH=5*60000;
+export const BATCH=10, INTERVAL=60000, FRESH=5*60000, LEASE=180000;
 const positive=x=>typeof x==='number'&&Number.isFinite(x)&&x>0;
 const validSymbol=s=>typeof s==='string'&&/^[A-Z][A-Z0-9.\-]{0,14}$/.test(s);
 export function activeUS(catalog,holdings){
@@ -30,15 +30,15 @@ export function normalize(symbol,body,now){
 export function d1Store(db){
  return {
   async init(){
-   await db.prepare('CREATE TABLE IF NOT EXISTS us_collect_gate_v17 (id INTEGER PRIMARY KEY CHECK(id=1), next_at INTEGER NOT NULL)').run();
+   await db.prepare('CREATE TABLE IF NOT EXISTS us_collect_gate_v17 (id INTEGER PRIMARY KEY CHECK(id=1), next_at INTEGER NOT NULL, owner INTEGER NOT NULL)').run();
    await db.prepare('CREATE TABLE IF NOT EXISTS us_collect_quotes_v17 (symbol TEXT PRIMARY KEY, attempt_at INTEGER NOT NULL, payload TEXT, error TEXT)').run();
   },
   async claim(now){
-   const r=await db.prepare('INSERT INTO us_collect_gate_v17(id,next_at) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET next_at=excluded.next_at WHERE us_collect_gate_v17.next_at<=?').bind(now+INTERVAL,now).run();
+   const r=await db.prepare('INSERT INTO us_collect_gate_v17(id,next_at,owner) VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET next_at=excluded.next_at,owner=excluded.owner WHERE us_collect_gate_v17.next_at<=?').bind(now+LEASE,now,now).run();
    return r.meta.changes===1;
   },
-  async backoff(until){
-   await db.prepare('UPDATE us_collect_gate_v17 SET next_at=max(next_at,?) WHERE id=1').bind(until).run();
+  async finish(owner,until){
+   await db.prepare('UPDATE us_collect_gate_v17 SET next_at=? WHERE id=1 AND owner=?').bind(until,owner).run();
   },
   async load(symbols){
    if(!symbols.length)return {};
@@ -59,7 +59,7 @@ export function d1Store(db){
   }
  };
 }
-export async function collectUS({catalog,holdings,store,fetchQuote,now=Date.now(),sessionOpen=false}){
+export async function collectUS({catalog,holdings,store,fetchQuote,now=Date.now(),sessionOpen=false,clock=Date.now}){
  const symbols=activeUS(catalog,holdings);
  if(!sessionOpen||!symbols.length)return {status:'closed-or-empty',attempted:0};
  await store.init();
@@ -68,21 +68,25 @@ export async function collectUS({catalog,holdings,store,fetchQuote,now=Date.now(
  if(!batch.length)return {status:'cached',attempted:0};
  if(!await store.claim(now))return {status:'rate-limited-locally',attempted:0};
  let attempted=0,succeeded=0;
+ let delay=INTERVAL;
+ try{
  // Sequential (not a burst), max 10 calls per reserved minute.
  for(const symbol of batch){
+  if(Math.max(now,clock())-now>=LEASE-15000)break;
   attempted++;
   let result;try{result=await fetchQuote(symbol)}catch(_){result={status:0}}
-  const q=result?.status===200?normalize(symbol,result.body,now):null;
+  const q=result?.status===200?normalize(symbol,result.body,Math.max(now,clock())):null;
   const old=records[symbol]?.quote;
   const newer=q&&(!old||Date.parse(q.tradeAt)>=Date.parse(old.tradeAt))?q:null;
   await store.save(symbol,now,newer,result?.status===429?'upstream_429':newer?null:'unavailable-or-older');
   if(newer)succeeded++;
   if(result?.status===429){
-   await store.backoff(now+2*INTERVAL);
+   delay=2*INTERVAL;
    return {status:'provider-rate-limit',attempted,succeeded};
   }
  }
  return {status:'collected',attempted,succeeded};
+ }finally{await store.finish(now,Math.max(now,clock())+delay);}
 }
 export function finnhubFetcher(key,fetchImpl=fetch){
  if(typeof key!=='string'||!key)throw Error('provider key missing');
