@@ -286,7 +286,7 @@ function saveReference(id,data,signature){
  return entry;
 }
 function referenceDisplay(id,data){
- if(!data?.estimated||data.brokerApi)return data;
+ if(!data?.estimated||data.brokerApi||window.ISA_SHARED_QUOTES?.valuationEnabled?.())return data;
  const signature=referenceSignature(id,data),old=read(REFERENCE)[id];
  const same=recordOK(old)&&old.signature===signature;
  const ready=data.complete&&finite(data.invested)&&finite(data.value);
@@ -360,7 +360,7 @@ function render(){
    ready?(x.toss.estimated?(x.toss.brokerApi&&!x.toss.revalued?'마지막 토스 저장 잔고':'참고 평가 자동 갱신'):'직접 기록한 계좌 금액')+' · 토스 실계좌 미연결':
    own?.loading?'보유정보·시세 확인 중':'토스 실계좌 미연결 · 참고 평가 확인 필요';
   if(!actual&&ready&&x.toss?.estimated)notice.textContent+=' · 새 매매 미반영';
-  if(window.ISA_PORTFOLIO_TOTALS?.sharedBasis?.())notice.textContent='공통 보유기록 기준 · 참고 평가 · 새 매매 자동 반영 아님';
+  if(window.ISA_PORTFOLIO_TOTALS?.sharedBasis?.())notice.textContent=window.ISA_SHARED_QUOTES?.valuationEnabled?.()?'공통 보유기록·평가가격 기준 · 새 매매 자동 반영 아님':'공통 보유기록 기준 · 참고 평가 · 새 매매 자동 반영 아님';
  const diagnostic=$('account-connection-detail');
   if(diagnostic)diagnostic.textContent=(own?.diagnosis?'토스 연결: '+own.diagnosis:
    connected?'토스 연결 설정 저장됨':'토스 연결 설정 없음')+
@@ -376,7 +376,7 @@ function render(){
    '토스의 공식 API 원화·USD 통화별 합계를 현재 환율로 환산한 참고액입니다. 토스 앱의 비용·환율 산식과 다를 수 있습니다. ':
    '공식 토스 연결이 없으면 저장된 보유정보와 확인된 시세로 참고 평가합니다. 새 매매는 반영되지 않습니다. ')+
    (latest?' 마지막 참고 계산: '+new Date(latest).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+'. ':'')+
-   '개인 동기화 연결 시 보유기록이 공유되며, 시세·증권사 연결은 기기별로 설정합니다.';
+   '개인 동기화 연결 시 보유기록과 공통 평가가격을 사용합니다. 토스 실제 계좌 연결은 별도입니다.';
  }
  const brokerNote=$('account-broker-compare');
  if(brokerNote){
@@ -512,6 +512,7 @@ function mount(){
   if(state)state.textContent='연결된 계좌·한국·미국 가격을 확인 중… 마지막 성공 기록은 유지합니다.';
   try{
    const tasks=[];
+   if(window.ISA_SHARED_QUOTES?.valuationEnabled?.())tasks.push(window.ISA_SHARED_QUOTES.refreshValuation(true));
    if(window.ISA_TOSS_BROKER?.configured?.())tasks.push(window.ISA_TOSS_BROKER.load());
    if(window.ISA_KR_APP?.refresh)tasks.push(window.ISA_KR_APP.refresh());
    if(window.ISA_US_APP?.refresh)tasks.push(window.ISA_US_APP.refresh());
