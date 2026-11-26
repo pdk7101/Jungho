@@ -528,7 +528,17 @@ function mount(){
   }
  };
  $('account-summary-recalc')?.addEventListener('click',refreshAll);
- const auto=()=>{if(document.visibilityState!=='hidden'&&Date.now()-lastAuto>=5*60000)refreshAll().catch(()=>{});};
+ // KRX's previous-session file generally opens around 08:00 KST.
+ // In the 08:00–09:00 window, retry on returning to the page (once per minute).
+ // This is foreground refresh, not a promise of running when the browser is closed.
+ const auto=()=>{
+  if(document.visibilityState==='hidden')return;
+  const now=Date.now(),clock=Object.fromEntries(new Intl.DateTimeFormat('en-US',{
+   timeZone:'Asia/Seoul',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'
+  }).formatToParts(new Date(now)).map(p=>[p.type,p.value]));
+  const preOpen=!['Sat','Sun'].includes(clock.weekday)&&Number(clock.hour)===8;
+  if(now-lastAuto>=(preOpen?60000:5*60000))refreshAll().catch(()=>{});
+ };
  lastAuto=Date.now();
  if(typeof setInterval==='function')setInterval(auto,60000);
  document.addEventListener('visibilitychange',auto);
