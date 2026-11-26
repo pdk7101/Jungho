@@ -57,6 +57,18 @@ equal(cardDisplay.cardDecisionLabel(refDisplay),'종가 참고 · 매수 검토 
 truth(refDisplay.reference&&refDisplay.basis.includes('오늘 주문 신호 아님'),'historical signal is explicitly marked');
 const stopDisplay=cardDisplay.cardDecision({id:'robot'},{rows:{robot:{type:'stop',close:10000}}},null);
 equal(cardDisplay.cardDecisionLabel(stopDisplay),'중지','confirmed decision replaces reference label');
+// Data readiness refers to the session required for a decision, not the number of historic charts.
+const readinessSource=html.slice(html.indexOf('function kstClock(now)'),html.indexOf('function completedClose(id,phase,latestDate)'));
+const readinessFunds=['reit','sol','robot','space','sofr','tr'].map(id=>({id}));
+const readinessBars=Object.fromEntries(readinessFunds.map(f=>[f.id,{date:'20261125'}]));
+const readReady=new Function('FUNDS','byId','verified',readinessSource+'\nreturn quoteReadiness;')(readinessFunds,readinessBars,()=>true);
+equal(readReady(new Date('2026-11-26T22:52:00+09:00')).ready,0,'six historical charts do not mean today close is ready');
+equal(readReady(new Date('2026-11-26T22:52:00+09:00')).expected,'20261126','after close needs the current session');
+readinessBars.reit.date='20261126';
+equal(readReady(new Date('2026-11-27T08:10:00+09:00')).ready,1,'partial new session quotes are counted separately');
+for(const f of readinessFunds)readinessBars[f.id].date='20261126';
+equal(readReady(new Date('2026-11-27T08:10:00+09:00')).ready,6,'latest previous session eligible before open');
+truth(readReady(new Date('2026-11-27T10:00:00+09:00')).intraday,'daily readiness does not imply an intraday trade feed');
 const cardsMarkup=html.slice(html.indexOf('list.innerHTML=FUNDS.map'),html.indexOf("document.dispatchEvent(new Event('isa-rendered'))",html.indexOf('list.innerHTML=FUNDS.map')));
 equal(cardsMarkup.split('class="status state-').length-1,1,'one decision status per domestic ETF card');
 truth(!html.includes('당일 시세 판단 보류</div>')&&!html.includes('class="eod-checklist"'),'duplicated reference status and expanded per-symbol plan lists removed');
