@@ -43,3 +43,11 @@
 - D1 신규 분리 테이블 2개 설계: 원자적 3분 임대 잠금, 완료 후 최소 1분 간격, 429 시 2분 후 재시도, 실패/과거 시세로 정상값 덮어쓰기 방지. 실제 D1 미적용. 기존 Finnhub Worker가 동시에 호출하는 경우 전체 API 계정 한도를 보장하지 않으므로 통합 시 기존 경로와 중복 호출 제거 필요.
 - `scripts/verify-us-collector-v17.mjs`: 합성 100종목, 메모리 저장소 모의 시험 14건 통과. 100종목 10분 순환은 즉시 응답하는 합성 조건이며 실제 운영 속도 보장 아님.
 - 다음: 기존 서비스 바인딩/비밀키 유지하는 배포 형태 및 D1 예약 동시성 테스트, 거래 달력/스케줄 연결, 인증 경로 및 읽기 전용 조회, 기존 고정 5종목 경로와 호환성, 실제 장중 검증. 신규 UI 및 운영 배포 전 전체 회귀 시험.
+
+## 예약 수집 연결 후보 (2026-11-27)
+- `private-us-scheduled-worker-v17.js`: 기존 Finnhub Worker 교체 후보(단일 파일), 기존 VIEW_TOKEN 및 FINNHUB_API_KEY 재사용. 같은 D1을 DB로 바인딩하고 1분 UTC Cron Trigger가 필요하다. 운영 환경 미변경.
+- 정규장 판정: NYSE 2026~2028 공식 휴일·조기마감, 뉴욕 시간대 DST 자동 처리. 달력 범위 밖에는 수집하지 않는다. https://www.nyse.com/trade/hours-calendars
+- 예약 작업만 Finnhub 호출. /quotes GET은 기존 5개 ID 및 동적 bySymbol 캐시를 반환하며 공급원 요청을 하지 않는다. 수신시각 7분, 체결시각 45분 초과 가격은 제외. 신규 종목 레지스트리 별도 테이블의 실제 작성 기능은 후속 과제이며 현재 행이 없으면 기존 5개만 사용.
+- 무료 Workers/D1 범위 내에서 설계하되 실제 무료 Cron CPU 제한·서비스 호출량과 공급원 응답 시간 측정이 필요하다. https://developers.cloudflare.com/workers/platform/limits/ 및 https://developers.cloudflare.com/d1/platform/limits/
+- 합성 달력/응답 테스트 14건 통과. 별도 Node SQLite 기반 잠금·인증 테스트와 v16 회귀 테스트는 .github/workflows/verify-v17.yml 에 등록. 이 워크플로는 개발 브랜치 전용이며 Pages 배포 및 실제 API/DB 호출을 하지 않는다.
+- 배포 전 해결: 구형 클라이언트 버전 진단 및 공통 평가 날짜/시세 일치, 자동 등록용 레지스트리 쓰기, 실제 D1/장중 성능, Cloudflare 예약 실행/기기 OFF 검증. 기존 Worker에 적용 전 보안 토큰 교체 및 롤백 경로 준비.
