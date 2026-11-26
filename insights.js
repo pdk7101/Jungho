@@ -244,8 +244,8 @@ function updateSol(){
 function mount(){
  const root=$('summary');
  if(!root||!$('important-changes')||$('sol-panel'))return;
- const sol=document.createElement('section');sol.className='panel';sol.id='sol-panel';
- sol.innerHTML='<h2>SOL · 주당 분배금 목표 분석</h2>'+
+ const sol=document.createElement('details');sol.className='panel';sol.id='sol-panel';
+ sol.innerHTML='<summary><b>SOL · 월 분배금 목표 분석</b></summary>'+
  '<p class="fieldset-note">월 분배금 목표: 세전 30만~50만원 · ETF 실제 분배금·NAV·옵션 운용정보는 <a href="'+DOC_URL+'" target="_blank" rel="noopener noreferrer">운용사 SOL ETF 공식 안내</a>에서 확인하세요. 지급내역은 운용사 공식 공시에서 확인하세요.</p>'+
  '<label class="sol-input-label">목표 계산용 가정 수량 (주) <input id="sol-sim-shares" type="number" min="0" step="1" placeholder="내 보유수량 또는 가정 수량"></label>'+
  '<div id="sol-summary"></div>'+
