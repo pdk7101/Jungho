@@ -24,7 +24,7 @@ function quoteConfig(env,kind){
    u.username||u.password||u.port||u.pathname!=='/'||u.search||u.hash||
    u.hostname==='jungho-portfolio-sync.pdk7101.workers.dev'||
    typeof token!=='string'||token.length<20)return null;
-  return {url:u.origin,token};
+  return {url:u.origin,token,service:kind==='krx'?env.KRX_SERVICE:env.US_SERVICE};
  }catch(_){return null;}
 }
 function quoteCapabilities(env){return {krx:!!quoteConfig(env,'krx'),us:!!quoteConfig(env,'us')};}
@@ -40,12 +40,20 @@ async function forwardQuote(request,env,kind){
   path='/api/krx-history?page='+page;
  }
  try{
-  const upstream=await fetch(cfg.url+path,{method:'GET',redirect:'manual',
-   headers:{Origin:ORIGIN,Authorization:'Bearer '+cfg.token,Accept:'application/json'}});
-  if(!upstream.ok)return response(upstream.status>=400&&upstream.status<500?upstream.status:502,{error:'공통 시세 원본 연결 확인 필요'});
+  const options={method:'GET',redirect:'manual',
+   headers:{Origin:ORIGIN,Authorization:'Bearer '+cfg.token,Accept:'application/json'}};
+  // Same-account workers.dev HTTP calls can fail (Cloudflare 1042).
+  // Prefer explicit service bindings, retain legacy HTTP path for migration.
+  const upstream=cfg.service?.fetch?
+   await cfg.service.fetch(new Request(cfg.url+path,options)):
+   await fetch(cfg.url+path,options);
+  if(!upstream.ok)return response(upstream.status===401?401:upstream.status===429?429:502,{
+   error:upstream.status===401?'시세 원본 접근 토큰 확인 필요':
+    upstream.status===429?'시세 API 호출 한도 확인 필요':
+    '공통 시세 원본 연결 실패 · '+(cfg.service?.fetch?'서비스 바인딩':'직접 HTTP')+' · HTTP '+upstream.status});
   const data=await upstream.json();
   return response(200,data);
- }catch(_){return response(502,{error:'공통 시세 조회 실패'});}
+ }catch(_){return response(502,{error:'공통 시세 조회 실패 · '+(cfg.service?.fetch?'서비스 바인딩':'직접 HTTP')});}
 }
 export default {async fetch(request,env){
  if(request.headers.get('Origin')!==ORIGIN)return response(403,{error:'origin'});
