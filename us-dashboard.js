@@ -173,7 +173,7 @@ function holdingCard(id,usdPx){
  const officialLine=remote?'<small>토스 공식 보유 '+fmtQty(remote.quantity)+' · 원화 자료 확인 필요</small>':'';
  // Keep the main card in KRW, using the same position basis as the account summary.
  const row=window.ISA_PORTFOLIO_TOTALS?.row?.('us',id);
- if(remote&&row?.official&&Number.isFinite(row.qty)&&Number.isFinite(row.invested)&&Number.isFinite(row.value)){
+ if((remote&&row?.official||window.ISA_SHARED_QUOTES?.valuationEnabled?.())&&row?.qty>0&&Number.isFinite(row.qty)&&Number.isFinite(row.invested)&&Number.isFinite(row.value)){
   const pnl=row.value-row.invested,rate=row.invested>0?100*pnl/row.invested:null;
   const net=receipt&&receipt.amount!==null&&receipt.amount!==undefined&&Number.isFinite(Number(receipt.amount))?Number(receipt.amount):null;
   const inclusive=net===null?null:pnl+net;
@@ -181,12 +181,12 @@ function holdingCard(id,usdPx){
    '<div class="us-card-pnl '+(pnl>=0?'us-positive':'us-negative')+'">평가손익 '+signedWon(pnl)+(rate===null?'':' ('+pct(rate)+')')+'</div>'+
    receiptLine+
    (inclusive===null?'':'<div class="us-card-inclusive '+(inclusive>=0?'us-positive':'us-negative')+'">분배금 포함 총손익 '+signedWon(inclusive)+(row.invested>0?' ('+pct(100*inclusive/row.invested)+')':'')+'</div>')+
-   '<small>'+(row.cachedHolding?'저장된 토스 보유자료 · 새 매매 미반영':'토스 공식 보유자료')+' · 원화 환산 참고</small></div>';
+   '<small>'+(row.official?(row.cachedHolding?'저장된 토스 보유자료 · 새 매매 미반영':'토스 공식 보유자료'):(row.priceSource||'공통 평가')+' · '+(row.priceDate||'기준일 미확인'))+' · 원화 환산 참고</small></div>';
  }
  const holdings='보유 '+(qty===null?'미입력':fmtQty(qty))+
   ' · 평단 '+(avg===null?'미입력':wonAmount(avg,2));
  if(qty===0)return '<div class="us-card-holding">'+holdings+' · 현재 미보유'+receiptLine+'</div>';
- if(!position)return '<div class="us-card-holding">'+holdings+officialLine+
+ if(!position||window.ISA_SHARED_QUOTES?.valuationEnabled?.())return '<div class="us-card-holding">'+holdings+officialLine+
   '<div class="us-card-pnl">평가손익 계산 대기 · 보유정보와 원화 참고가격 확인</div>'+
   receiptLine+'</div>';
  return '<div class="us-card-holding">'+holdings+
