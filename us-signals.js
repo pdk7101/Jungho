@@ -63,6 +63,20 @@ function quote(id){
   priceKind:live?'finnhub-private':brokerRef?'toss-broker-last':kr?.kind||'missing',
   brokerQtySource:!!actual};
 }
+// Decision-time guard: a recent snapshot is not necessarily a trade from
+// this regular session. Never turn yesterday's close into a live buy/sell.
+function sessionTrade(source,now=new Date()){
+ const kr=source?.krw,session=source?.session;
+ if(!session?.open||source.priceKind!=='finnhub-private'||!valid(Number(kr?.usd))||!valid(kr?.amount))return false;
+ const stamp=Date.parse(kr.stamp||''),age=now.getTime()-stamp;
+ if(!Number.isFinite(age)||age<0||age>45*60000)return false;
+ const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{
+  timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',
+  hour:'2-digit',minute:'2-digit',hourCycle:'h23'
+ }).formatToParts(new Date(stamp)).map(x=>[x.type,x.value]));
+ const day=p.year+p.month+p.day,m=Number(p.hour)*60+Number(p.minute);
+ return day===session.today&&m>=570&&m<960;
+}
 function latest(x){
  if(!x||!x.ok||!/^\d{8}$/.test(x.date)||!Array.isArray(x.bars)||x.bars.length<40)return false;
  if(!valid(x.close)||!valid(x.low20)||!valid(x.high20)||x.low20>x.high20)return false;
@@ -117,6 +131,10 @@ function evaluate(id,source,cap){
  if(!NAMES[id])return basic('wait','종목 미확인','미국장 관리 대상 4종목이 아닙니다.');
  if(source?.session&&(!source.session.calendarKnown||x?.date!==source.session.expected))
   return basic('wait','최신 미국장 확정 종가 확인 보류','필요한 확정 일봉 '+source.session.expected+' · 현재 자료 '+(x?.date||'없음')+' · 이전 일봉으로 새 주문을 판단하지 않습니다.',{priceKind:source.priceKind,session:source.session});
+ if(source?.session?.open&&!sessionTrade(source))
+  return basic('wait','미국장 당일 체결가 확인 보류',
+   '정규장 중 검증된 당일 최근 체결가가 없습니다. 직전 종가는 참고용이며 오늘 신규 매수·매도 판단은 보류합니다.',
+   {priceKind:source.priceKind,session:source.session});
  if(!latest(x))return basic('wait','시세 확인 대기','최근 미국장 확정 일봉 40개 및 5·20일선이 검증되지 않아 매수 판단을 보류합니다.');
  if(!kr||!valid(kr.amount))return basic('wait','원화가격 미확인 · 대기','참고 USD/KRW 환율과 원화 현재가 모두 확인되지 않아 매수 상한 및 원화 평단을 검증할 수 없습니다.');
  const t=x.trend,ma20=Number(t.ma20),ma5=Number(t.ma5);
@@ -248,7 +266,7 @@ function detailLine(id){
  html+='<p class="us-small">토스 매일 주식모으기 기준 <b>'+krw(dailyAmount(id))+' 원화 정액 소수점 매수</b> · 프로그램 판단: <b>'+(v.type==='sell'?'매도 여부 검토':v.type==='buy'?'정액매수 유지 검토':id==='cony'?'기존 매수 일시중지 유지':'보류·중지 검토')+'</b>'+
   '</b> · 시세 '+(v.sourceDate?v.sourceDate.slice(0,4)+'-'+v.sourceDate.slice(4,6)+'-'+v.sourceDate.slice(6,8):'확인 불가')+
   ' 미국장 확정 일봉에 기초한 참고 판단 · '+
- (v.priceKind==='finnhub-private'?'가격은 최근 개인 미국 체결가':'가격은 마지막 완료 일봉')+
+ (v.priceKind==='finnhub-private'?'가격은 최근 개인 미국 체결가':'가격은 마지막 완료 일봉 (장중 참고용)')+
  ' · 실제 매매 주문 아님</p>';
  if(id!=='cony')html+='<p class="us-small">매수 상한: '+(getLimit(id)!==null?krw(getLimit(id)):'미설정')+
   ' · 예산과 계좌 비중은 별도 확인. CONY 목표 달성 뒤 재투자 우선순위: SCHD → AGNC → SPYM.</p>';
