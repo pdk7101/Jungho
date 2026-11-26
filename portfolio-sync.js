@@ -48,7 +48,10 @@ function validValuation(data){
 function valuationPrice(market,id){
  const q=valuationData()?.[market]?.[id];if(!q)return null;
  const age=Date.now()-Date.parse(q.date);
- return Number.isFinite(age)&&age>=-86400000&&age<=14*86400000?q:null;
+ if(!Number.isFinite(age)||age< -86400000||age>14*86400000)return null;
+ const liveAge=Date.now()-Date.parse(q.liveAt||'');
+ if(market==='us'&&Number.isFinite(q.liveAmount)&&q.liveAmount>0&&liveAge>=0&&liveAge<=45*60000)return {...q,amount:q.liveAmount,date:q.liveAt.slice(0,10),source:'Finnhub 최근 체결 × 공통 참고환율'};
+ return q;
 }
 async function refreshValuation(force=false){
  const c=quoteConnection('valuation');
