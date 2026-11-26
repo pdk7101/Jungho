@@ -39,7 +39,7 @@ function priceKrw(id,priceUsd){
  const bp=Number.isFinite(brokerAt)?Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(brokerAt)).map(x=>[x.type,x.value])):null;
  const brokerDay=bp?bp.year+'-'+bp.month+'-'+bp.day:null;
  const afterBar=!closeDate||(brokerDay&&(brokerDay>closeDate||(brokerDay===closeDate&&Number(bp.hour)>=16)));
- const match=['live','cached'].includes(brokerState)&&broker?.ok&&Array.isArray(broker.holdings)&&
+ const match=!window.ISA_PORTFOLIO_TOTALS?.sharedBasis?.()&&['live','cached'].includes(brokerState)&&broker?.ok&&Array.isArray(broker.holdings)&&
   Number.isFinite(brokerAge)&&brokerAge>=-60000&&brokerAge<=7*86400000&&afterBar?
   broker.holdings.find(h=>h?.marketCountry==='US'&&h.currency==='USD'&&String(h.symbol||'').toUpperCase()===(id==='spacex'?'SPCX':id.toUpperCase())):null;
  if(rate&&privateQuote&&finitePositive(privateQuote.usd))
