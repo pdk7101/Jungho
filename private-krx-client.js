@@ -29,11 +29,13 @@ token=savedDeviceToken||savedTabToken;
 if(!savedDeviceToken&&savedTabToken.length>=20&&workerUrl&&read(sessionStorage,SESSION_ONLY_KEY)!=='1'){
  if(write(localStorage,TOKEN_KEY,savedTabToken))remove(sessionStorage,TOKEN_KEY);
 }
+function sharedConnection(){return window.ISA_SHARED_QUOTES?.connection?.('krx')||null;}
+function cacheIdentity(){return sharedConnection()?.url||workerUrl;}
 function lastGood(){
  if(!configured())return null;
  try{
   const saved=JSON.parse(read(localStorage,LAST_GOOD_KEY)||'null');
-  if(!saved||saved.version!==1||saved.worker!==workerUrl||
+  if(!saved||saved.version!==1||saved.worker!==cacheIdentity()||
    !saved.data||!Array.isArray(saved.data.items))return null;
   const data=saved.data,stamp=Date.parse(data.fetchedAt);
   if(!Number.isFinite(stamp)||stamp>Date.now()+300000||
@@ -56,7 +58,7 @@ function saveLastGood(data){
   const oldLast=before?.items?.map(x=>x.date).sort().at(-1);
   const newLast=data.items.map(x=>x.date).sort().at(-1);
   if(oldLast&&newLast<oldLast)return false;
-  const value=JSON.stringify({version:1,worker:workerUrl,data});
+  const value=JSON.stringify({version:1,worker:cacheIdentity(),data});
   if(value.length>200000)return false;
   localStorage.setItem(LAST_GOOD_KEY,value);
   return true;
@@ -166,14 +168,15 @@ async function load(){
  const status=document.getElementById('krx-private-status');
  if(status)status.textContent='KRX 공식 확정 일봉을 개인 연결로 확인 중입니다.';
  try{
-  const origin=endpoint(workerUrl);
+  const shared=sharedConnection();
+  const origin=shared?null:endpoint(workerUrl);
   const saved=lastGood();
   const requestPage=async page=>{
    const controller=new AbortController();
    const timeout=setTimeout(()=>controller.abort(),45000);
    try{
-    const response=await fetch(origin+'/api/krx-history?page='+page,{
-     method:'GET',headers:{Authorization:'Bearer '+token,Accept:'application/json'},
+    const response=await fetch(shared?shared.url+'?page='+page:origin+'/api/krx-history?page='+page,{
+     method:'GET',headers:{Authorization:'Bearer '+(shared?shared.token:token),Accept:'application/json'},
      cache:'no-store',signal:controller.signal
     });
     const body=await response.json().catch(()=>({error:'응답 형식 확인 실패'}));
@@ -235,7 +238,7 @@ async function load(){
   throw error;
  }finally{busy=false;}
 }
-function configured(){return !!(workerUrl&&token&&token.length>=20);}
+function configured(){return !!(sharedConnection()||workerUrl&&token&&token.length>=20);}
 function setConnection(raw,secret,remember){
  const url=endpoint(raw),v=String(secret||'').trim();
  if(v.length<20)throw Error('접근 토큰은 20자 이상이어야 합니다.');
