@@ -119,7 +119,13 @@ function row(market,id){
   priceDate=stored.krwDay;
   priceMode='broker-manual';
  }
- if(unitPrice===null&&us){
+ const common=!!window.ISA_SHARED_QUOTES?.valuationEnabled?.();
+ if(unitPrice===null&&common){
+  const mapped=us?id:(TOSS_KR.find(x=>x[0]===id)?.[2]||id);
+  const q=window.ISA_SHARED_QUOTES.valuationPrice(us?'us':'kr',mapped);
+  if(positive(q?.amount)){unitPrice=q.amount;priceDate=q.date;priceSource=q.source+' · 공통 평가';priceMode=us?'us-reference':'kr-reference';}
+ }
+ if(unitPrice===null&&us&&!common){
   try{
    const usd=window.ISA_US_APP?.getPrice?.(id);
    const q=window.ISA_US_KRW?.priceKrw?.(id,usd);
@@ -129,7 +135,7 @@ function row(market,id){
    }
   }catch(_){}
  }
- if(unitPrice===null&&!us){
+ if(unitPrice===null&&!us&&!common){
   const mapped=TOSS_KR.find(x=>x[0]===id)?.[2];
   if(!mapped){
    const extra=window.ISA_PRIVATE_KRX?.extraQuote?.(id);
@@ -198,6 +204,7 @@ function totals(){
  if(values.length<14)note.push('평가액 미확인 '+(14-values.length)+'종목');
  if(rows.some(x=>x.cachedHolding))note.push('마지막 공식 보유수량 기준 · 새 매매 미반영');
  if(prices.official)note.push('공식 토스 보유자료 '+prices.official+'종목 · 각 종목 조회시각 기준');
+ if(window.ISA_SHARED_QUOTES?.valuationEnabled?.())note.push('공통 평가가격·환율');
  if(prices.photo)note.push('과거 사진 가격 '+prices.photo+'종목 (실시간 아님)');
  if(prices.reference)note.push('참고가격 '+prices.reference+'종목 (실시간 확정 아님)');
  const directlyEntered=rows.filter(x=>x.qty>0&&x.priceMode==='broker-manual').length;
