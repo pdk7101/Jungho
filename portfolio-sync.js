@@ -94,6 +94,7 @@ async function sync(choice=null){
   lastSeen=JSON.stringify(snapshot());lastEdit=0;
   status('자동 동기화 완료 · '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}));
   if(changed){try{sessionStorage.setItem('isa-portfolio-sync-scroll-v1',String(window.scrollY||0));}catch(_){}location.reload();} // Reload existing in-memory editors.
+  else if(initial){window.ISA_KR_APP?.renderCards?.();window.ISA_US_APP?.rerender?.();window.ISA_ACCOUNT_SUMMARY?.refresh?.();}
  }catch(e){status(String(e.message||e)+' · 기기 기록은 유지됩니다.');}
  finally{busy=false;}
 }
@@ -110,7 +111,7 @@ function mount(){
   try{const prev=read(CONFIG);if(prev&&(prev.url!==url||prev.token!==token))localStorage.removeItem(BASE);save(CONFIG,{url,token});conflict=false;choices(false);sync();}
   catch(_){status('기기 저장 실패 · 기존 기록 유지');}
  };
- $('portfolio-sync-disconnect').onclick=()=>{if(busy)return status('동기화 진행 중 · 완료 후 해제');localStorage.removeItem(CONFIG);localStorage.removeItem(BASE);conflict=false;choices(false);$('portfolio-sync-token').value='';status('연결 해제 · 기기 기록 유지');};
+ $('portfolio-sync-disconnect').onclick=()=>{if(busy)return status('동기화 진행 중 · 완료 후 해제');localStorage.removeItem(CONFIG);localStorage.removeItem(BASE);conflict=false;choices(false);$('portfolio-sync-token').value='';status('연결 해제 · 기기 기록 유지');window.ISA_KR_APP?.renderCards?.();window.ISA_US_APP?.rerender?.();window.ISA_ACCOUNT_SUMMARY?.refresh?.();};
  $('portfolio-sync-local').onclick=()=>sync('local');
  $('portfolio-sync-cloud').onclick=()=>sync('cloud');
  try{const y=sessionStorage.getItem('isa-portfolio-sync-scroll-v1');if(y!==null){sessionStorage.removeItem('isa-portfolio-sync-scroll-v1');window.addEventListener('load',()=>window.scrollTo(0,Number(y)||0),{once:true});}}catch(_){}
