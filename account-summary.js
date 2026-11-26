@@ -373,7 +373,7 @@ function render(){
    '토스의 공식 API 원화·USD 통화별 합계를 현재 환율로 환산한 참고액입니다. 토스 앱의 비용·환율 산식과 다를 수 있습니다. ':
    '공식 토스 연결이 없으면 저장된 보유정보와 확인된 시세로 참고 평가합니다. 새 매매는 반영되지 않습니다. ')+
    (latest?' 마지막 참고 계산: '+new Date(latest).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+'. ':'')+
-   '기기·브라우저마다 기록이 별도 저장됩니다. 데이터 삭제는 피하세요.';
+   '개인 동기화 연결 시 보유기록이 공유되며, 시세·증권사 연결은 기기별로 설정합니다.';
  }
  const brokerNote=$('account-broker-compare');
  if(brokerNote){
