@@ -903,7 +903,7 @@ truth(usKrwCode.includes("kind:'finnhub-private'")&&
  usKrwCode.includes("isa-personal-us-quote-refreshed"),
  'private US live price is used in KRW valuation and refreshes on new quote');
 truth(feedCode.includes("state:connectionState")&&
- feedCode.includes("configured:Boolean(endpoint&&password)")&&
+ feedCode.includes("configured:Boolean(sharedConnection()||endpoint&&password)")&&
  feedCode.includes("error:lastError?'시세 서버 조회 실패':''"),
  'card connection state is read-only, secret-free and never exposes VIEW_TOKEN');
 truth(feedCode.includes("window.addEventListener('pageshow',refreshOnReturn)")&&
