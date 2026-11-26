@@ -219,6 +219,8 @@ function kiwoomComputed(){
  };
 }
 function tossOfficial(){
+ // Official account snapshots remain accessible separately; shared cost basis drives the dashboard.
+ if(window.ISA_PORTFOLIO_TOTALS?.sharedBasis?.())return null;
  const data=window.ISA_TOSS_BROKER?.snapshot?.();
  if(!data?.ok||!data.totals||!data.amounts)return null;
  const cached=window.ISA_TOSS_BROKER?.snapshotMeta?.()?.state==='cached';
@@ -317,7 +319,7 @@ function refreshReferenceTotals(){
  const note=$('account-valuation-note');
  if(note)note.textContent=(updated.length?'참고 평가액 재계산: '+updated.join('·')+'. ':'')+
   (skipped.length?'현재 평가가격 미확인·직접 입력 유지: '+skipped.join('·')+'. ':'')+
-  '실제 증권사 잔고와 다를 수 있습니다. 휴대폰·노트북 저장정보는 서로 동기화되지 않습니다.';
+  '실제 증권사 잔고와 다를 수 있습니다. 개인 동기화 연결 시 보유기록이 공유됩니다.';
 }
 function displayAccount(id,data){
  const invested=$(id+'-total-invested'),value=$(id+'-total-value'),
@@ -358,7 +360,8 @@ function render(){
    ready?(x.toss.estimated?(x.toss.brokerApi&&!x.toss.revalued?'마지막 토스 저장 잔고':'참고 평가 자동 갱신'):'직접 기록한 계좌 금액')+' · 토스 실계좌 미연결':
    own?.loading?'보유정보·시세 확인 중':'토스 실계좌 미연결 · 참고 평가 확인 필요';
   if(!actual&&ready&&x.toss?.estimated)notice.textContent+=' · 새 매매 미반영';
-  const diagnostic=$('account-connection-detail');
+  if(window.ISA_PORTFOLIO_TOTALS?.sharedBasis?.())notice.textContent='공통 보유기록 기준 · 참고 평가 · 새 매매 자동 반영 아님';
+ const diagnostic=$('account-connection-detail');
   if(diagnostic)diagnostic.textContent=(own?.diagnosis?'토스 연결: '+own.diagnosis:
    connected?'토스 연결 설정 저장됨':'토스 연결 설정 없음')+
    (x.toss?.cached?' · 마지막 공식 조회 '+format(official?.fetchedAt):'')+
