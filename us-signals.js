@@ -292,14 +292,14 @@ function mount(){
  const holder=document.createElement('div');
  holder.id='us-signals-panel';
  holder.className='us-signals-panel';
- holder.innerHTML='<div class="us-head"><h3>미국주식 기술적 추가매수 분석 (실제 주문상태와 별도)</h3></div>'+
- '<div id="us-signal-summary"></div>'+
+ holder.innerHTML=
+ '<div id="us-signal-summary" hidden></div>'+
  '<details id="us-signal-settings"><summary>미국주식 원화 매수 상한 설정 (선택)</summary>'+
  '<p class="us-small">상한은 미설정이 기본값입니다. 투자자가 정한 상한을 초과하면 중단으로 표시합니다. 임의 상한을 자동으로 정하지 않습니다.</p>'+
  '<div id="us-signal-limits" class="us-signal-limits"></div>'+
  '<p class="us-small" id="us-signal-limits-note"></p></details>';
- const anchor=$('us-krw-panel');
- if(anchor)anchor.insertAdjacentElement('afterend',holder);else $('us-updated').insertAdjacentElement('afterend',holder);
+ const settingsRoot=$('cap-settings');
+ if(settingsRoot)settingsRoot.appendChild(holder);else container.appendChild(holder);
  window.ISA_US_SIGNAL={evaluate,decision,cardLine,cardStatus,detailLine,settings,refreshSummary};
  updateLimitsUI();
  window.addEventListener('isa-us-quotes-refreshed',render);
