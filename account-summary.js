@@ -57,6 +57,7 @@ function dividendTotals(){
  return {us,usKnown,domestic:domestic?.amount??null,kiwoom:kiwoom?.amount??null,
   toss:us+(domestic?.amount||0),all:us+(domestic?.amount||0)+(kiwoom?.amount||0),
   complete:!missing.length&&!provisional.length,missing,provisional,
+  scope:{'toss-us':'legacy-symbols','toss-kr':domesticBase&&domesticBase.amount>0?'account-opening':domesticItem?.kind==='partial'||domesticItem?.kind==='account-baseline'&&domesticBase?.amount===0?'legacy-symbols':'unknown','kiwoom-isa':kiwoomBase&&kiwoomBase.amount>0?'account-opening':kiwoomItem?.kind==='partial'||kiwoomItem?.kind==='account-baseline'&&kiwoomBase?.amount===0?'legacy-symbols':'unknown'},
   dates:[domestic?.date,kiwoom?.date].filter(Boolean),
   afterBase:[domesticItem?.added||0,kiwoomItem?.added||0]};
 }
