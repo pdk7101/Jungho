@@ -95,15 +95,10 @@ function fmtQty(n){
  return Number(n).toLocaleString('ko-KR',{maximumFractionDigits:6})+'주';
 }
 function pendingUSCloseUpdate(x,now=new Date()){
- // Informational only: US exchange holidays may have no new completed bar.
  if(!x?.date||!/^[0-9]{8}$/.test(String(x.date)))return false;
- const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{
-  timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',
-  hour:'2-digit',hourCycle:'h23',weekday:'short'
- }).formatToParts(now).map(v=>[v.type,v.value]));
- const today=String(parts.year)+String(parts.month)+String(parts.day);
- return ['Mon','Tue','Wed','Thu','Fri'].includes(parts.weekday)&&
-  Number(parts.hour)>=17&&String(x.date)<today;
+ const session=window.ISA_US_SIGNAL?.session?.(now);
+ const expected=session?.calendarKnown?session.expected:data?.expectedDate;
+ return typeof expected==='string'&&/^\d{8}$/.test(expected)&&x.date<expected;
 }
 function priceSource(f,x,wonQuote){
  const state=window.ISA_PERSONAL_US?.state?.();
@@ -326,10 +321,13 @@ async function refresh(){
   const d=await r.json();
   if(d.market!=='US'||d.currency!=='USD'||!Array.isArray(d.items))throw Error('미국장 일봉 형식 미확인');
   data=mergeDaily(data,d);loadTime=d.fetchedAt;
-  const count=FUNDS.filter(f=>market(f)).length;
+  const expected=window.ISA_US_SIGNAL?.session?.()?.expected||data.expectedDate;
+  const count=FUNDS.filter(f=>market(f)?.date===expected).length;
+  const spcx=data.extraQuotes?.spacex;
+  const extraCount=spcx&&fresh(spcx)&&spcx.date===expected?1:0;
   const time=loadTime?new Date(loadTime).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'미확인';
   const dated=FUNDS.map(f=>market(f)?.date).filter(Boolean).sort();
-  el.textContent='기술 분석용 확정 일봉 '+count+'/4 · 기준 '+(dated.length?date(dated[0])+(dated[0]!==dated.at(-1)?'~'+date(dated.at(-1)):''):'미확인')+' · 조회 '+time;
+  el.textContent='최신 거래일 일봉 '+(expected?count+extraCount+'/5 · 필요 '+date(expected):'확인 대기')+' · 수집 기준 '+(dated.length?date(dated[0])+(dated[0]!==dated.at(-1)?'~'+date(dated.at(-1)):''):'미확인')+' · 조회 '+time;
  }catch(e){if(el)el.textContent='미국장 새 자료 조회 실패 · 마지막 확인 자료 유지: '+String(e.message||e);}
  render();
  window.dispatchEvent(new Event('isa-us-quotes-refreshed'));
