@@ -37,7 +37,7 @@ const server=createServer(async(req,res)=>{
   const file=path.resolve(root,name);
   if(!file.startsWith(root+path.sep))throw Error('path');
   let body=await fs.readFile(file,'utf8');
-  const type=/\\.(mjs|js)$/.test(name)?'text/javascript':name.endsWith('.json')?'application/json':'text/html';
+  const type=(name.endsWith('.mjs')||name.endsWith('.js'))?'text/javascript':name.endsWith('.json')?'application/json':'text/html';
   if(Object.hasOwn(checks,name))body=body.replace('</body>',`<script>window.addEventListener('load',()=>{try{${checks[name]}document.body.setAttribute('data-smoke','PASS')}catch(e){document.body.setAttribute('data-smoke','FAIL:'+String(e.message))}});</script></body>`);
   res.writeHead(200,{'Content-Type':type+'; charset=utf-8','Cache-Control':'no-store'});res.end(body);
  }catch(_){res.writeHead(404);res.end();}
