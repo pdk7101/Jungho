@@ -40,3 +40,11 @@ EODHD 공개 페이지: 6개 ISA ETF 모두 11월 26일 날짜 표시, 추가 4�
 - 한국투자증권 KIS 공식 REST API 추가 후보: 국내주식기간별시세 FHKST03010100, J=KRX (NX/UN 사용 안 함), D=일봉, FID_ORG_ADJ_PRC=1 원주가, 최대 100일/종목 호출. 계좌 Appkey/App secret 및 토큰 필요. 개인 고객의 무료 클라우드 접속 및 약관, 보유한 계좌 유무, ETF/신규 코드와 실제 당일 종가 지원 확인 필요. 고정 IP 불필요를 공식적으로 확정하지 않음. 토스·키움의 계좌 연결과는 별개로 시세만 조회하는 후보. 추가 계좌 개설/비용 승인 없이 진행하지 않음.
 - 다음 실측: EODHD 무료 키가 있다면 10개 중 0229F0.KO 등 미확인 종목 포함 검증. 없다면 무료 등록 여부 결정. 이후 무료 할당량, 날짜, 원종가, 시장, 통화, 기존 KRX 대조 결과가 통과해야 별도 비공개 수집기를 도입. 키움 실제 잔고 유료 연결은 계속 보류. main 및 운영 Worker 미변경.
 - 참고: https://eodhd.com/financial-apis/quick-start-with-our-financial-data-apis ; https://eodhd.com/financial-apis/api-for-historical-data-and-volumes ; https://apiportal.koreainvestment.com/intro ; https://github.com/koreainvestment/open-trading-api/tree/main/examples_llm/domestic_stock/inquire_daily_itemchartprice
+
+## 2026-11-27 추가 대안 결정
+- EODHD 20회/일은 사용자의 장중 반복 분석 및 종목 확대 요구에 부족하여 가입/채택 보류. Oracle 무료 VM도 사용자 관리 부담으로 제외.
+- NAVER 공식 접근 정책은 허용되지 않은 자동 수집을 제한(https://policy.naver.com/policy/disclaimer.html). 허가되지 않은 내부 API/스크래핑 도입하지 않음.
+- 기존 토스/키움은 허용 IP 인증 제약 유지(https://developers.tossinvest.com/docs/auth ; https://openapi.kiwoom.com/intro/serviceInfo). 새 고정 IP 서버 설치/비용 지출 없음.
+- KIS 공식 REST 시세 우선 검증 후보, LS 공식 ETF t1901/t1903 차선 후보(LS 위탁계좌 필요). 양쪽 모두 실제 개인 무료 사용, 허용 IP 정책, Cloudflare 또는 기존 GitHub Actions 실행 가능 여부, 비공개 저장 권한 및 현재 국내 10종목 실제 원주가 검증 전 활성화하지 않음. 계좌 개설은 사용자 결정.
+- 별도 계좌를 원하지 않을 때: KRX 전종목 시세 및 ETF 공식 파일을 사용자가 정상 다운로드한 경우에만 일괄 가져오기 후보(https://data.krx.co.kr/). 파일 실제 컬럼/인코딩 및 날짜 확인 후 보유 종목 코드 대조, 중복/오류 차단, 기존 기록 수정 없이 별도 참고가격, 공식 API 재수신 시 대조. 반자동이므로 완전 자동 수집 해결로 판정 금지. 아직 구현/실측 없음.
+- 운영 PR #1 보류 유지. 기존 시세와 원금, 분배금, 계좌 및 동기화 데이터 미변경.
