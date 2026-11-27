@@ -33,3 +33,10 @@ EODHD 공개 페이지: 6개 ISA ETF 모두 11월 26일 날짜 표시, 추가 4�
 - https://eodhd.com/financial-apis/quick-start-with-our-financial-data-apis
 - https://support.google.com/docs/answer/3093281
 - https://data.krx.co.kr/contents/MDC/INFO/informationController/MDCINFO003.cmd
+
+## 2026-11-27 추가 조사 및 우선순위 변경
+- 운영 화면의 11/27 국내 공식 종가 0/6, 공통 평가가격 10/10은 이전 기준일 자료임. 당일 종가 공급원 미해결로 PR #1 운영 병합 보류.
+- EODHD 공식 Quick Start: 무료 계정, 결제카드 불필요, 20회/일 및 최근 1년 일봉. 공식 EOD 문서상 미국 주요 시장 외에는 마감 후 2~3시간 정도 갱신될 수 있음. 10개 고유 국내 코드 1회 조회 및 실패 대상 제한 재시도는 후보이나 100개 확대 요구에 부적합. ETF/알파벳 코드 및 당일 날짜의 실제 인증 응답과 원종가 대조 전 채택 금지. 새 유료 가입/공개 시세 파일 저장 금지.
+- 한국투자증권 KIS 공식 REST API 추가 후보: 국내주식기간별시세 FHKST03010100, J=KRX (NX/UN 사용 안 함), D=일봉, FID_ORG_ADJ_PRC=1 원주가, 최대 100일/종목 호출. 계좌 Appkey/App secret 및 토큰 필요. 개인 고객의 무료 클라우드 접속 및 약관, 보유한 계좌 유무, ETF/신규 코드와 실제 당일 종가 지원 확인 필요. 고정 IP 불필요를 공식적으로 확정하지 않음. 토스·키움의 계좌 연결과는 별개로 시세만 조회하는 후보. 추가 계좌 개설/비용 승인 없이 진행하지 않음.
+- 다음 실측: EODHD 무료 키가 있다면 10개 중 0229F0.KO 등 미확인 종목 포함 검증. 없다면 무료 등록 여부 결정. 이후 무료 할당량, 날짜, 원종가, 시장, 통화, 기존 KRX 대조 결과가 통과해야 별도 비공개 수집기를 도입. 키움 실제 잔고 유료 연결은 계속 보류. main 및 운영 Worker 미변경.
+- 참고: https://eodhd.com/financial-apis/quick-start-with-our-financial-data-apis ; https://eodhd.com/financial-apis/api-for-historical-data-and-volumes ; https://apiportal.koreainvestment.com/intro ; https://github.com/koreainvestment/open-trading-api/tree/main/examples_llm/domestic_stock/inquire_daily_itemchartprice
