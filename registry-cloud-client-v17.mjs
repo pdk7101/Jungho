@@ -17,11 +17,13 @@ export function modelFromWatchlist(payload){
  if(Object.keys(model.state.holdings).length!==Object.keys(payload.holdings).length)throw Error('기존 등록 목록 누락');
  return model;
 }
-export function watchClient({url,viewToken,writeToken,fetchImpl=fetch}){
+export function watchClient({url,viewToken,writeToken,sharedRead=null,fetchImpl=fetch}){
  const origin=workerOrigin(url);
- if(typeof viewToken!=='string'||viewToken.length<20)throw Error('조회 토큰 확인');
+ if(sharedRead&&(typeof sharedRead!=='function'||origin!==V17_ORIGIN))throw Error('shared_read_scope');
+ if(!sharedRead&&(typeof viewToken!=='string'||viewToken.length<20))throw Error('조회 토큰 확인');
  if(writeToken&&(writeToken.length<32||writeToken===viewToken))throw Error('등록 토큰 확인');
  async function call(path,token,body){
+  if(!body&&sharedRead)return sharedRead(path);
   const options={method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,Accept:'application/json'},cache:'no-store',credentials:'omit',redirect:'error',signal:AbortSignal.timeout(10000)};
   if(body){options.headers['Content-Type']='application/json';options.body=JSON.stringify(body)}
   const r=await fetchImpl(origin+path,options);
@@ -52,5 +54,26 @@ export function watchClient({url,viewToken,writeToken,fetchImpl=fetch}){
    if(p.cachedOnly!==true||!p.bySymbol||typeof p.bySymbol!=='object')throw Error('예약 수집 응답 미확인');
    return p;
   }
+ };
+}
+
+const SYNC_ORIGIN='https://jungho-portfolio-sync.pdk7101.workers.dev';
+const V17_ORIGIN='https://jungho-v17.pdk7101.workers.dev';
+// Reuse only an established sync connection, and send its existing token only to its original host.
+export function sharedRegistryRead(storage,fetchImpl=fetch){
+ const read=()=>{
+  try{
+   const c=JSON.parse(storage.getItem('isa-portfolio-sync-config-v1')||'null'),b=JSON.parse(storage.getItem('isa-portfolio-sync-base-v1')||'null');
+   if(c?.url!==SYNC_ORIGIN+'/sync'||b?.url!==c.url||!Number.isSafeInteger(b.revision)||b.revision<1||typeof c.token!=='string'||c.token.length<32)return null;
+   return c.token;
+  }catch(_){return null;}
+ };
+ const initial=read();if(!initial)return null;
+ const paths={'/watchlist':'/quote/watchlist','/quotes':'/quote/us','/daily':'/quote/daily'};
+ return async path=>{
+  if(!Object.hasOwn(paths,path)||read()!==initial)throw Error('shared_read_disconnected');
+  const r=await fetchImpl(SYNC_ORIGIN+paths[path],{method:'GET',headers:{Authorization:'Bearer '+initial,Accept:'application/json'},cache:'no-store',credentials:'omit',redirect:'error',signal:AbortSignal.timeout(10000)});
+  if(!r.ok)throw Error('shared_read_'+r.status);
+  return r.json();
  };
 }
