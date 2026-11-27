@@ -19,3 +19,13 @@ jobs:
         run: node scripts/verify-instrument-registry.mjs && node scripts/verify-us-freshness.mjs && node scripts/verify-us-collector-v17.mjs && node scripts/verify-us-scheduled-v17.mjs && node scripts/verify-legacy-registry-preview.mjs && node scripts/verify-registry-ui-preview.mjs && node scripts/verify-registry-cloud-client-v17.mjs && node scripts/verify-portfolio-recovery-v17.mjs && node scripts/verify-portfolio-recovery-sandbox-v17.mjs && node scripts/verify-us-close-calendar.mjs && node scripts/verify-krx-dynamic-v17.mjs && node scripts/verify-us-daily-v17.mjs && node scripts/verify-registry-valuation-v17.mjs && node scripts/verify-position-records-v17.mjs && node scripts/verify-registry-consolidated-v17.mjs && node scripts/verify-broker-reconciliation-v17.mjs
       - name: Check preview module syntax
         run: node --check registry-ui-page.mjs
+      - name: Build isolated deployment validation bundle
+        run: node scripts/build-v17-validation-bundle.mjs
+      - name: Browser smoke test (synthetic data only)
+        run: node scripts/verify-v17-browser.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v17-validation-bundle
+          path: v17-validation-bundle/
+          retention-days: 7
+          if-no-files-found: error
