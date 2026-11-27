@@ -1,0 +1,45 @@
+name: KRX exact-date availability probe (no market data published)
+on:
+  push:
+    branches: [architecture-v17]
+    paths: ['.github/workflows/krx-same-day-probe-v17.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query only requested Korean trading date, report counts
+        env:
+          KRX_AUTH_KEY: ${{ secrets.KRX_AUTH_KEY }}
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          const key=(process.env.KRX_AUTH_KEY||'').trim();
+          if(!key){console.log('SKIP: repository KRX_AUTH_KEY unavailable. Existing Worker configuration not changed.');process.exit(0)}
+          const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date()).map(x=>[x.type,x.value]));
+          const date=parts.year+parts.month+parts.day;
+          const weekday=new Date(parts.year+'-'+parts.month+'-'+parts.day+'T12:00:00Z').getUTCDay();
+          if([0,6].includes(weekday)||Number(parts.hour)*60+Number(parts.minute)<990){console.log('SKIP: outside weekday post-close probe window');process.exit(0)}
+          const groups=[['ETF','etp/etf_bydd_trd',['329200','0167B0','469070','0131V0','455030','278530','0229F0','228810']],['KOSPI','sto/stk_bydd_trd',['003280']],['KOSDAQ','sto/ksq_bydd_trd',['321370']]];
+          let total=0;
+          for(const [label,path,symbols] of groups){
+            try{
+              const r=await fetch('https://data-dbg.krx.co.kr/svc/apis/'+path+'?basDd='+date,{headers:{AUTH_KEY:key,Accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(15000)});
+              if(!r.ok){console.log(label+' '+date+' HTTP '+r.status+' (no market values logged)');if(r.status===429)break;continue}
+              const p=await r.json();
+              if(!Array.isArray(p?.OutBlock_1)){console.log(label+' '+date+' unexpected response schema');continue}
+              const found=new Set();
+              for(const row of p.OutBlock_1){
+                if(String(row.BAS_DD??'').replaceAll('-','')!==date)continue;
+                const symbol=[row.ISU_SRT_CD,row.ISU_CD,row.ISU_SHORT_CD,row.SRT_CD].map(x=>String(x??'').trim().toUpperCase().replace(/^A(?=[0-9A-Z]{6}$)/,'')).find(x=>symbols.includes(x));
+                const close=String(row.TDD_CLSPRC??'').replaceAll(',','').trim();
+                if(symbol&&/^\d+(?:\.\d+)?$/.test(close)&&Number(close)>0)found.add(symbol);
+              }
+              total+=found.size;
+              console.log(label+' '+date+' HTTP 200 | returned rows '+p.OutBlock_1.length+' | exact-date valid symbol count '+found.size+'/'+symbols.length);
+            }catch{console.log(label+' '+date+' request or response unavailable')}
+          }
+          console.log('Exact-date valid matches: '+total+'/10. No prices, credentials, or payloads logged or stored.');
+          JS
