@@ -69,7 +69,7 @@ export function sharedRegistryRead(storage,fetchImpl=fetch){
   }catch(_){return null;}
  };
  const initial=read();if(!initial)return null;
- const paths={'/watchlist':'/quote/watchlist','/quotes':'/quote/us','/daily':'/quote/daily'};
+ const paths={'/watchlist':'/quote/watchlist','/quotes':'/quote/us','/daily':'/quote/daily','/position-records':'/quote/positions'};
  return async path=>{
   if(!Object.hasOwn(paths,path)||read()!==initial)throw Error('shared_read_disconnected');
   const r=await fetchImpl(SYNC_ORIGIN+paths[path],{method:'GET',headers:{Authorization:'Bearer '+initial,Accept:'application/json'},cache:'no-store',credentials:'omit',redirect:'error',signal:AbortSignal.timeout(10000)});
