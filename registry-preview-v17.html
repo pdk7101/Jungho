@@ -14,6 +14,8 @@
 <label>종목명<input id="name" required maxlength="120" autocomplete="off" placeholder="종목명 직접 입력"></label>
 <button type="submit" id="add" disabled>종목 등록 테스트</button></form><p id="message" role="status" aria-live="polite">화면 초기화 중</p>
 <p class="sub">등록은 감시 대상의 미리보기이며 매수 주문이 아닙니다. 종목코드 형식 확인과 실제 거래 가능 확인은 별개입니다.</p></section>
+<section class="panel"><h2>신규 미국 종목 원화 환산</h2><p class="sub">직접 입력한 참고환율을 신규 미국 종목 전체에 동일 적용합니다. 실시간 환율이나 증권사 적용 환율이 아닙니다. 실제 계좌 기록과 분리된 테스트이며 새로고침·연결 전환 시 입력 기록이 초기화될 수 있습니다.</p><form id="fx-form"><label>USD 1달러당 원화 환율<input id="fx-rate" type="number" min="700" max="3000" step="any" required></label><label>환율 기준일<input id="fx-date" type="date" required></label><button type="submit">참고환율 적용</button></form><button id="fx-clear" type="button">참고환율 지우기</button><p id="fx-status" role="status" class="sub">참고환율 미입력</p></section>
+<section class="panel"><h2>신규 종목만의 계좌별 합계</h2><p class="sub">기존 계좌 총액에 더하지 않습니다. 시세·원금 미확인 시 해당 합계는 미확인으로 표시합니다. 분배금은 평가손익과 별도입니다.</p><div id="new-totals"></div></section>
 <section class="panel"><h2>계좌별 종목</h2><p id="counts" class="counts sub"></p><label>보기<select id="filter"><option value="all">전체 계좌</option><option value="kiwoom-isa">키움 ISA</option><option value="toss-kr">토스 국내</option><option value="toss-us">토스 미국</option></select></label><div id="list"></div></section>
 <p class="sub">기존 목록은 v16 등록 목록 기준입니다. 실제 잔고가 아닙니다. 미연결 테스트 등록은 메모리에만 남고, 연결 상태에서는 서버 확인 후 등록됩니다.</p>
 <noscript>이 미리보기에는 JavaScript가 필요합니다.</noscript></main><script type="module" src="./registry-ui-page.mjs"></script></body></html>
