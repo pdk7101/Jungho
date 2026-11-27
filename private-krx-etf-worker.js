@@ -158,16 +158,16 @@ function extractDynamic(group,day,body){
  return [...found.values()];
 }
 async function dynamicCloses({groups,days,key,fetchImpl=fetch}){
- const byId={},errors=[];let requests=0;
+ const byId={},errors=[];let requests=0,rateLimited=false;
  for(const group of groups){
   const pending=new Set(group.codes);
   for(const day of days){
-   if(!pending.size)break;
+   if(!pending.size||rateLimited)break;
    requests++;
    try{
     const url='https://data-dbg.krx.co.kr/svc/apis/'+MARKETS[group.venue]+'?basDd='+day;
     const r=await fetchImpl(url,{headers:{AUTH_KEY:key,Accept:'application/json'},redirect:'manual',signal:AbortSignal.timeout(10000)});
-    if(!r.ok){errors.push({venue:group.venue,date:day,status:r.status});if([401,403,429].includes(r.status))break;continue;}
+    if(!r.ok){errors.push({venue:group.venue,date:day,status:r.status});if(r.status===429)rateLimited=true;if([401,403,429].includes(r.status))break;continue;}
     const rows=extractDynamic({...group,codes:[...pending]},day,await r.json());
     for(const q of rows){byId[q.id]=q;pending.delete(q.symbol);}
    }catch(_){errors.push({venue:group.venue,date:day,status:'unavailable'});break;}
