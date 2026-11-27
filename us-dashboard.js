@@ -97,7 +97,7 @@ function fmtQty(n){
 function pendingUSCloseUpdate(x,now=new Date()){
  if(!x?.date||!/^[0-9]{8}$/.test(String(x.date)))return false;
  const session=window.ISA_US_SIGNAL?.session?.(now);
- const expected=session?.calendarKnown?session.expected:data?.expectedDate;
+ const expected=session?.calendarKnown?session.expected:(typeof data!=='undefined'?data?.expectedDate:null);
  return typeof expected==='string'&&/^\d{8}$/.test(expected)&&x.date<expected;
 }
 function priceSource(f,x,wonQuote){
