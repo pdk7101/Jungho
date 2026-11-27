@@ -1,6 +1,6 @@
 // Compact status surface; existing refresh loops own network requests.
 export function autoStatus({sync='',kr='',us='',choices=false,configured=false}={}){
- const repair=choices||!configured||/실패|401|403|오류|중단|충돌|확인하세요/.test(sync);
+ const repair=choices||!configured||/실패|401|403|오류|중단|충돌|확인하세요|미연결|연결 해제/.test(sync);
  return {sync:sync||'투자기록 연결 확인 중',kr:kr||'공식 종가 확인 중',us:us||'미국 시세 확인 중',repair};
 }
 export function mountAuto(doc,win){
