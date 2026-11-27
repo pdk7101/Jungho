@@ -34,9 +34,14 @@ async function forwardQuote(request,env,kind){
  if(!cfg)return response(503,{error:'공통 시세 설정 필요'});
  const incoming=new URL(request.url);
  let path='/quotes';
- if(kind==='watchlist'||kind==='daily'){
+ if(kind==='watchlist'||kind==='daily'||kind==='positions'){
   if(incoming.search||cfg.url!=='https://jungho-v17.pdk7101.workers.dev'||!cfg.service?.fetch)return response(503,{error:'v17_read_connection_required'});
-  path=kind==='watchlist'?'/watchlist':'/daily';
+  path=kind==='watchlist'?'/watchlist':kind==='positions'?'/position-records':'/daily';
+  if(kind==='positions'){
+   const secret=env.V17_POSITION_READ_TOKEN;
+   if(typeof secret!=='string'||secret.length<32||secret===cfg.token||secret===env.PORTFOLIO_SYNC_TOKEN)return response(503,{error:'position_read_not_configured'});
+   cfg.token=secret;
+  }
  }
  if(kind==='krx'){
   const page=incoming.searchParams.get('page');
@@ -158,11 +163,11 @@ async function sharedValuation(request,env){
 export default {async fetch(request,env){
  if(request.headers.get('Origin')!==ORIGIN)return response(403,{error:'origin'});
  const path=new URL(request.url).pathname;
- if(!['/sync','/quote/krx','/quote/us','/quote/valuation','/quote/watchlist','/quote/daily'].includes(path))return response(404,{error:'path'});
+ if(!['/sync','/quote/krx','/quote/us','/quote/valuation','/quote/watchlist','/quote/daily','/quote/positions'].includes(path))return response(404,{error:'path'});
  if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':ORIGIN,'Access-Control-Allow-Methods':'GET, PUT, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Max-Age':'600','Vary':'Origin'}});
  if(!await authorized(request,env))return response(401,{error:'authorization'});
  if(path==='/quote/valuation')return sharedValuation(request,env);
- if(path!=='/sync')return forwardQuote(request,env,path==='/quote/krx'?'krx':path==='/quote/watchlist'?'watchlist':path==='/quote/daily'?'daily':'us');
+ if(path!=='/sync')return forwardQuote(request,env,path==='/quote/krx'?'krx':path==='/quote/watchlist'?'watchlist':path==='/quote/daily'?'daily':path==='/quote/positions'?'positions':'us');
  if(!['GET','PUT'].includes(request.method))return response(405,{error:'method'});
  try{
   await env.DB.prepare('CREATE TABLE IF NOT EXISTS portfolio_sync (id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL, payload TEXT NOT NULL, updated_at TEXT NOT NULL)').run();
