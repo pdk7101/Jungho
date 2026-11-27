@@ -19,6 +19,8 @@ jobs:
         run: node scripts/verify-instrument-registry.mjs && node scripts/verify-us-freshness.mjs && node scripts/verify-us-collector-v17.mjs && node scripts/verify-us-scheduled-v17.mjs && node scripts/verify-legacy-registry-preview.mjs && node scripts/verify-registry-ui-preview.mjs && node scripts/verify-registry-cloud-client-v17.mjs && node scripts/verify-portfolio-recovery-v17.mjs && node scripts/verify-portfolio-recovery-sandbox-v17.mjs && node scripts/verify-us-close-calendar.mjs && node scripts/verify-us-close-retention.mjs && node scripts/verify-krx-dynamic-v17.mjs && node scripts/verify-us-daily-v17.mjs && node scripts/verify-registry-valuation-v17.mjs && node scripts/verify-position-records-v17.mjs && node scripts/verify-registry-consolidated-v17.mjs && node scripts/verify-broker-reconciliation-v17.mjs && node scripts/verify-v17-connection-test.mjs && node scripts/verify-dashboard-v17-extension.mjs && node scripts/verify-shared-registry-v17.mjs && node scripts/verify-dashboard-unified-v17.mjs && node scripts/verify-dashboard-auto-v17.mjs && node scripts/verify-payout-unified-v17.mjs && node scripts/verify-sync-races-v17.mjs
       - name: Korean CSV reference-only preview (synthetic)
         run: node scripts/verify-kr-close-file-preview-v17.mjs
+      - name: Shared Toss Korean quote plan (synthetic)
+        run: node scripts/verify-toss-kr-quote-plan-v17.mjs
       - name: Check preview module syntax
         run: node --check registry-ui-page.mjs && node --check dashboard-unified-v17.mjs && node --check dashboard-auto-v17.mjs
       - name: Build isolated deployment validation bundle
