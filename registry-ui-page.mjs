@@ -1,3 +1,4 @@
+import {mountKRClosePreview} from './kr-close-file-page-v17.mjs';
 import {ACCOUNT_NAMES,initialPreview,previewAdd,previewRows,previewCounts} from './registry-ui-preview.mjs';
 import {watchClient,sharedRegistryRead} from './registry-cloud-client-v17.mjs';
 import {krxClient} from './registry-krx-client-v17.mjs';
@@ -14,7 +15,9 @@ const valuationInputs=()=>({live:quotes,daily:mergeReferenceDaily(publicDaily,da
 const el=(tag,value,cls)=>{const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e};
 function message(value,error=false){$('message').textContent=value;$('message').dataset.error=String(error)}
 function adjust(){const us=$('account').value==='toss-us';$('venue-label').hidden=us;$('venue').disabled=us;$('symbol').maxLength=us?15:6;$('symbol').placeholder=us?'예: QQQM':'예: 329200';}
+const refreshKRFileScope=mountKRClosePreview(()=>Object.values(model.state.holdings).filter(h=>!h.archived).map(h=>model.state.catalog[h.instrumentId]).filter(i=>i?.market==='KR').map(i=>i.symbol));
 function render(){
+ refreshKRFileScope();
  const synced=confirmedLegacy(localStorage);if(synced){legacyAuto=true;legacyBasis=synced.basis;legacyConfirmed=true;$('legacy-status').textContent='동기화된 기존 기록 자동 확인 · 버전 '+synced.revision;}else if(legacyAuto){legacyAuto=false;legacyConfirmed=false;$('legacy-status').textContent='동기화 기록 재확인 대기';}
  const count=previewCounts(model);
  $('counts').textContent='고유 종목 '+count.instruments+'/100 · 계좌별 등록 '+count.positions+'건 · 미국 수집 대상 '+count.usSymbols+'개';
