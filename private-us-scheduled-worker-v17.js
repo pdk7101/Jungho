@@ -196,6 +196,50 @@ async function readSmallJSON(request){
   return JSON.parse(raw);
  }finally{await reader.cancel().catch(()=>{});}
 }
+// Private account records are isolated from market-data credentials and legacy sync.
+const basisKeys=['avgKRW','netDistributionsKRW','qty'];
+function eligibleBasis(registry,id){
+ return typeof id==='string'&&Object.hasOwn(registry.holdings,id)&&!Object.hasOwn(seedRegistry().holdings,id)&&registry.holdings[id].archived===false;
+}
+function checkedBasis(registry,id,data){
+ if(!eligibleBasis(registry,id)||!data||Object.keys(data).sort().join(',')!==basisKeys.join(','))throw Error('invalid_basis');
+ const i=registry.catalog[registry.holdings[id].instrumentId],{qty,avgKRW,netDistributionsKRW}=data;
+ const bounded=(v,lower)=>typeof v==='number'&&Number.isFinite(v)&&v>=lower&&v<=1e12;
+ if(qty!==null&&(!bounded(qty,0)||i.market==='KR'&&!Number.isSafeInteger(qty))||avgKRW!==null&&(!bounded(avgKRW,0)||avgKRW===0)||netDistributionsKRW!==null&&!bounded(netDistributionsKRW,0)||qty!==null&&avgKRW!==null&&qty*avgKRW>1e15)throw Error('invalid_basis');
+ return {qty,avgKRW,netDistributionsKRW};
+}
+async function basisInit(db){await db.prepare('CREATE TABLE IF NOT EXISTS new_position_basis_v17 (id TEXT PRIMARY KEY, revision INTEGER NOT NULL, payload TEXT NOT NULL, updated_at TEXT NOT NULL)').run();}
+async function basisList(db,registry){
+ const records={};
+ for(const row of (await db.prepare('SELECT id,revision,payload,updated_at FROM new_position_basis_v17').all()).results||[]){
+  if(!eligibleBasis(registry,row.id))continue;
+  if(!Number.isSafeInteger(row.revision)||row.revision<1)throw Error('invalid_revision');
+  records[row.id]={revision:row.revision,data:checkedBasis(registry,row.id,JSON.parse(row.payload)),updatedAt:row.updated_at};
+ }
+ return {schema:'new-position-basis-v17',records};
+}
+async function saveBasis(db,registry,input){
+ if(!input||Object.keys(input).sort().join(',')!=='data,id,revision'||!Number.isSafeInteger(input.revision)||input.revision<0||input.revision>=Number.MAX_SAFE_INTEGER)throw Error('invalid_basis');
+ const {id,revision}=input,data=checkedBasis(registry,id,input.data),payload=JSON.stringify(data),updatedAt=new Date().toISOString();
+ const result=revision===0
+  ?await db.prepare('INSERT OR IGNORE INTO new_position_basis_v17(id,revision,payload,updated_at) VALUES(?,1,?,?)').bind(id,payload,updatedAt).run()
+  :await db.prepare('UPDATE new_position_basis_v17 SET revision=revision+1,payload=?,updated_at=? WHERE id=? AND revision=?').bind(payload,updatedAt,id,revision).run();
+ if(result.meta.changes!==1)throw Error('basis_conflict');
+ return {id,revision:revision+1,data,updatedAt};
+}
+async function basisRoute(request,env){
+ if(!['GET','POST'].includes(request.method))return response(405,{error:'method'});
+ const secret=env.POSITION_RECORD_TOKEN;
+ if(typeof secret!=='string'||secret.length<32||[env.VIEW_TOKEN,env.REGISTRY_WRITE_TOKEN,env.FINNHUB_API_KEY].includes(secret))return response(503,{error:'basis_disabled'});
+ if(!await authorized(request,secret))return response(401,{error:'unauthorized'});
+ if(!env.DB)return response(503,{error:'missing database binding'});
+ try{
+  const registry=await registryFromDB(env.DB);await basisInit(env.DB);
+  if(request.method==='GET')return response(200,await basisList(env.DB,registry));
+  let input;try{input=await readSmallJSON(request)}catch(_){return response(400,{error:'invalid_body'});}
+  return response(200,await saveBasis(env.DB,registry,input));
+ }catch(e){return response(e.message==='basis_conflict'?409:e.message==='invalid_basis'?400:503,{error:['basis_conflict','invalid_basis'].includes(e.message)?e.message:'basis_unavailable'});}
+}
 async function registrationRoute(request,env,full=false){
  if(full&&request.method==='GET'){
   if(!await authorized(request,env.VIEW_TOKEN))return response(401,{error:'unauthorized'});
@@ -360,8 +404,9 @@ export default {
  async fetch(request,env){
   if(request.headers.get('Origin')!==ORIGIN)return new Response(null,{status:403});
   const url=new URL(request.url);
-  if(!['/quotes','/registry','/watchlist','/daily'].includes(url.pathname)||url.search)return response(404,{error:'not_found'});
+  if(!['/quotes','/registry','/watchlist','/daily','/position-records'].includes(url.pathname)||url.search)return response(404,{error:'not_found'});
   if(request.method==='OPTIONS')return response(200,{ok:true});
+  if(url.pathname==='/position-records')return basisRoute(request,env);
   if(url.pathname==='/registry'||url.pathname==='/watchlist')return registrationRoute(request,env,url.pathname==='/watchlist');
   if(request.method!=='GET')return response(405,{error:'method'});
   if(!await authorized(request,env.VIEW_TOKEN))return response(401,{error:'unauthorized'});
