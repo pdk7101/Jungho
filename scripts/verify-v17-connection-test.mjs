@@ -25,3 +25,17 @@ r=await get('/position-records',{'Sec-Fetch-Site':'same-origin',Authorization:'B
 assert.equal((await worker.fetch(new Request(origin+'/watchlist',{method:'POST',headers:{...same,'Content-Type':'application/json'},body:'{}'}),env)).status,403);
 assert.equal((await get('/watchlist',{Origin:'https://pdk7101.github.io',Authorization:'Bearer '+env.VIEW_TOKEN})).status,200);
 console.log('PASS: same-origin isolated read-only connection test, token separation and existing origin policy');
+
+const storage=(auth=env.REGISTRY_WRITE_TOKEN,position=env.POSITION_RECORD_TOKEN,site='same-origin')=>worker.fetch(new Request(origin+'/storage-test',{method:'POST',headers:{Origin:origin,'Sec-Fetch-Site':site,Authorization:'Bearer '+auth,'X-Position-Authorization':'Bearer '+position}}),env);
+assert.equal((await storage(env.VIEW_TOKEN)).status,401);
+assert.equal((await storage(env.REGISTRY_WRITE_TOKEN,env.VIEW_TOKEN)).status,401);
+assert.equal((await storage(env.REGISTRY_WRITE_TOKEN,env.POSITION_RECORD_TOKEN,'cross-site')).status,403);
+const firstTest=await storage();assert.equal(firstTest.status,200);
+const firstResult=await firstTest.json();assert.equal(firstResult.revision,1);assert.equal(firstResult.conflictBlocked,true);assert.equal(firstResult.isolated,true);
+const secondTest=await storage();assert.equal(secondTest.status,200);assert.equal((await secondTest.json()).revision,2);
+const names=sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(x=>x.name);
+assert.ok(names.includes('v17_test_registry'));assert.ok(names.includes('v17_test_basis'));
+assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM new_position_basis_v17').get().n,0);
+assert.equal(Object.keys((await (await get('/watchlist',same)).json()).catalog).length,15);
+assert.equal(Object.keys((await (await get('/quotes',same)).json()).bySymbol).length,5);
+console.log('PASS: real SQLite registration/storage path with isolated tables, repeatable CAS and unchanged active watchlist');
