@@ -21,3 +21,11 @@
 - sandbox 저장/복구/롤백은 운영 18개 키와 완전히 분리한다. 기존 동기화가 연결된 상태에서 실기기 기록 복구를 실행하지 않는다.
 - 실제 백업 내보내기 및 기기 내 검증 완료 후 구형 sync 정지/이전/재연결 절차 별도 테스트.
 - 국내 신규 종목 KRX 필터, 미국 확정 종가, 공통 환율, 전체 포트폴리오 평가 연결 및 기기 간 동일 결과 확인 전 운영 버전 병합 금지.
+
+## 5. 격리 검증용 묶음과 실제 운영 순서 (2026-11-27)
+- Actions의 V17 isolated development verification 성공 실행에서 v17-validation-bundle artifact를 받는다. preview 폴더는 개발 화면 및 필요한 모듈만 포함하고 us-quotes.json은 가격·환율 없는 합성 파일이다. workers 폴더는 배포 후보 소스만 포함한다. manifest SHA-256은 파일 대조용이며 서명은 아니다. 비밀키·실제 계좌·운영 KRX 자료는 포함하지 않는다. GitHub Actions의 브라우저 스모크 테스트는 격리 합성 데이터만 사용한다.
+- 기존 Cloudflare 대시보드에서 Workers & Pages의 현재 미국 시세 Worker와 D1 연결 상태, 무료 플랜, Cron 실행 로그를 확인한다. 화면에 비밀값/API 키/토큰/계좌번호가 보이면 가리고 공유한다. 기존 Worker 삭제, Cron 변경, D1 초기화, 유료 전환 금지.
+- 운영 페이지는 main의 기존 GitHub Pages 그대로 유지한다. 현재 묶음은 다운로드 검증용이지 배포된 URL이 아니다. 기존 주소와 같은 origin에서만 기존 localStorage를 읽을 수 있으며 다른 호스트/로컬 주소에서는 읽을 수 없다. Worker CORS는 기존 GitHub Pages origin으로 제한되어 있다. 검증 시 해당 origin의 격리 테스트 경로 배포 승인이 별도로 필요하다.
+- 첫 실제 클라우드 실험은 별도 개발 Worker 및 별도 D1(무료 한도 확인)으로 수행. DB binding 이름 DB. FINNHUB_API_KEY는 기존 운영 수집기와 병행 사용하지 않는다. VIEW_TOKEN, REGISTRY_WRITE_TOKEN, POSITION_RECORD_TOKEN은 서로 다른 비밀값. US_DAILY_AUTHORIZED는 공급원 권한 확인 전 설정하지 않는다. KRX_DYNAMIC_ENABLED는 개발 KRX Worker에서 실응답 및 이용 승인 확인 전 설정하지 않는다. 최초에는 실제 투자기록 없이 합성 신규 종목 등록/기록 저장/조회/충돌만 확인한다.
+- 증권사 허용 IP 및 키움 ISA 등록 조건은 독립적인 미해결 과제다. 기존 무료 Workers/GitHub Actions에서 고정 출구 IP를 보장하지 못하므로 잔고 자동 조회를 출시 완료 조건으로 착각하지 않는다. 직접 입력·동기화·시세 조회는 별도로 검증하고, 실제 사용자 데이터 이관/운영 전환은 명시적 승인 후 진행한다.
+- 미국 신규 종목 일봉 자동화 공급원 허용, 국내 당일 종가, 배당 중복 확인, 양방향 실기기 동기화는 아직 미완료. 개발 코드 및 합성 검증 결과를 실제 시세 수집/운영 성공으로 표시하지 않는다.
