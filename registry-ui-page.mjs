@@ -7,7 +7,7 @@ import {readLegacyBasis,consolidated,loadPublishedReference,mergeReferenceDaily}
 const $=id=>document.getElementById(id);
 let model=initialPreview(),client=null,quotes=null,busy=false,canWrite=false,krClient=null,krQuotes=null,dailyQuotes=null;
 let legacyBasis={},legacyConfirmed=false,registryConfirmed=false,autoFx=null,publicDaily=null;
-let sharedRead=null;
+let sharedRead=null,autoPosition=null,lastAutoRead=0,autoDisabled=false;
 let basis={},fx=null,position=null,positionRows={},positionReady=false,drafts={},cloudUrl='';
 const won=n=>n===null?'미확인':Math.round(n).toLocaleString('ko-KR')+'원';
 const valuationInputs=()=>({live:quotes,daily:mergeReferenceDaily(publicDaily,dailyQuotes),kr:krQuotes,fx:validFx(fx)?fx:validFx(autoFx)?autoFx:null});
@@ -97,9 +97,9 @@ function controls(){
 }
 function positionStatus(value){$('position-status').textContent=value}
 async function refreshPositions(){
- if(!position)return;
+ const reader=position||autoPosition;if(!reader)return;
  positionReady=false;
- try{const next=await position.load(model);positionRows=next;basis=Object.fromEntries(Object.entries(next).map(([id,r])=>[id,r.data]));positionReady=true;positionStatus('서버 신규 투자기록 '+Object.keys(next).length+'건 확인 · 미저장 입력은 유지됩니다.');}
+ try{const next=await reader.load(model);positionRows=next;basis=Object.fromEntries(Object.entries(next).map(([id,r])=>[id,r.data]));positionReady=true;positionStatus('서버 신규 투자기록 '+Object.keys(next).length+'건 확인 · 미저장 입력은 유지됩니다.');}
  catch(_){positionStatus('서버 투자기록 조회 실패 · 저장 중단 · 기존 확인값과 입력 초안 유지');}
 }
 function krStatus(value){$('kr-status').textContent=value}
@@ -135,7 +135,7 @@ $('cloud-refresh').addEventListener('click',async()=>{
  finally{busy=false;controls();render();}
 });
 $('disconnect').addEventListener('click',()=>{
- if(busy)return;if(Object.keys(drafts).length&&!window.confirm('미저장 입력을 버리고 연결을 해제할까요?'))return;sharedRead=null;registryConfirmed=false;position=null;positionReady=false;positionRows={};drafts={};cloudUrl='';positionStatus('미연결');client=null;quotes=null;dailyQuotes=null;krQuotes=null;canWrite=false;basis={};model=initialPreview();$('confirm-dev').checked=false;cloudStatus('연결 해제 · 오프라인 미리보기');controls();render();
+ if(busy)return;if(Object.keys(drafts).length&&!window.confirm('미저장 입력을 버리고 연결을 해제할까요?'))return;autoDisabled=true;sharedRead=null;autoPosition=null;registryConfirmed=false;position=null;positionReady=false;positionRows={};drafts={};cloudUrl='';positionStatus('미연결');client=null;quotes=null;dailyQuotes=null;krQuotes=null;canWrite=false;basis={};model=initialPreview();$('confirm-dev').checked=false;cloudStatus('연결 해제 · 오프라인 미리보기');controls();render();
 });
 $('registration').addEventListener('submit',async e=>{
  e.preventDefault();if(busy||client&&!canWrite)return;
@@ -188,12 +188,13 @@ $('shared-write').addEventListener('submit',e=>{
 });
 async function connectShared(){
  let reader;try{reader=sharedRegistryRead(localStorage);}catch(_){return;}
- if(!reader||client||busy)return;
+ if(!reader||client||busy||autoDisabled)return;
  busy=true;controls();
  try{
   const candidate=watchClient({url:$('worker-url').value,sharedRead:reader});
   const next=await candidate.load();
   sharedRead=reader;client=candidate;model=next;registryConfirmed=true;cloudUrl=$('worker-url').value;canWrite=false;
+  autoPosition=positionClient({url:cloudUrl,sharedRead:reader});if(model.added.length)await refreshPositions();
   const ok=await refreshQuotes();cloudStatus('기존 동기화로 자동 조회 연결 · '+(ok?'시세 조회 완료':'시세 확인 실패')+' · 등록 및 수정은 별도 암호');
  }catch(_){cloudStatus('자동 조회 미연결 · 직접 연결 가능');}
  finally{busy=false;controls();render();}
@@ -201,3 +202,14 @@ async function connectShared(){
 adjust();render();controls();message('등록 테스트 가능');
 refreshReference().then(render);
 connectShared();
+// Cached server reads only. Never rerender over an active editor or unsaved draft.
+async function autoRead(){
+ if(document.hidden||busy||autoDisabled||Object.keys(drafts).length||document.activeElement?.matches?.('input,select,textarea')||Date.now()-lastAutoRead<300000)return;
+ lastAutoRead=Date.now();
+ if(!client){await connectShared();return;}
+ busy=true;controls();
+ try{model=await client.load();registryConfirmed=true;await refreshPositions();await refreshQuotes();cloudStatus('자동 조회 완료 · '+new Date().toLocaleTimeString('ko-KR'));}
+ catch(_){registryConfirmed=false;positionReady=false;cloudStatus('자동 조회 실패 · 기존 기록 유지');}
+ finally{busy=false;controls();render();}
+}
+lastAutoRead=Date.now();setInterval(autoRead,60000);document.addEventListener('visibilitychange',autoRead);window.addEventListener('pageshow',autoRead);window.addEventListener('online',autoRead);
