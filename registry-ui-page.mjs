@@ -2,7 +2,7 @@ import {ACCOUNT_NAMES,initialPreview,previewAdd,previewRows,previewCounts} from 
 import {watchClient} from './registry-cloud-client-v17.mjs';
 import {krxClient} from './registry-krx-client-v17.mjs';
 const $=id=>document.getElementById(id);
-let model=initialPreview(),client=null,quotes=null,busy=false,canWrite=false,krClient=null,krQuotes=null;
+let model=initialPreview(),client=null,quotes=null,busy=false,canWrite=false,krClient=null,krQuotes=null,dailyQuotes=null;
 const el=(tag,value,cls)=>{const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e};
 function message(value,error=false){$('message').textContent=value;$('message').dataset.error=String(error)}
 function adjust(){const us=$('account').value==='toss-us';$('venue-label').hidden=us;$('venue').disabled=us;$('symbol').maxLength=us?15:6;$('symbol').placeholder=us?'예: QQQM':'예: 329200';}
@@ -16,16 +16,21 @@ function render(){
   list.append(el('h3',name+' ('+rows.length+')'));
   for(const r of rows){
    const row=el('article','','row');
-   let price=r.priceStatus;
+   let price=r.priceStatus,dailyNote=null;
    if(client&&account==='toss-us'){
     const q=quotes?.bySymbol?.[r.symbol],now=Date.now(),trade=Date.parse(q?.tradeAt),received=Date.parse(q?.receivedAt);
     const usable=q?.symbol===r.symbol&&typeof q.usd==='number'&&Number.isFinite(q.usd)&&q.usd>0&&trade<=now&&now-trade<=45*60000&&received<=now&&now-received<=7*60000;
+    const d=dailyQuotes?.bySymbol?.[r.symbol];
+    const dailyValid=d?.symbol===r.symbol&&d.currency==='USD'&&Number.isFinite(d.close)&&d.close>0&&/^\d{8}$/.test(d.date)&&/^\d{8}$/.test(dailyQuotes?.expectedDate||'')&&d.date<=dailyQuotes.expectedDate;
+    const ready=dailyValid&&d.date===dailyQuotes.expectedDate&&d.status==='ready'&&d.barCount===40&&[d.ma5,d.ma20,d.low20,d.high20].every(v=>Number.isFinite(v)&&v>0);
+    dailyNote=dailyValid?'미국 일봉 '+d.date+' · USD '+d.close.toFixed(2)+(ready?' · 5일선 '+d.ma5.toFixed(2)+' · 20일선 '+d.ma20.toFixed(2)+' · 20일 범위 '+d.low20.toFixed(2)+'~'+d.high20.toFixed(2):' · 최신성 또는 40거래일 자료 부족')+' · 신규 매수 판단 보류':'미국 확정 일봉 미연결 · 공급원 승인 또는 수집 대기';
     price=usable?'USD '+q.usd.toFixed(2)+' · 체결 '+new Date(trade).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' · 원화 환산 미연결':'미국 예약 시세 대기 또는 만료';
    }else if(account!=='toss-us'&&krClient){
     const id='KR:'+r.venue+':'+r.symbol,q=krQuotes?.byId?.[id];
     price=q?.close>0?'KRW '+q.close.toLocaleString('ko-KR')+'원 · 공식 일별 종가 '+q.date.slice(0,4)+'-'+q.date.slice(4,6)+'-'+q.date.slice(6)+(q.date!==krQuotes.asOfCandidate?' · 이전 자료':'')+' · 실시간 아님':'KRX 공식 종가 미확인';
    }else if(client&&r.added)price='국내 신규 시세 연결 대기';
    row.append(el('strong',r.name+' ('+r.symbol+')'),el('p',r.venue+' · '+r.status,r.added?'wait':'sub'),el('p','수량 미확인 · 평단 미확인 · '+price,'sub'));
+   if(dailyNote)row.append(el('p',dailyNote,'sub'));
    list.append(row);
   }
  }
@@ -45,7 +50,11 @@ async function refreshKr(){
  catch(_){krQuotes=null;krStatus('KRX 조회 실패 · 인증·승인·제한 확인 필요');}
 }
 function cloudStatus(value){$('cloud-status').textContent=value}
-async function refreshQuotes(){try{quotes=await client.quotes();return true}catch(_){quotes=null;return false}}
+async function refreshQuotes(){
+ const [live,daily]=await Promise.allSettled([client.quotes(),client.daily()]);
+ quotes=live.status==='fulfilled'?live.value:null;dailyQuotes=daily.status==='fulfilled'?daily.value:null;
+ return live.status==='fulfilled';
+}
 $('connection').addEventListener('submit',async e=>{
  e.preventDefault();if(busy||client||!$('confirm-dev').checked)return;
  if(model.added.length&&!window.confirm('메모리 테스트 등록은 서버로 이전되지 않습니다. 서버 목록으로 전환할까요?'))return;
@@ -61,11 +70,11 @@ $('connection').addEventListener('submit',async e=>{
 $('cloud-refresh').addEventListener('click',async()=>{
  if(busy||!client)return;busy=true;controls();
  try{model=await client.load();krQuotes=null;const ok=await refreshQuotes();cloudStatus(ok?'서버 목록과 시세 캐시 조회 완료':'서버 목록 확인 · 시세 조회 실패');}
- catch(_){quotes=null;cloudStatus('서버 조회 실패 · 마지막 확인 목록 유지');}
+ catch(_){quotes=null;dailyQuotes=null;cloudStatus('서버 조회 실패 · 마지막 확인 목록 유지');}
  finally{busy=false;controls();render();}
 });
 $('disconnect').addEventListener('click',()=>{
- if(busy)return;client=null;quotes=null;krQuotes=null;canWrite=false;model=initialPreview();$('confirm-dev').checked=false;cloudStatus('연결 해제 · 오프라인 미리보기');controls();render();
+ if(busy)return;client=null;quotes=null;dailyQuotes=null;krQuotes=null;canWrite=false;model=initialPreview();$('confirm-dev').checked=false;cloudStatus('연결 해제 · 오프라인 미리보기');controls();render();
 });
 $('registration').addEventListener('submit',async e=>{
  e.preventDefault();if(busy||client&&!canWrite)return;
