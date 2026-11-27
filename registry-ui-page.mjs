@@ -45,7 +45,7 @@ function render(){
     for(const [k,label] of [['qty','보유수량'],['avgKRW','원화 평단'],['netDistributionsKRW','누적 세후 배당·분배금(원)']]){
      const wrap=el('label',label),input=document.createElement('input');input.type='number';input.min='0';input.step=k==='qty'&&r.account!=='toss-us'?'1':'any';input.value=v[k]??'';wrap.append(input);form.append(wrap);fields[k]=input;
     }
-    const btn=el('button','신규 종목 평가 테스트 저장');btn.type='submit';btn.disabled=busy;form.append(btn);
+    const btn=el('button','신규 종목 평가 테스트 저장');btn.type='submit';form.append(btn);
     const status=el('p','','sub');form.append(status);
     form.addEventListener('submit',e=>{e.preventDefault();if(busy)return;try{basis=editNewBasis(model,basis,r.id,Object.fromEntries(Object.entries(fields).map(([k,input])=>[k,inputNumber(input.value)])));render();}catch(_){status.textContent='수량·평단·분배금 입력값을 확인하세요.'}});row.append(form);
    }
@@ -121,5 +121,5 @@ $('kr-connection').addEventListener('submit',async e=>{
 $('kr-refresh').addEventListener('click',async()=>{if(busy||!krClient)return;busy=true;controls();try{await refreshKr();}finally{busy=false;controls();render();}});
 $('kr-disconnect').addEventListener('click',()=>{if(busy)return;krClient=null;krQuotes=null;$('kr-confirm').checked=false;krStatus('연결 해제');controls();render();});
 $('fx-form').addEventListener('submit',e=>{e.preventDefault();if(busy)return;try{const candidate={rate:inputNumber($('fx-rate').value),date:$('fx-date').value.replaceAll('-','')};if(!validFx(candidate))throw Error('fx');fx=candidate;$('fx-status').textContent='참고환율 적용 · 실제 증권사 환율 아님';render();}catch(_){fx=null;$('fx-status').textContent='환율 및 최근 3일 이내 기준일 확인 필요';render();}});
-$('fx-clear').addEventListener('click',()=>{fx=null;$('fx-rate').value='';$('fx-date').value='';$('fx-status').textContent='참고환율 미입력';render();});
+$('fx-clear').addEventListener('click',()=>{if(busy)return;fx=null;$('fx-rate').value='';$('fx-date').value='';$('fx-status').textContent='참고환율 미입력';render();});
 adjust();render();controls();message('등록 테스트 가능');
