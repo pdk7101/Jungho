@@ -3,10 +3,10 @@ import {watchClient,sharedRegistryRead} from './registry-cloud-client-v17.mjs';
 import {krxClient} from './registry-krx-client-v17.mjs';
 import {inputNumber,editNewBasis,valueNewPosition,newPositionTotals,validFx} from './registry-valuation-v17.mjs';
 import {positionClient} from './registry-position-client-v17.mjs';
-import {readLegacyBasis,consolidated,loadPublishedReference,mergeReferenceDaily} from './registry-consolidated-v17.mjs';
+import {readLegacyBasis,confirmedLegacy,consolidated,loadPublishedReference,mergeReferenceDaily} from './registry-consolidated-v17.mjs';
 const $=id=>document.getElementById(id);
 let model=initialPreview(),client=null,quotes=null,busy=false,canWrite=false,krClient=null,krQuotes=null,dailyQuotes=null;
-let legacyBasis={},legacyConfirmed=false,registryConfirmed=false,autoFx=null,publicDaily=null;
+let legacyBasis={},legacyConfirmed=false,legacyAuto=false,registryConfirmed=false,autoFx=null,publicDaily=null;
 let sharedRead=null,autoPosition=null,lastAutoRead=0,autoDisabled=false;
 let basis={},fx=null,position=null,positionRows={},positionReady=false,drafts={},cloudUrl='';
 const won=n=>n===null?'미확인':Math.round(n).toLocaleString('ko-KR')+'원';
@@ -15,6 +15,7 @@ const el=(tag,value,cls)=>{const e=document.createElement(tag);e.textContent=val
 function message(value,error=false){$('message').textContent=value;$('message').dataset.error=String(error)}
 function adjust(){const us=$('account').value==='toss-us';$('venue-label').hidden=us;$('venue').disabled=us;$('symbol').maxLength=us?15:6;$('symbol').placeholder=us?'예: QQQM':'예: 329200';}
 function render(){
+ const synced=confirmedLegacy(localStorage);if(synced){legacyAuto=true;legacyBasis=synced.basis;legacyConfirmed=true;$('legacy-status').textContent='동기화된 기존 기록 자동 확인 · 버전 '+synced.revision;}else if(legacyAuto){legacyAuto=false;legacyConfirmed=false;$('legacy-status').textContent='동기화 기록 재확인 대기';}
  const count=previewCounts(model);
  $('counts').textContent='고유 종목 '+count.instruments+'/100 · 계좌별 등록 '+count.positions+'건 · 미국 수집 대상 '+count.usSymbols+'개';
  const list=$('list');list.replaceChildren();
