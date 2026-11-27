@@ -1,5 +1,5 @@
 import {ACCOUNT_NAMES,initialPreview,previewAdd,previewRows,previewCounts} from './registry-ui-preview.mjs';
-import {watchClient} from './registry-cloud-client-v17.mjs';
+import {watchClient,sharedRegistryRead} from './registry-cloud-client-v17.mjs';
 import {krxClient} from './registry-krx-client-v17.mjs';
 import {inputNumber,editNewBasis,valueNewPosition,newPositionTotals,validFx} from './registry-valuation-v17.mjs';
 import {positionClient} from './registry-position-client-v17.mjs';
@@ -7,6 +7,7 @@ import {readLegacyBasis,consolidated,loadPublishedReference,mergeReferenceDaily}
 const $=id=>document.getElementById(id);
 let model=initialPreview(),client=null,quotes=null,busy=false,canWrite=false,krClient=null,krQuotes=null,dailyQuotes=null;
 let legacyBasis={},legacyConfirmed=false,registryConfirmed=false,autoFx=null,publicDaily=null;
+let sharedRead=null;
 let basis={},fx=null,position=null,positionRows={},positionReady=false,drafts={},cloudUrl='';
 const won=n=>n===null?'미확인':Math.round(n).toLocaleString('ko-KR')+'원';
 const valuationInputs=()=>({live:quotes,daily:mergeReferenceDaily(publicDaily,dailyQuotes),kr:krQuotes,fx:validFx(fx)?fx:validFx(autoFx)?autoFx:null});
@@ -84,6 +85,9 @@ $('account').addEventListener('change',adjust);
 $('filter').addEventListener('change',render);
 function controls(){
  $('reference-refresh').disabled=busy;$('legacy-read').disabled=busy;
+ $('connection').hidden=!!sharedRead&&!!client;
+ $('shared-write').hidden=!sharedRead||!client||canWrite;
+ $('shared-write-connect').disabled=busy;
  $('connect').disabled=busy||!!client;$('disconnect').disabled=busy||!client;
  $('cloud-refresh').disabled=busy||!client;$('add').disabled=busy||!!client&&!canWrite;
  $('kr-connect').disabled=busy||!!krClient;$('kr-refresh').disabled=busy||!krClient;$('kr-disconnect').disabled=busy||!krClient;
@@ -131,7 +135,7 @@ $('cloud-refresh').addEventListener('click',async()=>{
  finally{busy=false;controls();render();}
 });
 $('disconnect').addEventListener('click',()=>{
- if(busy)return;if(Object.keys(drafts).length&&!window.confirm('미저장 입력을 버리고 연결을 해제할까요?'))return;registryConfirmed=false;position=null;positionReady=false;positionRows={};drafts={};cloudUrl='';positionStatus('미연결');client=null;quotes=null;dailyQuotes=null;krQuotes=null;canWrite=false;basis={};model=initialPreview();$('confirm-dev').checked=false;cloudStatus('연결 해제 · 오프라인 미리보기');controls();render();
+ if(busy)return;if(Object.keys(drafts).length&&!window.confirm('미저장 입력을 버리고 연결을 해제할까요?'))return;sharedRead=null;registryConfirmed=false;position=null;positionReady=false;positionRows={};drafts={};cloudUrl='';positionStatus('미연결');client=null;quotes=null;dailyQuotes=null;krQuotes=null;canWrite=false;basis={};model=initialPreview();$('confirm-dev').checked=false;cloudStatus('연결 해제 · 오프라인 미리보기');controls();render();
 });
 $('registration').addEventListener('submit',async e=>{
  e.preventDefault();if(busy||client&&!canWrite)return;
@@ -174,5 +178,26 @@ $('legacy-confirm').addEventListener('change',()=>{legacyConfirmed=false;$('lega
 $('legacy-read').addEventListener('click',()=>{if(busy)return;legacyBasis=readLegacyBasis(localStorage);legacyConfirmed=$('legacy-confirm').checked;const known=Object.values(legacyBasis).filter(x=>x.qty!==null&&(x.qty===0||x.avgKRW!==null)).length;$('legacy-status').textContent='기존 직접 입력 '+known+'/20건 · '+(legacyConfirmed?'사용자 확인 기준 참고 평가':'확인 전 합산 보류');render();});
 window.addEventListener('storage',e=>{if(e.key===null||['isa-private-positions-v1','isa-private-toss-domestic-holdings-v1','isa-us-holdings-v1'].includes(e.key)){legacyConfirmed=false;$('legacy-confirm').checked=false;$('legacy-status').textContent='기존 기록 변경 감지 · 다시 확인하세요.';render();}});
 $('reference-refresh').addEventListener('click',async()=>{if(busy)return;busy=true;controls();try{await refreshReference();}finally{busy=false;controls();render();}});
+$('shared-write').addEventListener('submit',e=>{
+ e.preventDefault();if(busy||!sharedRead||!client||canWrite)return;
+ const token=$('shared-write-token').value;
+ $('shared-write-token').value='';
+ try{client=watchClient({url:cloudUrl,sharedRead,writeToken:token});canWrite=true;cloudStatus('조회 연결 · 등록 암호 입력됨 (저장 시 권한 확인)');}
+ catch(_){cloudStatus('등록 암호 형식 확인 필요');}
+ controls();render();
+});
+async function connectShared(){
+ let reader;try{reader=sharedRegistryRead(localStorage);}catch(_){return;}
+ if(!reader||client||busy)return;
+ busy=true;controls();
+ try{
+  const candidate=watchClient({url:$('worker-url').value,sharedRead:reader});
+  const next=await candidate.load();
+  sharedRead=reader;client=candidate;model=next;registryConfirmed=true;cloudUrl=$('worker-url').value;canWrite=false;
+  const ok=await refreshQuotes();cloudStatus('기존 동기화로 자동 조회 연결 · '+(ok?'시세 조회 완료':'시세 확인 실패')+' · 등록 및 수정은 별도 암호');
+ }catch(_){cloudStatus('자동 조회 미연결 · 직접 연결 가능');}
+ finally{busy=false;controls();render();}
+}
 adjust();render();controls();message('등록 테스트 가능');
 refreshReference().then(render);
+connectShared();
