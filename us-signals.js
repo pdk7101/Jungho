@@ -319,7 +319,7 @@ function mount(){
  '<p class="us-small" id="us-signal-limits-note"></p></details>';
  const settingsRoot=$('cap-settings');
  if(settingsRoot)settingsRoot.appendChild(holder);else container.appendChild(holder);
- window.ISA_US_SIGNAL={evaluate,decision,cardLine,cardStatus,detailLine,settings,refreshSummary};
+ window.ISA_US_SIGNAL={evaluate,decision,cardLine,cardStatus,detailLine,settings,refreshSummary,session:usSession};
  updateLimitsUI();
  window.addEventListener('isa-us-quotes-refreshed',render);
  document.addEventListener('isa-toss-broker-data',render);
