@@ -114,63 +114,94 @@ function session(now){
  const trading=['2026','2027','2028'].includes(p.year)&&!['Sat','Sun'].includes(p.weekday)&&!HOLIDAYS.has(date);
  return {date,open:trading&&m>=570&&m<close,trading,close,minute:m};
 }
+const KR_SEED=[
+ ['329200','TIGER 리츠부동산인프라','KRX-ETF',true,true],
+ ['0167B0','SOL 200타겟위클리커버드콜','KRX-ETF',true,false],
+ ['469070','RISE AI&로봇','KRX-ETF',true,true],
+ ['0131V0','1Q 미국우주항공테크','KRX-ETF',true,true],
+ ['455030','KODEX 미국달러SOFR','KRX-ETF',true,true],
+ ['278530','KODEX 200TR','KRX-ETF',true,true],
+ ['0229F0','마이티 신약포커스바이오액티브','KRX-ETF',false,true],
+ ['228810','TIGER 미디어컨텐츠','KRX-ETF',false,true],
+ ['003280','흥아해운','KOSPI',false,true],
+ ['321370','센서뷰','KOSDAQ',false,true]
+];
+const accounts={'kiwoom-isa':'KR','toss-kr':'KR','toss-us':'US'};
+function watchInput(x){
+ if(!x||Object.keys(x).sort().join(',')!=='account,name,symbol,venue'||!Object.hasOwn(accounts,x.account))throw Error('invalid_input');
+ const market=accounts[x.account],{symbol,venue,name}=x;
+ if(typeof name!=='string'||!name.trim()||name.length>120||
+ !(market==='US'?venue==='US'&&validSymbol(symbol):['KRX-ETF','KOSPI','KOSDAQ'].includes(venue)&&typeof symbol==='string'&&/^[A-Z0-9]{6}$/.test(symbol)))throw Error('invalid_input');
+ return {account:x.account,id:market+':'+venue+':'+symbol,market,venue,symbol,name:name.trim()};
+}
+function appendWatch(state,input){
+ const i=watchInput(input),id=i.account+'|'+i.id;
+ if(Object.hasOwn(state.holdings,id))return false;
+ if(!Object.hasOwn(state.catalog,i.id)&&Object.keys(state.catalog).length>=100)throw Error('registry_limit');
+ state.catalog[i.id]??={id:i.id,market:i.market,venue:i.venue,symbol:i.symbol,name:i.name};
+ state.holdings[id]={instrumentId:i.id,archived:false};
+ return true;
+}
 function seedRegistry(){
- const catalog={},holdings={};
- for(const symbol of Object.values(LEGACY)){
-  const id='US:US:'+symbol;
-  catalog[id]={id,market:'US',venue:'US',symbol};
-  holdings['toss-us|'+id]={instrumentId:id,archived:false};
+ const state={catalog:{},holdings:{}};
+ for(const symbol of Object.values(LEGACY))appendWatch(state,{account:'toss-us',venue:'US',symbol,name:symbol});
+ for(const [symbol,name,venue,isa,toss] of KR_SEED){
+  if(isa)appendWatch(state,{account:'kiwoom-isa',venue,symbol,name});
+  if(toss)appendWatch(state,{account:'toss-kr',venue,symbol,name});
  }
- return {catalog,holdings};
+ return state;
 }
-// A future validated registry writer will use this separate row.
-// No write route is exposed now. Missing row uses known legacy watchlist,
-// malformed row fails closed rather than guessing a set of holdings.
-async function registryFromDB(db){
- await db.prepare('CREATE TABLE IF NOT EXISTS us_collect_registry_v17 (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL)').run();
- const row=await db.prepare('SELECT payload FROM us_collect_registry_v17 WHERE id=1').first();
- if(!row)return seedRegistry();
+function decodeRegistry(row){
+ const state=seedRegistry();
+ if(!row)return state;
  const data=JSON.parse(row.payload);
- if(!data||!data.catalog||!data.holdings||Array.isArray(data.catalog)||Array.isArray(data.holdings))throw Error('registry invalid');
- if(Object.keys(data.catalog).length>100||Object.keys(data.holdings).length>300)throw Error('registry limit');
- for(const [id,h] of Object.entries(data.holdings)){
-  if(!h||typeof h.archived!=='boolean'||!Object.hasOwn(data.catalog,h.instrumentId))throw Error('registry invalid');
+ if(!data||!data.catalog||!data.holdings||Array.isArray(data.catalog)||Array.isArray(data.holdings)||Object.keys(data.catalog).length>100||Object.keys(data.holdings).length>300)throw Error('registry invalid');
+ // Upgrade previous US-only prototype row without dropping any registrations.
+ for(const [key,h] of Object.entries(data.holdings)){
+  const i=data.catalog[h?.instrumentId],account=key.split('|')[0];
+  if(!i||h.archived!==false)throw Error('registry invalid');
+  const input={account,venue:i.venue,symbol:i.symbol,name:i.name||i.symbol};
+  const checked=watchInput(input);
+  if(checked.id!==h.instrumentId||key!==account+'|'+checked.id||i.market!==checked.market)throw Error('registry invalid');
+  appendWatch(state,input);
  }
- activeUS(data.catalog,data.holdings);
- return data;
+ return state;
 }
-// Add-only registry writer. Does not accept holdings, cost basis or trading instructions.
-// A compare-and-swap on the exact previous payload prevents lost updates across devices.
-async function registerSymbol(db,symbol){
- if(!validSymbol(symbol))throw Error('invalid_symbol');
- await registryFromDB(db);
+async function registryRow(db){
+ await db.prepare('CREATE TABLE IF NOT EXISTS us_collect_registry_v17 (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL)').run();
+ return db.prepare('SELECT payload FROM us_collect_registry_v17 WHERE id=1').first();
+}
+async function registryFromDB(db){return decodeRegistry(await registryRow(db));}
+async function registerWatch(db,input){
+ const i=watchInput(input);
  for(let attempt=0;attempt<5;attempt++){
-  const row=await db.prepare('SELECT payload FROM us_collect_registry_v17 WHERE id=1').first();
-  const state=row?JSON.parse(row.payload):seedRegistry();
-  const id='US:US:'+symbol;
-  if(activeUS(state.catalog,state.holdings).includes(symbol))return {status:'already_registered',symbol};
-  if(Object.keys(state.catalog).length>=100&&!Object.hasOwn(state.catalog,id))throw Error('registry_limit');
-  state.catalog[id]={id,market:'US',venue:'US',symbol};
-  state.holdings['toss-us|'+id]={instrumentId:id,archived:false};
+  const row=await registryRow(db),state=decodeRegistry(row);
+  if(!appendWatch(state,input))return {status:'already_registered',symbol:i.symbol};
   const payload=JSON.stringify(state);
   const result=row
    ?await db.prepare('UPDATE us_collect_registry_v17 SET payload=? WHERE id=1 AND payload=?').bind(payload,row.payload).run()
    :await db.prepare('INSERT OR IGNORE INTO us_collect_registry_v17(id,payload) VALUES(1,?)').bind(payload).run();
-  if(result.meta.changes===1)return {status:'registered',symbol};
+  if(result.meta.changes===1)return {status:'registered',symbol:i.symbol};
  }
  throw Error('registry_conflict');
 }
+async function registerSymbol(db,symbol){return registerWatch(db,{account:'toss-us',venue:'US',symbol,name:symbol});}
 async function readSmallJSON(request){
  if(!request.headers.get('Content-Type')?.toLowerCase().startsWith('application/json')||!request.body)throw Error('invalid_body');
  const reader=request.body.getReader(),decoder=new TextDecoder();
  let size=0,raw='';
  try{
-  for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>256)throw Error('invalid_body');raw+=decoder.decode(value,{stream:true});}
+  for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>1024)throw Error('invalid_body');raw+=decoder.decode(value,{stream:true});}
   raw+=decoder.decode();
   return JSON.parse(raw);
  }finally{await reader.cancel().catch(()=>{});}
 }
-async function registrationRoute(request,env){
+async function registrationRoute(request,env,full=false){
+ if(full&&request.method==='GET'){
+  if(!await authorized(request,env.VIEW_TOKEN))return response(401,{error:'unauthorized'});
+  if(!env.DB)return response(503,{error:'missing database binding'});
+  try{return response(200,{schema:'watchlist-v17',...(await registryFromDB(env.DB))});}catch(_){return response(503,{error:'registry_unavailable'});}
+ }
  if(request.method!=='POST')return response(405,{error:'method'});
  const secret=env.REGISTRY_WRITE_TOKEN;
  if(typeof secret!=='string'||secret.length<32||secret===env.VIEW_TOKEN)return response(503,{error:'registry_write_disabled'});
@@ -178,8 +209,9 @@ async function registrationRoute(request,env){
  if(!env.DB)return response(503,{error:'missing database binding'});
  let data;
  try{data=await readSmallJSON(request)}catch(_){return response(400,{error:'invalid_body'});}
- if(!data||Object.keys(data).length!==1||!validSymbol(data.symbol))return response(400,{error:'invalid_symbol'});
- try{return response(200,await registerSymbol(env.DB,data.symbol));}
+ if(!full&&(!data||Object.keys(data).length!==1||!validSymbol(data.symbol)))return response(400,{error:'invalid_symbol'});
+ if(full){try{watchInput(data)}catch(_){return response(400,{error:'invalid_input'});}}
+ try{return response(200,full?await registerWatch(env.DB,data):await registerSymbol(env.DB,data.symbol));}
  catch(e){return response(e.message==='registry_limit'?409:e.message==='registry_conflict'?409:503,{error:['registry_limit','registry_conflict'].includes(e.message)?e.message:'registry_unavailable'});}
 }
 async function tick({store,readRegistry,fetchQuote,now=Date.now(),clock=Date.now}){
@@ -218,9 +250,9 @@ export default {
  async fetch(request,env){
   if(request.headers.get('Origin')!==ORIGIN)return new Response(null,{status:403});
   const url=new URL(request.url);
-  if(!['/quotes','/registry'].includes(url.pathname)||url.search)return response(404,{error:'not_found'});
+  if(!['/quotes','/registry','/watchlist'].includes(url.pathname)||url.search)return response(404,{error:'not_found'});
   if(request.method==='OPTIONS')return response(200,{ok:true});
-  if(url.pathname==='/registry')return registrationRoute(request,env);
+  if(url.pathname==='/registry'||url.pathname==='/watchlist')return registrationRoute(request,env,url.pathname==='/watchlist');
   if(request.method!=='GET')return response(405,{error:'method'});
   if(!await authorized(request,env.VIEW_TOKEN))return response(401,{error:'unauthorized'});
   if(!env.DB)return response(503,{error:'missing database binding'});
