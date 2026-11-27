@@ -1,8 +1,12 @@
 import {ACCOUNT_NAMES,initialPreview,previewAdd,previewRows,previewCounts} from './registry-ui-preview.mjs';
 import {watchClient} from './registry-cloud-client-v17.mjs';
 import {krxClient} from './registry-krx-client-v17.mjs';
+import {inputNumber,editNewBasis,valueNewPosition,newPositionTotals,validFx} from './registry-valuation-v17.mjs';
 const $=id=>document.getElementById(id);
 let model=initialPreview(),client=null,quotes=null,busy=false,canWrite=false,krClient=null,krQuotes=null,dailyQuotes=null;
+let basis={},fx=null;
+const won=n=>n===null?'미확인':Math.round(n).toLocaleString('ko-KR')+'원';
+const valuationInputs=()=>({live:quotes,daily:dailyQuotes,kr:krQuotes,fx});
 const el=(tag,value,cls)=>{const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e};
 function message(value,error=false){$('message').textContent=value;$('message').dataset.error=String(error)}
 function adjust(){const us=$('account').value==='toss-us';$('venue-label').hidden=us;$('venue').disabled=us;$('symbol').maxLength=us?15:6;$('symbol').placeholder=us?'예: QQQM':'예: 329200';}
@@ -10,6 +14,8 @@ function render(){
  const count=previewCounts(model);
  $('counts').textContent='고유 종목 '+count.instruments+'/100 · 계좌별 등록 '+count.positions+'건 · 미국 수집 대상 '+count.usSymbols+'개';
  const list=$('list');list.replaceChildren();
+ const totals=$('new-totals');totals.replaceChildren();
+ for(const [account,t] of Object.entries(newPositionTotals(model,basis,valuationInputs()))){if(!t.count)continue;totals.append(el('p',ACCOUNT_NAMES[account]+' · 신규 '+t.count+'건 · 원금 '+won(t.cost)+' · 참고 평가 '+won(t.value)+' · 손익 '+won(t.profit)+' · 세후 분배금 '+won(t.netDistributionsKRW)+' · 미확인 '+t.missing+'건','sub'));}
  for(const [account,name] of Object.entries(ACCOUNT_NAMES)){
   if($('filter').value!=='all'&&$('filter').value!==account)continue;
   const rows=previewRows(model,account);
@@ -29,8 +35,20 @@ function render(){
     const id='KR:'+r.venue+':'+r.symbol,q=krQuotes?.byId?.[id];
     price=q?.close>0?'KRW '+q.close.toLocaleString('ko-KR')+'원 · 공식 일별 종가 '+q.date.slice(0,4)+'-'+q.date.slice(4,6)+'-'+q.date.slice(6)+(q.date!==krQuotes.asOfCandidate?' · 이전 자료':'')+' · 실시간 아님':'KRX 공식 종가 미확인';
    }else if(client&&r.added)price='국내 신규 시세 연결 대기';
-   row.append(el('strong',r.name+' ('+r.symbol+')'),el('p',r.venue+' · '+r.status,r.added?'wait':'sub'),el('p','수량 미확인 · 평단 미확인 · '+price,'sub'));
+   row.append(el('strong',r.name+' ('+r.symbol+')'),el('p',r.venue+' · '+r.status,r.added?'wait':'sub'),el('p',(r.added?'':'수량 미확인 · 평단 미확인 · ')+price,'sub'));
    if(dailyNote)row.append(el('p',dailyNote,'sub'));
+   if(r.added){
+    const v=valueNewPosition(model,basis,r.id,valuationInputs());
+    row.append(el('p','수량 '+(v.qty??'미확인')+' · 평단 '+won(v.avgKRW),'sub'),el('p','투자원금 '+won(v.cost)+' · 참고 평가액 '+won(v.value),'sub'),el('p','평가손익 '+won(v.profit)+' · 수익률 '+(v.returnPct===null?'미확인':v.returnPct.toFixed(2)+'%'),'sub'),el('p','누적 세후 분배금 직접 입력 '+won(v.netDistributionsKRW)+' · 평가손익과 별도','sub'));
+    if(v.quote)row.append(el('p','참고 평가 기준 '+v.quote.date+(v.quote.fxDate?' · 환율 기준 '+v.quote.fxDate:'')+' · 실제 증권사 평가액 아님','sub'));
+    const form=document.createElement('form');const fields={};
+    for(const [k,label] of [['qty','보유수량'],['avgKRW','원화 평단'],['netDistributionsKRW','누적 세후 배당·분배금(원)']]){
+     const wrap=el('label',label),input=document.createElement('input');input.type='number';input.min='0';input.step=k==='qty'&&r.account!=='toss-us'?'1':'any';input.value=v[k]??'';wrap.append(input);form.append(wrap);fields[k]=input;
+    }
+    const btn=el('button','신규 종목 평가 테스트 저장');btn.type='submit';btn.disabled=busy;form.append(btn);
+    const status=el('p','','sub');form.append(status);
+    form.addEventListener('submit',e=>{e.preventDefault();if(busy)return;try{basis=editNewBasis(model,basis,r.id,Object.fromEntries(Object.entries(fields).map(([k,input])=>[k,inputNumber(input.value)])));render();}catch(_){status.textContent='수량·평단·분배금 입력값을 확인하세요.'}});row.append(form);
+   }
    list.append(row);
   }
  }
@@ -62,7 +80,7 @@ $('connection').addEventListener('submit',async e=>{
  try{
   const writeToken=$('write-token').value;
   const candidate=watchClient({url:$('worker-url').value,viewToken:$('view-token').value,writeToken});
-  const next=await candidate.load();client=candidate;model=next;canWrite=Boolean(writeToken);
+  const next=await candidate.load();client=candidate;model=next;basis={};canWrite=Boolean(writeToken);
   krQuotes=null;const ok=await refreshQuotes();cloudStatus('서버 목록 확인 · '+(canWrite?'등록 토큰 입력됨':'조회 전용')+(ok?' · 시세 캐시 조회 완료':' · 시세 확인 실패'));
  }catch(_){cloudStatus('개발 Worker 연결 실패 · 주소·토큰·버전을 확인하세요.');}
  finally{$('view-token').value='';$('write-token').value='';busy=false;controls();render();}
@@ -74,7 +92,7 @@ $('cloud-refresh').addEventListener('click',async()=>{
  finally{busy=false;controls();render();}
 });
 $('disconnect').addEventListener('click',()=>{
- if(busy)return;client=null;quotes=null;dailyQuotes=null;krQuotes=null;canWrite=false;model=initialPreview();$('confirm-dev').checked=false;cloudStatus('연결 해제 · 오프라인 미리보기');controls();render();
+ if(busy)return;client=null;quotes=null;dailyQuotes=null;krQuotes=null;canWrite=false;basis={};model=initialPreview();$('confirm-dev').checked=false;cloudStatus('연결 해제 · 오프라인 미리보기');controls();render();
 });
 $('registration').addEventListener('submit',async e=>{
  e.preventDefault();if(busy||client&&!canWrite)return;
@@ -102,4 +120,6 @@ $('kr-connection').addEventListener('submit',async e=>{
 });
 $('kr-refresh').addEventListener('click',async()=>{if(busy||!krClient)return;busy=true;controls();try{await refreshKr();}finally{busy=false;controls();render();}});
 $('kr-disconnect').addEventListener('click',()=>{if(busy)return;krClient=null;krQuotes=null;$('kr-confirm').checked=false;krStatus('연결 해제');controls();render();});
+$('fx-form').addEventListener('submit',e=>{e.preventDefault();if(busy)return;try{const candidate={rate:inputNumber($('fx-rate').value),date:$('fx-date').value.replaceAll('-','')};if(!validFx(candidate))throw Error('fx');fx=candidate;$('fx-status').textContent='참고환율 적용 · 실제 증권사 환율 아님';render();}catch(_){fx=null;$('fx-status').textContent='환율 및 최근 3일 이내 기준일 확인 필요';render();}});
+$('fx-clear').addEventListener('click',()=>{fx=null;$('fx-rate').value='';$('fx-date').value='';$('fx-status').textContent='참고환율 미입력';render();});
 adjust();render();controls();message('등록 테스트 가능');
