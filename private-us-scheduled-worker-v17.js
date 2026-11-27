@@ -390,6 +390,41 @@ async function authorized(request,secret){
  const enc=new TextEncoder(),a=new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode(request.headers.get('Authorization')||''))),b=new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode('Bearer '+secret)));
  let diff=0;for(let i=0;i<a.length;i++)diff|=a[i]^b[i];return diff===0;
 }
+// Isolated deployment check: available only on the dedicated v17 Worker.
+const TEST_ORIGIN='https://jungho-v17.pdk7101.workers.dev';
+const TEST_HTML=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>v17 서버 연결 점검</title><style>body{font-family:system-ui,sans-serif;background:#0e1627;color:#eaf0fb;margin:0}main{max-width:600px;margin:auto;padding:20px}section{border:1px solid #35435a;border-radius:12px;padding:16px;background:#19253a}label,input,button{display:block;width:100%;box-sizing:border-box}input,button{font:inherit;min-height:44px;margin:8px 0 16px;padding:10px;border-radius:8px}input{background:#101b2e;color:white;border:1px solid #596a85}button{background:#2563eb;color:white;border:0;font-weight:bold}button:disabled{opacity:.5}p,li{line-height:1.6;overflow-wrap:anywhere}</style></head><body><main><h1>v17 서버 연결 점검</h1><p>개발 서버 전용. 실제 투자기록 및 시세 공급원을 변경하지 않습니다.</p><section><form id="check" autocomplete="off"><label>조회용 암호 (VIEW_TOKEN)<input id="view" type="password" required minlength="20" autocomplete="off"></label><label>투자기록용 암호 (POSITION_RECORD_TOKEN, 선택)<input id="position" type="password" minlength="32" autocomplete="off"></label><button id="run" type="submit">연결 테스트</button></form><ul id="results" aria-live="polite"></ul><p id="status" role="status">암호를 입력하고 연결 테스트를 누르세요.</p></section><p>암호는 저장하거나 화면에 출력하지 않습니다. 성공 결과만 캡처하세요. 시세 수집이 시작되지 않았으면 가격 0건은 정상입니다.</p><script src="/connection-test.js" defer></script></main></body></html>`;
+const TEST_JS=`'use strict';
+const $=id=>document.getElementById(id);
+$('check').addEventListener('submit',async e=>{
+ e.preventDefault();if($('run').disabled)return;
+ const view=$('view').value,position=$('position').value;
+ $('view').value='';$('position').value='';$('run').disabled=true;$('results').replaceChildren();$('status').textContent='확인 중';
+ let success=0,attempted=0;
+ async function check(path,token,validate){
+  attempted++;const item=document.createElement('li');$('results').append(item);
+  try{
+   const r=await fetch(path,{headers:{Authorization:'Bearer '+token,Accept:'application/json'},cache:'no-store',credentials:'omit',redirect:'error',signal:AbortSignal.timeout(10000)});
+   if(!r.ok){item.textContent=path+' · HTTP '+r.status+' · 연결 실패';return;}
+   const detail=validate(await r.json());if(detail===null){item.textContent=path+' · 응답 형식 오류';return;}
+   success++;item.textContent=path+' · 200 연결 성공 · '+detail;
+  }catch(_){item.textContent=path+' · 통신 또는 응답 오류';}
+ }
+ try{
+  await check('/watchlist',view,p=>p?.schema==='watchlist-v17'&&p.catalog&&p.holdings?'고유 종목 '+Object.keys(p.catalog).length+'개 / 계좌별 '+Object.keys(p.holdings).length+'건':null);
+  await check('/quotes',view,p=>p?.cachedOnly===true&&p.bySymbol?'수집 대상 '+Object.keys(p.bySymbol).length+'개 / 유효 시세 '+Object.values(p.bySymbol).filter(q=>typeof q.usd==='number'&&q.usd>0).length+'건':null);
+  if(position)await check('/position-records',position,p=>p?.schema==='new-position-basis-v17'&&p.records?'신규 투자기록 '+Object.keys(p.records).length+'건':null);
+  $('status').textContent=success===attempted?'연결 점검 통과 ('+success+'/'+attempted+') · 실제 장중 수집 및 저장 테스트는 별도':'연결 점검 '+success+'/'+attempted+' · 실패 항목 확인 필요';
+ }finally{$('run').disabled=false;}
+});`;
+function testAsset(url,request){
+ if(url.origin!==TEST_ORIGIN||url.search||request.method!=='GET')return null;
+ if(!['/connection-test','/connection-test.js'].includes(url.pathname))return null;
+ const js=url.pathname.endsWith('.js');
+ return new Response(js?TEST_JS:TEST_HTML,{headers:{'Content-Type':js?'application/javascript; charset=utf-8':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",'X-Robots-Tag':'noindex, nofollow'}});
+}
+function sameOriginTestRead(request,url){
+ return url.origin===TEST_ORIGIN&&request.method==='GET'&&!url.search&&['/watchlist','/quotes','/position-records'].includes(url.pathname)&&request.headers.get('Sec-Fetch-Site')==='same-origin'&&(!request.headers.get('Origin')||request.headers.get('Origin')===TEST_ORIGIN);
+}
 export default {
  async scheduled(controller,env,ctx){
   // Use the actual invocation time, not an old scheduledTime after platform delay.
@@ -402,8 +437,9 @@ export default {
   ctx.waitUntil(tick({store:d1Store(env.DB),readRegistry:()=>registryFromDB(env.DB),fetchQuote:finnhubFetcher(env.FINNHUB_API_KEY),now}));
  },
  async fetch(request,env){
-  if(request.headers.get('Origin')!==ORIGIN)return new Response(null,{status:403});
   const url=new URL(request.url);
+  const asset=testAsset(url,request);if(asset)return asset;
+  if(request.headers.get('Origin')!==ORIGIN&&!sameOriginTestRead(request,url))return new Response(null,{status:403});
   if(!['/quotes','/registry','/watchlist','/daily','/position-records'].includes(url.pathname)||url.search)return response(404,{error:'not_found'});
   if(request.method==='OPTIONS')return response(200,{ok:true});
   if(url.pathname==='/position-records')return basisRoute(request,env);
