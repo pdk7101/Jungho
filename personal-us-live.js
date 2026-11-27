@@ -7,6 +7,7 @@
  // Explicit opt-in only. A persistent access token can be read by scripts on this public origin.
  const REMEMBER_KEY='isa-us-private-worker-remembered-v1',REMEMBER_MAX_MS=30*86400000;
  const TRADE_TTL=45*60000,RESPONSE_TTL=5*60000;
+ let dynamicQuotes=null;
  let endpoint='',password='',quotes={},fetchedAt='',busy=false,lastMessage='',diagnostics={},workerVersion='',lastRequestAt=0,lastError='';
  const $=id=>document.getElementById(id);
  function rememberedAccess(url){
@@ -136,13 +137,14 @@ function renderDiagnostics(){
     }
    }
    quotes=next;diagnostics=details;fetchedAt=payload.fetchedAt;lastError='';
-   workerVersion=/^20261114-quote-transport-2$/.test(String(payload.workerVersion||''))?
+   workerVersion=/^20261114-quote-transport-2$/.test(String(payload.workerVersion||''))||payload.workerVersion==='20261127-v17-scheduled-candidate'?
     payload.workerVersion:'';
+   dynamicQuotes=payload.workerVersion==='20261127-v17-scheduled-candidate'&&payload.cachedOnly===true&&payload.bySymbol&&typeof payload.bySymbol==='object'?{bySymbol:payload.bySymbol,session:payload.session,fetchedAt:payload.fetchedAt}:null;
    status(IDS.filter(id=>quote(id)).length?
     '개인 시세 서버 조회 성공 · 최근 체결 확인':
     '개인 시세 서버 응답 성공 · 유효한 최근 체결 0/4 (시세 지연·미제공 가능, 장 마감 단정 불가)');
   }catch(e){
-   quotes={};fetchedAt='';diagnostics={};workerVersion='';
+   dynamicQuotes=null;quotes={};fetchedAt='';diagnostics={};workerVersion='';
    lastError='시세 서버 조회 실패';
    status('자동 조회 실패: '+String(e?.message||e));
   }finally{
@@ -189,7 +191,7 @@ function renderDiagnostics(){
   accessHint();
   status('개인 시세 연결 해제');signal();
  }
- window.ISA_PERSONAL_US={quote,refresh,state:connectionState};
+ window.ISA_PERSONAL_US={quote,refresh,state:connectionState,scheduledSnapshot:()=>dynamicQuotes};
  const connectButton=$('us-live-connect'),stopButton=$('us-live-disconnect'),quickRefresh=$('us-live-refresh');
  if(connectButton)connectButton.addEventListener('click',connect);
  if(stopButton)stopButton.addEventListener('click',disconnect);
