@@ -1,10 +1,13 @@
 import {workerOrigin} from './registry-cloud-client-v17.mjs';
 import {editNewBasis} from './registry-valuation-v17.mjs';
 // Dedicated credential, in memory only. No price API or legacy sync access.
-export function positionClient({url,token,fetchImpl=fetch}){
+export function positionClient({url,token,sharedRead=null,fetchImpl=fetch}){
  const origin=workerOrigin(url);
- if(typeof token!=='string'||token.length<32)throw Error('position_token');
+ if(sharedRead&&(typeof sharedRead!=='function'||origin!=='https://jungho-v17.pdk7101.workers.dev'))throw Error('position_scope');
+ if(!sharedRead&&(typeof token!=='string'||token.length<32))throw Error('position_token');
  async function request(data){
+  if(!data&&sharedRead)return sharedRead('/position-records');
+  if(typeof token!=='string'||token.length<32)throw Error('position_write_required');
   const r=await fetchImpl(origin+'/position-records',{method:data?'POST':'GET',headers:{Authorization:'Bearer '+token,Accept:'application/json',...(data?{'Content-Type':'application/json'}:{})},...(data?{body:JSON.stringify(data)}:{}),cache:'no-store',credentials:'omit',redirect:'error',signal:AbortSignal.timeout(10000)});
   if(!r.ok)throw Error(r.status===409?'basis_conflict':'basis_http_'+r.status);
   return r.json();
