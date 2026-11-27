@@ -3,8 +3,10 @@
 <style>
 :root{color-scheme:dark;font-family:system-ui,sans-serif;background:#0e1627;color:#eaf0fb}*{box-sizing:border-box}body{margin:0}main{max-width:760px;margin:auto;padding:18px 14px 48px}h1{font-size:1.5rem}h2{font-size:1.1rem}p{line-height:1.6}.panel{background:#19253a;border:1px solid #35435a;border-radius:14px;padding:16px;margin:14px 0}label{display:block;margin:12px 0;color:#c3cee1}input,select,button{display:block;width:100%;font:inherit;border-radius:9px;padding:12px;margin-top:5px;min-height:44px;border:1px solid #596a85;background:#101b2e;color:#fff}button{background:#2563eb;border:0;font-weight:700;cursor:pointer}button:disabled{opacity:.6}.sub{color:#b5c3d8;font-size:.85rem}.row{border-top:1px solid #35435a;padding:12px 0;overflow-wrap:anywhere}.row strong{display:block}.row p{margin:5px 0}.wait{color:#f5ce86}#message{min-height:1.5em}#message[data-error=true]{color:#ffacb6}[hidden]{display:none!important}.counts{font-variant-numeric:tabular-nums}
 </style></head><body><main>
-<h1>종목 추가 · 계좌 관리</h1><p class="sub">v17 개발 미리보기 · 실제 보유량과 시세를 읽거나 변경하지 않습니다. 새로고침하면 테스트 등록이 초기화됩니다.</p>
-<section class="panel"><h2>신규 종목 등록 테스트</h2><form id="registration">
+<h1>종목 추가 · 계좌 관리</h1><p class="sub">v17 개발 화면 · 기본은 메모리 전용 테스트입니다. 검증된 개발 Worker에 연결하면 종목 목록을 공유합니다. 실제 보유기록은 변경하지 않습니다.</p>
+<section class="panel"><h2>개발용 Cloudflare 연결</h2><p class="sub">운영 Worker가 아닌 본인의 격리 개발 Worker만 사용하세요. 토큰은 저장하지 않으며 새로고침 시 재입력해야 합니다.</p>
+<form id="connection"><label>개발 Worker HTTPS 주소<input id="worker-url" type="url" required autocomplete="off" placeholder="https://이름.계정.workers.dev"></label><label>조회 토큰<input id="view-token" type="password" required minlength="20" autocomplete="off"></label><label>등록 토큰 (조회만 할 때는 생략)<input id="write-token" type="password" minlength="32" autocomplete="off"></label><label><input id="confirm-dev" type="checkbox" required style="display:inline;width:auto;min-height:0"> 격리 개발 Worker임을 확인했습니다.</label><button id="connect" type="submit">연결 및 목록 불러오기</button></form><p id="cloud-status" role="status" class="sub">오프라인 미리보기</p><button id="cloud-refresh" type="button" disabled>저장 목록 · 미국 시세 다시 조회</button><button id="disconnect" type="button" disabled>연결 해제</button></section>
+<section class="panel"><h2>신규 종목 등록</h2><form id="registration">
 <label>계좌<select id="account" required><option value="kiwoom-isa">키움 ISA</option><option value="toss-kr">토스 국내</option><option value="toss-us">토스 미국</option></select></label>
 <label id="venue-label">시장<select id="venue"><option value="KRX-ETF">국내 ETF</option><option value="KOSPI">코스피</option><option value="KOSDAQ">코스닥</option></select></label>
 <label>종목코드 / 티커<input id="symbol" required maxlength="15" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="예: 329200"></label>
@@ -12,5 +14,5 @@
 <button type="submit" id="add" disabled>종목 등록 테스트</button></form><p id="message" role="status" aria-live="polite">화면 초기화 중</p>
 <p class="sub">등록은 감시 대상의 미리보기이며 매수 주문이 아닙니다. 종목코드 형식 확인과 실제 거래 가능 확인은 별개입니다.</p></section>
 <section class="panel"><h2>계좌별 종목</h2><p id="counts" class="counts sub"></p><label>보기<select id="filter"><option value="all">전체 계좌</option><option value="kiwoom-isa">키움 ISA</option><option value="toss-kr">토스 국내</option><option value="toss-us">토스 미국</option></select></label><div id="list"></div></section>
-<p class="sub">기존 종목 목록은 v16 코드의 등록 목록을 바탕으로 표시합니다. 실제 잔고가 아니며 신규 등록은 현재 브라우저 메모리에서만 유지됩니다.</p>
+<p class="sub">기존 목록은 v16 등록 목록 기준입니다. 실제 잔고가 아닙니다. 미연결 테스트 등록은 메모리에만 남고, 연결 상태에서는 서버 확인 후 등록됩니다.</p>
 <noscript>이 미리보기에는 JavaScript가 필요합니다.</noscript></main><script type="module" src="./registry-ui-page.mjs"></script></body></html>
