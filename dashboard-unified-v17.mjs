@@ -5,6 +5,7 @@ import {instrument,holdingId} from './instrument-registry.mjs';
 import {confirmedLegacy,consolidated,loadPublishedReference,mergeReferenceDaily} from './registry-consolidated-v17.mjs';
 import {sharedRegistryRead,watchClient} from './registry-cloud-client-v17.mjs';
 import {positionClient} from './registry-position-client-v17.mjs';
+import {confirmedPayouts,unifiedPayouts} from './payout-unified-v17.mjs';
 const TARGET='https://jungho-v17.pdk7101.workers.dev';
 const basisKeys=['isa-private-positions-v1','isa-private-toss-domestic-holdings-v1','isa-us-holdings-v1'];
 const names={'kiwoom-isa':'키움 ISA','toss-kr':'토스 국내','toss-us':'토스 미국',all:'전체'};
@@ -41,14 +42,18 @@ export function mountUnified(doc,win){
  let busy=false,position=null,model=null,records=null,reference=null,daily=null,live=null,registryConfirmed=false,positionConfirmed=false,epoch=0,lastLoad=0;
  const status=$('v17-unified-status'),form=$('v17-unified-auth'),input=$('v17-unified-token'),refresh=$('v17-unified-refresh');
  const render=()=>{
-  root.replaceChildren();if(!model)return;
+  root.replaceChildren();
+  const payout=$('v17-unified-payout');
+  const payment=unifiedPayouts(model,{legacy:confirmedPayouts(win.localStorage,win.ISA_ACCOUNT_SUMMARY?.getDividends?.()),records:records||{},registryConfirmed,positionConfirmed});
+  if(payout){payout.textContent=payment.recorded===null?'기존·신규 배당 자동 대조 대기':(payment.complete?'통합 누적 세후 배당·분배금 ':'중복 제외 기록된 세후 배당·분배금 ')+won(payment.recorded)+(payment.overlap>0?' · 중복 범위 확인 대기 '+won(payment.overlap):'')+(payment.unknown>0?' · 신규 미입력 '+payment.unknown+'건':'')+(payment.complete?'':' · 일부 기록 확인 필요');}
+  if(!model)return;
   const result=unifiedReference(model,{legacy:confirmedLegacy(win.localStorage),records,registryConfirmed,positionConfirmed,inputs:{kr:commonKR(win.ISA_SHARED_QUOTES?.valuationData?.()),live,daily:mergeReferenceDaily(reference?.daily,daily),fx:reference?.fx}});
   for(const [account,t] of [...Object.entries(result.accounts),['all',result.all]]){
    const p=doc.createElement('p');p.className='sub';
    p.textContent=names[account]+' · '+t.count+'건 · 원금 '+won(t.cost)+' · 참고 평가 '+won(t.value)+' · 손익 '+won(t.profit)+' · 수익률 '+(t.returnPct===null?'미확인':t.returnPct.toFixed(2)+'%')+' · 미확인 '+t.missing+'건 · 기준일 '+(t.dates.join(', ')||'미확인');
    root.append(p);
   }
-  const p=doc.createElement('p');p.className='sub';p.textContent=result.ambiguous?'동일 계좌·종목에 시장 분류가 중복되어 합산 보류':result.legacyRevision===null?'기존 동기화 기록 확인 전 합산 보류':'기존 동기화 버전 '+result.legacyRevision+' · 신규 배당 '+won(result.all.newNetDistributionsKRW)+' (기존 배당과 합산 보류)';
+  const p=doc.createElement('p');p.className='sub';p.textContent=result.ambiguous?'동일 계좌·종목에 시장 분류가 중복되어 합산 보류':result.legacyRevision===null?'기존 동기화 기록 확인 전 합산 보류':'기존 동기화 버전 '+result.legacyRevision+' · 신규 배당은 위 누적 배당 영역에서 자동 대조';
   root.append(p);
  };
  async function load(){
@@ -73,6 +78,7 @@ export function mountUnified(doc,win){
  win.addEventListener('isa-personal-us-quote-refreshed',()=>{live=win.ISA_PERSONAL_US?.scheduledSnapshot?.()||null;render();if(!model&&!busy&&Date.now()-lastLoad>60000&&confirmedLegacy(win.localStorage))load();});
  // Read cached records only, at most once per five minutes while visible.
  const auto=()=>{render();if(!doc.hidden&&!busy&&Date.now()-lastLoad>=300000&&confirmedLegacy(win.localStorage))load();};
+ win.addEventListener('isa-us-valuation-refreshed',render);doc.addEventListener('isa-kr-dividends-updated',render);
  win.setInterval(auto,60000);win.addEventListener('pageshow',auto);doc.addEventListener('visibilitychange',auto);win.addEventListener('online',auto);
  if(confirmedLegacy(win.localStorage))load();
 }
