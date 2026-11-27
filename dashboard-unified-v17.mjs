@@ -63,11 +63,12 @@ export function mountUnified(doc,win){
    const reader=sharedRegistryRead(win.localStorage);if(!reader)throw Error('sync_required');
    const client=watchClient({url:TARGET,sharedRead:reader});
    const next=await client.load();if(start!==epoch)throw Error('changed');model=next;
-   const results=await Promise.allSettled([loadPublishedReference(),client.quotes(),client.daily(),position?position.load(model):Promise.resolve(null)]);
+   const results=await Promise.allSettled([loadPublishedReference(),client.quotes(),client.daily(),model.added.length? (position||positionClient({url:TARGET,sharedRead:reader})).load(model):Promise.resolve({})]);
    if(start!==epoch)throw Error('changed');registryConfirmed=true;
    reference=results[0].status==='fulfilled'?results[0].value:null;live=results[1].status==='fulfilled'?results[1].value:null;daily=results[2].status==='fulfilled'?results[2].value:null;
    records=results[3].status==='fulfilled'&&results[3].value!==null?Object.fromEntries(Object.entries(results[3].value).map(([id,r])=>[id,r.data])):{};
-   positionConfirmed=model.added.length===0||!!position&&results[3].status==='fulfilled'&&results[3].value!==null;
+   positionConfirmed=model.added.length===0||results[3].status==='fulfilled'&&results[3].value!==null;
+   $('v17-unified-auth-settings').hidden=positionConfirmed;
    status.textContent=positionConfirmed?'서버 등록 및 신규 투자기록 확인 · 참고 평가':'신규 투자기록 조회 암호 필요 또는 조회 실패 · 합계 미확인';
   }catch(_){registryConfirmed=false;positionConfirmed=false;status.textContent='동기화 또는 v17 조회 연결 확인 필요 · 기존 투자현황 유지';}
   finally{busy=false;refresh.disabled=false;render();}
@@ -76,8 +77,9 @@ export function mountUnified(doc,win){
  refresh.addEventListener('click',load);
  win.addEventListener('storage',e=>{if(e.key===null||basisKeys.includes(e.key)||['isa-portfolio-sync-config-v1','isa-portfolio-sync-base-v1'].includes(e.key)){epoch++;registryConfirmed=false;positionConfirmed=false;records=null;render();status.textContent='기존 기록 변경 감지 · 다시 조회하세요.';}});
  win.addEventListener('isa-personal-us-quote-refreshed',()=>{live=win.ISA_PERSONAL_US?.scheduledSnapshot?.()||null;render();if(!model&&!busy&&Date.now()-lastLoad>60000&&confirmedLegacy(win.localStorage))load();});
- // Initial confirmed connection or manual refresh only; no extra provider polling.
- win.setInterval(render,60000);
+ // Read cached records only, at most once per five minutes while visible.
+ const auto=()=>{render();if(!doc.hidden&&!busy&&Date.now()-lastLoad>=300000&&confirmedLegacy(win.localStorage))load();};
+ win.setInterval(auto,60000);win.addEventListener('pageshow',auto);doc.addEventListener('visibilitychange',auto);win.addEventListener('online',auto);
  if(confirmedLegacy(win.localStorage))load();
 }
 if(typeof window!=='undefined'&&typeof document!=='undefined')mountUnified(document,window);
