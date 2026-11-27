@@ -42,6 +42,11 @@ export function watchClient({url,viewToken,writeToken,fetchImpl=fetch}){
    if(!Object.hasOwn(model.state.holdings,id))throw Error('저장 확인 실패 · 다시 조회 필요');
    return {model,id,duplicate:result.status==='already_registered'};
   },
+  async daily(){
+   const p=await call('/daily',viewToken);
+   if(p.schema!=='us-private-daily-v17'||p.cachedOnly!==true||!p.bySymbol||typeof p.bySymbol!=='object')throw Error('확정 일봉 응답 미확인');
+   return p;
+  },
   async quotes(){
    const p=await call('/quotes',viewToken);
    if(p.cachedOnly!==true||!p.bySymbol||typeof p.bySymbol!=='object')throw Error('예약 수집 응답 미확인');
