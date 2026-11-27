@@ -34,3 +34,8 @@
 - 사용자 화면에서 jungho-v17 D1 및 동명 Worker 생성, DB 바인딩 및 세 별도 Secret 등록 확인. Cron/FINNHUB_API_KEY 추가하지 않음.
 - Chrome DevTools 붙여넣기 경고를 우회하지 않는다. 개발 Worker 전용 https://jungho-v17.pdk7101.workers.dev/connection-test 경로의 암호 입력폼으로 GET /watchlist, /quotes, 선택 GET /position-records를 확인한다. 해당 페이지용 같은 origin GET만 추가 허용하며 기존 토큰 인증, 운영 origin 정책과 POST 제한 유지.
 - 결과는 HTTP 상태 및 개수만 표시한다. 비밀값 저장·출력 금지. DB 테이블 초기화 가능하지만 보유기록 쓰기나 시세 공급원 호출 없음. 시세 0건은 미수집 상태로 정상일 수 있다. 실제 저장·두 기기 검증은 후속 단계. main 및 기존 운영 Worker 변경 없음.
+
+## 7. 실서버 저장 검증
+- 실제 연결 테스트 3/3 통과 화면 확인: 고유 종목 15, 계좌별 20, 미국 수집 대상 5, 유효 시세 0, 신규 기록 0. 실제 시세 수집은 아직 미활성화.
+- /connection-test 하단 가상 투자기록 저장 테스트는 등록·기록 전용 토큰 두 개를 모두 요구한다. 동일 등록/CAS 저장 로직의 SQL 대상만 고정 검증 테이블 v17_test_registry, v17_test_basis로 분리한다. 실제 등록 목록, 투자 기록, 기존 운영 DB, 수집 대상은 변경하지 않는다. 재실행은 동일 가상 종목의 검증 기록 버전만 증가시킨다.
+- 저장 및 재조회와 충돌 차단 성공 후 다음은 별도 기기 테스트 및 기존 Finnhub 수집기와 중복 없는 전환. US_DAILY_AUTHORIZED는 권한 미확인 상태로 비활성화 유지. 실제 시세 수집 성공은 장중 확인 필요.
