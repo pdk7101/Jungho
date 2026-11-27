@@ -12,6 +12,7 @@ const checks={
  if(!$('v17-auto-sync').textContent.includes('투자기록'))throw Error('automatic status missing');
  if(document.documentElement.scrollWidth>window.innerWidth+2)throw Error('mobile horizontal overflow');`,
  'registry-preview-v17.html':`const $=id=>document.getElementById(id);
+ if(!$('kr-file-date').value||!$('kr-file-status').textContent.includes('참고용')||$('kr-file-form').closest('details').open)throw Error('CSV optional preview missing');
  if(!$('counts').textContent.includes('15/100'))throw Error('initial render');
  $('account').value='toss-us';$('account').dispatchEvent(new Event('change'));
  $('symbol').value='QQQM';$('name').value='Synthetic test';
