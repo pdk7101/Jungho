@@ -219,6 +219,112 @@ async function tick({store,readRegistry,fetchQuote,now=Date.now(),clock=Date.now
  const state=await readRegistry();
  return collectUS({...state,store,fetchQuote,now,clock,sessionOpen:true});
 }
+// Private dynamic daily history. Disabled unless the operator confirms permitted
+// automated personal use of the existing Yahoo chart source. No paid API calls.
+function dailyContext(now){
+ const p=ET.formatToParts(new Date(now)),x=Object.fromEntries(p.map(v=>[v.type,v.value]));
+ const day=new Date(x.year+'-'+x.month+'-'+x.day+'T12:00:00Z'),minute=Number(x.hour)*60+Number(x.minute);
+ const current=session(now);
+ if(!['2026','2027','2028'].includes(x.year))return null;
+ if(!current.trading||minute<current.close+30)day.setUTCDate(day.getUTCDate()-1);
+ for(let n=0;n<10;n++,day.setUTCDate(day.getUTCDate()-1)){
+  const s=day.toISOString().slice(0,10).replaceAll('-','');
+  if(!['2026','2027','2028'].includes(s.slice(0,4)))return null;
+  if(![0,6].includes(day.getUTCDay())&&!HOLIDAYS.has(s))return s;
+ }
+ return null;
+}
+function dailyTradingDate(s){
+ if(typeof s!=='string'||!/^\d{8}$/.test(s)||!['2026','2027','2028'].includes(s.slice(0,4)))return false;
+ const d=new Date(s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8)+'T12:00:00Z');
+ return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10).replaceAll('-','')===s&&![0,6].includes(d.getUTCDay())&&!HOLIDAYS.has(s);
+}
+function analyzeDaily(symbol,raw,expected){
+ if(!validSymbol(symbol)||!dailyTradingDate(expected)||!Array.isArray(raw))throw Error('daily_input');
+ const rows=new Map(),conflict=new Set();
+ for(const b of raw){
+  if(!dailyTradingDate(b?.date)||b.date>expected||symbol==='SPCX'&&b.date<'20260612'||![b.open,b.high,b.low,b.close].every(positive)||b.high<Math.max(b.open,b.close)||b.low>Math.min(b.open,b.close))continue;
+  const row={date:b.date,open:b.open,high:b.high,low:b.low,close:b.close};
+  if(rows.has(b.date)&&JSON.stringify(rows.get(b.date))!==JSON.stringify(row))conflict.add(b.date);
+  rows.set(b.date,row);
+ }
+ for(const d of conflict)rows.delete(d);
+ const bars=[...rows.values()].sort((a,b)=>a.date.localeCompare(b.date)).slice(-40);
+ const last=bars.at(-1);
+ if(!last)return null;
+ const d=new Date(last.date.slice(0,4)+'-'+last.date.slice(4,6)+'-'+last.date.slice(6,8)+'T12:00:00Z');
+ let consecutive=true;
+ for(let i=bars.length-1;i>=0;i--){
+  while(!dailyTradingDate(d.toISOString().slice(0,10).replaceAll('-',''))){if(d.getUTCFullYear()<2026){consecutive=false;break;}d.setUTCDate(d.getUTCDate()-1);}
+  if(!consecutive||bars[i].date!==d.toISOString().slice(0,10).replaceAll('-','')){consecutive=false;break;}
+  d.setUTCDate(d.getUTCDate()-1);
+ }
+ const complete=bars.length===40&&consecutive&&last.date===expected;
+ const avg=n=>bars.slice(-n).reduce((a,b)=>a+b.close,0)/n;
+ return {symbol,date:last.date,close:last.close,expectedDate:expected,barCount:bars.length,
+  status:last.date!==expected?'stale':complete?'ready':'history_incomplete',currency:'USD',
+  source:'Yahoo Finance 비공식 일봉',ma5:complete?avg(5):null,ma20:complete?avg(20):null,
+  low20:complete?Math.min(...bars.slice(-20).map(b=>b.low)):null,high20:complete?Math.max(...bars.slice(-20).map(b=>b.high)):null,signal:'wait'};
+}
+function yahooDaily(fetchImpl=fetch){
+ return async symbol=>{
+  if(!validSymbol(symbol))throw Error('daily_symbol');
+  const url='https://query2.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(symbol)+'?range=6mo&interval=1d';
+  const r=await fetchImpl(url,{headers:{Accept:'application/json'},redirect:'manual',signal:AbortSignal.timeout(10000)});
+  if(!r.ok)return {status:r.status};
+  const v=(await r.json())?.chart?.result?.[0],q=v?.indicators?.quote?.[0];
+  if(v?.meta?.symbol!==symbol||v?.meta?.currency!=='USD'||!q||!Array.isArray(v.timestamp))throw Error('daily_identity');
+  const rows=v.timestamp.map((t,i)=>{const p=Object.fromEntries(ET.formatToParts(new Date(t*1000)).map(x=>[x.type,x.value]));return {date:p.year+p.month+p.day,open:q.open?.[i],high:q.high?.[i],low:q.low?.[i],close:q.close?.[i]};});
+  return {status:200,rows};
+ };
+}
+function dailyStore(db){
+ return {
+  async init(){
+   await db.prepare('CREATE TABLE IF NOT EXISTS us_daily_v17(symbol TEXT PRIMARY KEY, expected TEXT NOT NULL, attempts INTEGER NOT NULL, attempted_at INTEGER NOT NULL, payload TEXT, error TEXT)').run();
+   await db.prepare('CREATE TABLE IF NOT EXISTS us_daily_gate_v17(id INTEGER PRIMARY KEY CHECK(id=1), next_at INTEGER NOT NULL)').run();
+  },
+  async claim(now){const r=await db.prepare('INSERT INTO us_daily_gate_v17(id,next_at) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET next_at=excluded.next_at WHERE us_daily_gate_v17.next_at<=?').bind(now+180000,now).run();return r.meta.changes===1;},
+  async load(){const out={};for(const r of (await db.prepare('SELECT * FROM us_daily_v17').all()).results||[]){let q=null;try{q=JSON.parse(r.payload||'null')}catch(_){}out[r.symbol]={...r,q};}return out;},
+  async reserve(symbol,expected,now){
+   const r=await db.prepare('INSERT INTO us_daily_v17(symbol,expected,attempts,attempted_at) VALUES(?,?,1,?) ON CONFLICT(symbol) DO UPDATE SET expected=excluded.expected,attempts=CASE WHEN us_daily_v17.expected=excluded.expected THEN us_daily_v17.attempts+1 ELSE 1 END,attempted_at=excluded.attempted_at WHERE us_daily_v17.expected<excluded.expected OR (us_daily_v17.expected=excluded.expected AND us_daily_v17.attempts<2 AND us_daily_v17.attempted_at<=?)').bind(symbol,expected,now,now-30*60000).run();
+   return r.meta.changes===1;
+  },
+  async save(symbol,expected,now,quote,error){await db.prepare('UPDATE us_daily_v17 SET payload=COALESCE(?,payload),error=? WHERE symbol=? AND expected=? AND attempted_at=?').bind(quote?JSON.stringify(quote):null,error,symbol,expected,now).run();}
+ };
+}
+async function collectDaily({symbols,store,fetchDaily,now=Date.now()}){
+ const expected=dailyContext(now);
+ if(!expected||session(now).open)return {attempted:0,status:'closed-or-unknown'};
+ await store.init();
+ const records=await store.load();
+ const batch=symbols.filter(s=>validSymbol(s)&&!(records[s]?.q?.date===expected&&records[s].q.status==='ready')&&
+  (records[s]?.expected!==expected||records[s].attempts<2&&now-records[s].attempted_at>=30*60000))
+  .sort((a,b)=>(records[a]?.attempted_at||0)-(records[b]?.attempted_at||0)||a.localeCompare(b)).slice(0,3);
+ if(!batch.length||!await store.claim(now))return {attempted:0,status:'cached-or-limited'};
+ let attempted=0;
+ for(const symbol of batch){
+  if(!await store.reserve(symbol,expected,now))continue;
+  attempted++;
+  let result;try{result=await fetchDaily(symbol)}catch(_){result={status:0};}
+  let q=null;try{if(result.status===200)q=analyzeDaily(symbol,result.rows,expected);}catch(_){}
+  const old=records[symbol]?.q;
+  const usable=q&&(!old||q.date>=old.date)?q:null;
+  await store.save(symbol,expected,now,usable,result.status===429?'rate_limited':q?null:'unavailable');
+  if(result.status===429)break;
+ }
+ return {attempted,status:'collected'};
+}
+function dailyPayload(symbols,records,now){
+ const expectedDate=dailyContext(now),bySymbol={};
+ for(const symbol of symbols){
+  const q=records[symbol]?.q;
+  if(!q||q.symbol!==symbol||!positive(q.close)||!dailyTradingDate(q.date)||!expectedDate||q.date>expectedDate){bySymbol[symbol]={symbol,status:'unavailable',signal:'wait'};continue;}
+  const status=q.date===expectedDate?q.status:'stale';
+  bySymbol[symbol]={...q,expectedDate,status,signal:'wait',...(status!=='ready'?{ma5:null,ma20:null,low20:null,high20:null}:{})};
+ }
+ return {schema:'us-private-daily-v17',expectedDate,bySymbol,cachedOnly:true};
+}
 function cachedPayload(symbols,records,now){
  const quotes={},bySymbol={};
  for(const symbol of symbols){
@@ -243,21 +349,30 @@ export default {
  async scheduled(controller,env,ctx){
   // Use the actual invocation time, not an old scheduledTime after platform delay.
   const now=Date.now();
-  if(!session(now).open)return;
+  if(!session(now).open){
+   if(env.US_DAILY_AUTHORIZED==='true'&&env.DB)ctx.waitUntil((async()=>{const state=await registryFromDB(env.DB);return collectDaily({symbols:activeUS(state.catalog,state.holdings),store:dailyStore(env.DB),fetchDaily:yahooDaily(),now});})());
+   return;
+  }
   if(!env.DB||!env.FINNHUB_API_KEY)throw Error('missing collector bindings');
   ctx.waitUntil(tick({store:d1Store(env.DB),readRegistry:()=>registryFromDB(env.DB),fetchQuote:finnhubFetcher(env.FINNHUB_API_KEY),now}));
  },
  async fetch(request,env){
   if(request.headers.get('Origin')!==ORIGIN)return new Response(null,{status:403});
   const url=new URL(request.url);
-  if(!['/quotes','/registry','/watchlist'].includes(url.pathname)||url.search)return response(404,{error:'not_found'});
+  if(!['/quotes','/registry','/watchlist','/daily'].includes(url.pathname)||url.search)return response(404,{error:'not_found'});
   if(request.method==='OPTIONS')return response(200,{ok:true});
   if(url.pathname==='/registry'||url.pathname==='/watchlist')return registrationRoute(request,env,url.pathname==='/watchlist');
   if(request.method!=='GET')return response(405,{error:'method'});
   if(!await authorized(request,env.VIEW_TOKEN))return response(401,{error:'unauthorized'});
   if(!env.DB)return response(503,{error:'missing database binding'});
   try{
-   const store=d1Store(env.DB),registry=await registryFromDB(env.DB);
+   const registry=await registryFromDB(env.DB);
+   if(url.pathname==='/daily'){
+    if(env.US_DAILY_AUTHORIZED!=='true')return response(503,{error:'daily_source_not_authorized'});
+    const daily=dailyStore(env.DB);await daily.init();
+    return response(200,dailyPayload(activeUS(registry.catalog,registry.holdings),await daily.load(),Date.now()));
+   }
+   const store=d1Store(env.DB);
    await store.init();
    const symbols=activeUS(registry.catalog,registry.holdings);
    return response(200,cachedPayload(symbols,await store.load(symbols),Date.now()));
