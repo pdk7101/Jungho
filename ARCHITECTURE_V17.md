@@ -51,3 +51,9 @@
 - 무료 Workers/D1 범위 내에서 설계하되 실제 무료 Cron CPU 제한·서비스 호출량과 공급원 응답 시간 측정이 필요하다. https://developers.cloudflare.com/workers/platform/limits/ 및 https://developers.cloudflare.com/d1/platform/limits/
 - 합성 달력/응답 테스트 14건 통과. 별도 Node SQLite 기반 잠금·인증 테스트와 v16 회귀 테스트는 .github/workflows/verify-v17.yml 에 등록. 이 워크플로는 개발 브랜치 전용이며 Pages 배포 및 실제 API/DB 호출을 하지 않는다.
 - 배포 전 해결: 구형 클라이언트 버전 진단 및 공통 평가 날짜/시세 일치, 자동 등록용 레지스트리 쓰기, 실제 D1/장중 성능, Cloudflare 예약 실행/기기 OFF 검증. 기존 Worker에 적용 전 보안 토큰 교체 및 롤백 경로 준비.
+
+## 기존 기록과 종목 레지스트리 연결 (2026-11-27)
+- `legacy-registry-preview.mjs`: 기존 ISA 6, 토스 국내 9, 미국 5 포지션을 15개 고유 종목 ID로 읽기 전용 변환. 계좌별 보유 기록 분리. 기존 Toss row 해석값과 ISA 기록을 입력받아 원금 대조; 기기 전용 공식 잔고는 공유 원금으로 복사하지 않음. 누락 수량/평단은 null, 신규 종목은 보류.
+- 신규 등록 시 시세용 US 레지스트리는 수량/평단/분배금 없이 종목 ID만 추출. 국내 신규 종목은 KRX 시장별 요청 계획에 포함하되 실제 Worker 필터는 아직 고정 코드이며 후속 변경 필요.
+- 합성 데이터 23건 통과. 기존 실제 기록의 원금/분배금/설정 검증 및 레지스트리 쓰기·UI 연결은 아직 수행하지 않음. 실제 D1 미변경.
+- 사용자 제공 화면에서 기존 Finnhub Worker의 DB 바인딩 및 Every minute Cron 등록 확인. 코드 배포 상태 및 예약 실행 성공, 실제 장중 시세 응답은 미확인. 다음 실제 장중 확인 필요.
