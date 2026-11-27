@@ -392,7 +392,7 @@ async function authorized(request,secret){
 }
 // Isolated deployment check: available only on the dedicated v17 Worker.
 const TEST_ORIGIN='https://jungho-v17.pdk7101.workers.dev';
-const TEST_HTML=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>v17 서버 연결 점검</title><style>body{font-family:system-ui,sans-serif;background:#0e1627;color:#eaf0fb;margin:0}main{max-width:600px;margin:auto;padding:20px}section{border:1px solid #35435a;border-radius:12px;padding:16px;background:#19253a}label,input,button{display:block;width:100%;box-sizing:border-box}input,button{font:inherit;min-height:44px;margin:8px 0 16px;padding:10px;border-radius:8px}input{background:#101b2e;color:white;border:1px solid #596a85}button{background:#2563eb;color:white;border:0;font-weight:bold}button:disabled{opacity:.5}p,li{line-height:1.6;overflow-wrap:anywhere}</style></head><body><main><h1>v17 서버 연결 점검</h1><p>개발 서버 전용. 실제 투자기록 및 시세 공급원을 변경하지 않습니다.</p><section><form id="check" autocomplete="off"><label>조회용 암호 (VIEW_TOKEN)<input id="view" type="password" required minlength="20" autocomplete="off"></label><label>투자기록용 암호 (POSITION_RECORD_TOKEN, 선택)<input id="position" type="password" minlength="32" autocomplete="off"></label><button id="run" type="submit">연결 테스트</button></form><ul id="results" aria-live="polite"></ul><p id="status" role="status">암호를 입력하고 연결 테스트를 누르세요.</p></section><p>암호는 저장하거나 화면에 출력하지 않습니다. 성공 결과만 캡처하세요. 시세 수집이 시작되지 않았으면 가격 0건은 정상입니다.</p><script src="/connection-test.js" defer></script></main></body></html>`;
+const TEST_HTML=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>v17 서버 연결 점검</title><style>body{font-family:system-ui,sans-serif;background:#0e1627;color:#eaf0fb;margin:0}main{max-width:600px;margin:auto;padding:20px}section{border:1px solid #35435a;border-radius:12px;padding:16px;background:#19253a}label,input,button{display:block;width:100%;box-sizing:border-box}input,button{font:inherit;min-height:44px;margin:8px 0 16px;padding:10px;border-radius:8px}input{background:#101b2e;color:white;border:1px solid #596a85}button{background:#2563eb;color:white;border:0;font-weight:bold}button:disabled{opacity:.5}p,li{line-height:1.6;overflow-wrap:anywhere}</style></head><body><main><h1>v17 서버 연결 점검</h1><p>개발 서버 전용. 실제 투자기록 및 시세 공급원을 변경하지 않습니다.</p><section><form id="check" autocomplete="off"><label>조회용 암호 (VIEW_TOKEN)<input id="view" type="password" required minlength="20" autocomplete="off"></label><label>투자기록용 암호 (POSITION_RECORD_TOKEN, 선택)<input id="position" type="password" minlength="32" autocomplete="off"></label><button id="run" type="submit">연결 테스트</button></form><ul id="results" aria-live="polite"></ul><p id="status" role="status">암호를 입력하고 연결 테스트를 누르세요.</p></section><section style="margin-top:16px"><h2>가상 투자기록 저장 테스트</h2><p>검증 전용 두 테이블에만 가상 종목을 기록합니다. 실제 등록 목록·투자기록·시세 수집 대상은 변경하지 않습니다.</p><form id="storage" autocomplete="off"><label>종목 등록용 암호 (REGISTRY_WRITE_TOKEN)<input id="write-test" type="password" required minlength="32" autocomplete="off"></label><label>투자기록용 암호 (POSITION_RECORD_TOKEN)<input id="position-test" type="password" required minlength="32" autocomplete="off"></label><button id="save-test" type="submit">가상 기록 저장 및 재조회 테스트</button></form><p id="save-result" role="status"></p></section><p>암호는 저장하거나 화면에 출력하지 않습니다. 성공 결과만 캡처하세요. 시세 수집이 시작되지 않았으면 가격 0건은 정상입니다.</p><script src="/connection-test.js" defer></script></main></body></html>`;
 const TEST_JS=`'use strict';
 const $=id=>document.getElementById(id);
 $('check').addEventListener('submit',async e=>{
@@ -415,7 +415,48 @@ $('check').addEventListener('submit',async e=>{
   if(position)await check('/position-records',position,p=>p?.schema==='new-position-basis-v17'&&p.records?'신규 투자기록 '+Object.keys(p.records).length+'건':null);
   $('status').textContent=success===attempted?'연결 점검 통과 ('+success+'/'+attempted+') · 실제 장중 수집 및 저장 테스트는 별도':'연결 점검 '+success+'/'+attempted+' · 실패 항목 확인 필요';
  }finally{$('run').disabled=false;}
+});
+$('storage').addEventListener('submit',async e=>{
+ e.preventDefault();if($('save-test').disabled)return;
+ const write=$('write-test').value,position=$('position-test').value;
+ $('write-test').value='';$('position-test').value='';$('save-test').disabled=true;$('save-result').textContent='가상 기록 검증 중';
+ try{
+  const r=await fetch('/storage-test',{method:'POST',headers:{Authorization:'Bearer '+write,'X-Position-Authorization':'Bearer '+position},cache:'no-store',credentials:'omit',redirect:'error',signal:AbortSignal.timeout(15000)});
+  if(!r.ok){$('save-result').textContent='HTTP '+r.status+' · 저장 점검 실패';return;}
+  const p=await r.json();
+  $('save-result').textContent=p.schema==='v17-storage-test'&&['registered','duplicateBlocked','saved','reread','conflictBlocked','isolated'].every(k=>p[k]===true)?'저장 점검 통과 (5/5) · 종목 등록 · 중복 방지 · 저장 · 재조회 · 충돌 차단 · 검증 전용 테이블 / 버전 '+p.revision:'응답 형식 오류';
+ }catch(_){$('save-result').textContent='통신 또는 응답 오류';}
+ finally{$('save-test').disabled=false;}
 });`;
+// Real D1 smoke test uses the same registration and revision-CAS code,
+// with fixed isolated tables. No test symbols enter the market collector.
+function isolatedTestDB(db){
+ return {prepare(sql){
+  if(!/\b(?:us_collect_registry_v17|new_position_basis_v17)\b/.test(sql))throw Error('test_sql_scope');
+  return db.prepare(sql.replace(/\bus_collect_registry_v17\b/g,'v17_test_registry').replace(/\bnew_position_basis_v17\b/g,'v17_test_basis'));
+ }};
+}
+async function storageTest(request,env){
+ if(request.headers.get('Origin')!==TEST_ORIGIN||request.headers.get('Sec-Fetch-Site')!=='same-origin')return response(403,{error:'origin'});
+ const write=env.REGISTRY_WRITE_TOKEN,position=env.POSITION_RECORD_TOKEN;
+ if(!env.DB||typeof write!=='string'||write.length<32||typeof position!=='string'||position.length<32||new Set([write,position,env.VIEW_TOKEN]).size!==3)return response(503,{error:'test_disabled'});
+ if(!await authorized(request,write)||!await authorized(new Request(TEST_ORIGIN,{headers:{Authorization:request.headers.get('X-Position-Authorization')||''}}),position))return response(401,{error:'unauthorized'});
+ const db=isolatedTestDB(env.DB),input={account:'toss-us',venue:'US',symbol:'V17TEST',name:'가상 검증 전용 (실제 투자 아님)'},id='toss-us|US:US:V17TEST';
+ try{
+  const first=await registerWatch(db,input),again=await registerWatch(db,input);
+  const registry=await registryFromDB(db);
+  if(!['registered','already_registered'].includes(first.status)||again.status!=='already_registered'||!Object.hasOwn(registry.holdings,id))throw Error('registration_check');
+  await basisInit(db);
+  const old=(await basisList(db,registry)).records[id],revision=old?.revision??0;
+  const data={qty:old?.data?.qty===1.25?2.5:1.25,avgKRW:10000,netDistributionsKRW:200};
+  const saved=await saveBasis(db,registry,{id,revision,data});
+  let blocked=false;
+  try{await saveBasis(db,registry,{id,revision,data:{...data,qty:99}});}catch(e){if(e.message!=='basis_conflict')throw e;blocked=true;}
+  const reread=(await basisList(db,await registryFromDB(db))).records[id];
+  if(!blocked||saved.revision!==revision+1||reread?.revision!==saved.revision||JSON.stringify(reread?.data)!==JSON.stringify(data))throw Error('storage_check');
+  return response(200,{schema:'v17-storage-test',registered:true,duplicateBlocked:true,saved:true,reread:true,conflictBlocked:true,isolated:true,revision:saved.revision});
+ }catch(_){return response(503,{error:'isolated_storage_test_failed'});}
+}
 function testAsset(url,request){
  if(url.origin!==TEST_ORIGIN||url.search||request.method!=='GET')return null;
  if(!['/connection-test','/connection-test.js'].includes(url.pathname))return null;
@@ -439,6 +480,7 @@ export default {
  async fetch(request,env){
   const url=new URL(request.url);
   const asset=testAsset(url,request);if(asset)return asset;
+  if(url.origin===TEST_ORIGIN&&url.pathname==='/storage-test'&&!url.search&&request.method==='POST')return storageTest(request,env);
   if(request.headers.get('Origin')!==ORIGIN&&!sameOriginTestRead(request,url))return new Response(null,{status:403});
   if(!['/quotes','/registry','/watchlist','/daily','/position-records'].includes(url.pathname)||url.search)return response(404,{error:'not_found'});
   if(request.method==='OPTIONS')return response(200,{ok:true});
