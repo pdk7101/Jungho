@@ -285,6 +285,7 @@ function dailyStore(db){
    await db.prepare('CREATE TABLE IF NOT EXISTS us_daily_gate_v17(id INTEGER PRIMARY KEY CHECK(id=1), next_at INTEGER NOT NULL)').run();
   },
   async claim(now){const r=await db.prepare('INSERT INTO us_daily_gate_v17(id,next_at) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET next_at=excluded.next_at WHERE us_daily_gate_v17.next_at<=?').bind(now+180000,now).run();return r.meta.changes===1;},
+  async defer(until){await db.prepare('UPDATE us_daily_gate_v17 SET next_at=MAX(next_at,?) WHERE id=1').bind(until).run();},
   async load(){const out={};for(const r of (await db.prepare('SELECT * FROM us_daily_v17').all()).results||[]){let q=null;try{q=JSON.parse(r.payload||'null')}catch(_){}out[r.symbol]={...r,q};}return out;},
   async reserve(symbol,expected,now){
    const r=await db.prepare('INSERT INTO us_daily_v17(symbol,expected,attempts,attempted_at) VALUES(?,?,1,?) ON CONFLICT(symbol) DO UPDATE SET expected=excluded.expected,attempts=CASE WHEN us_daily_v17.expected=excluded.expected THEN us_daily_v17.attempts+1 ELSE 1 END,attempted_at=excluded.attempted_at WHERE us_daily_v17.expected<excluded.expected OR (us_daily_v17.expected=excluded.expected AND us_daily_v17.attempts<2 AND us_daily_v17.attempted_at<=?)').bind(symbol,expected,now,now-30*60000).run();
@@ -311,7 +312,7 @@ async function collectDaily({symbols,store,fetchDaily,now=Date.now()}){
   const old=records[symbol]?.q;
   const usable=q&&(!old||q.date>=old.date)?q:null;
   await store.save(symbol,expected,now,usable,result.status===429?'rate_limited':q?null:'unavailable');
-  if(result.status===429)break;
+  if(result.status===429){await store.defer(now+30*60000);break;}
  }
  return {attempted,status:'collected'};
 }
