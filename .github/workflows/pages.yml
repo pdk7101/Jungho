@@ -11,6 +11,8 @@ on:
     - cron: '15 09 * * 1-5'
     # KRX official completed daily bars are fetched on the existing 17:25 / 18:15 KST runs.
     # New York 16:00 close (both daylight saving and standard time): next day Korea morning.
+    # First post-close retry at 06:45 KST (after both US standard/DST closes).
+    - cron: '45 21 * * 1-5'
     - cron: '35 22 * * 1-5'
     - cron: '15 23 * * 1-5'
     # Extra 09:30 KST refresh (Tue-Sat) after the prior US regular session has ended.
@@ -26,6 +28,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
