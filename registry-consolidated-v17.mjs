@@ -2,6 +2,7 @@
 import {aliases} from './legacy-registry-preview.mjs';
 import {instrument,holdingId} from './instrument-registry.mjs';
 import {validFx,chooseValuationQuote,valueNewPosition} from './registry-valuation-v17.mjs';
+import {closeContext} from './scripts/us-close-calendar.mjs';
 const accounts=['kiwoom-isa','toss-kr','toss-us'];
 const keys={'kiwoom-isa':'isa-private-positions-v1','toss-kr':'isa-private-toss-domestic-holdings-v1','toss-us':'isa-us-holdings-v1'};
 const finite=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0;
@@ -15,10 +16,28 @@ export function publishedFx(payload,now=Date.now()){
  const fx={rate:f.usdKrw,date:day(stamp),observedAt:f.observedAt,source:'기존 공개 참고환율',manual:false};
  return validFx(fx,now)?fx:null;
 }
-export async function loadPublishedFx(fetchImpl=fetch,now=Date.now()){
+export function publishedDaily(payload,now=Date.now()){
+ const expectedDate=closeContext(new Date(now)).expected,bySymbol={};
+ if(!expectedDate||payload?.market!=='US'||payload.currency!=='USD'||payload.isRealtime!==false||!Array.isArray(payload.items))return {expectedDate,bySymbol};
+ const ids={schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY',spacex:'SPCX'};
+ for(const x of [...payload.items,payload.extraQuotes?.spacex]){
+  if(!x||x.ok!==true||!Object.hasOwn(ids,x.id)||ids[x.id]!==x.ticker||x.currency!=='USD'||x.date!==expectedDate||!finite(x.close)||x.close<=0||!Array.isArray(x.bars)||x.bars.length!==40||x.bars.at(-1)?.date!==x.date||x.bars.at(-1)?.close!==x.close||x.ticker==='SPCX'&&x.bars.some(b=>b.date<'20260612'))continue;
+  bySymbol[x.ticker]={symbol:x.ticker,currency:'USD',date:x.date,close:x.close,source:x.source||'기존 공개 일봉'};
+ }
+ return {expectedDate,bySymbol};
+}
+export function mergeReferenceDaily(publicDaily,privateDaily){
+ if(!publicDaily?.expectedDate)return privateDaily;
+ if(privateDaily?.expectedDate!==publicDaily.expectedDate)return publicDaily;
+ const bySymbol={...publicDaily.bySymbol};
+ for(const [symbol,q] of Object.entries(privateDaily.bySymbol||{}))if(q?.symbol===symbol&&q.date===privateDaily.expectedDate&&q.currency==='USD'&&finite(q.close)&&q.close>0)bySymbol[symbol]=q;
+ return {expectedDate:publicDaily.expectedDate,bySymbol};
+}
+export async function loadPublishedReference(fetchImpl=fetch,now=Date.now()){
  const r=await fetchImpl('./us-quotes.json',{cache:'no-store',credentials:'omit',redirect:'error',signal:AbortSignal.timeout(10000)});
- if(!r.ok)throw Error('fx_unavailable');
- return publishedFx(await r.json(),now);
+ if(!r.ok)throw Error('reference_unavailable');
+ const payload=await r.json();
+ return {fx:publishedFx(payload,now),daily:publishedDaily(payload,now)};
 }
 export function readLegacyBasis(storage){
  const records={};
