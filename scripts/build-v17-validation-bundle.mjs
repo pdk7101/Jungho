@@ -16,7 +16,7 @@ async function write(relative,body){
 for(const name of staticFiles){
  const body=await fs.readFile(new URL(name,root),'utf8');
  for(const match of body.matchAll(/(?:from\s+['"]|src=["'])(\.[^'"]+)['"]/g)){
-  const dependency=path.posix.normalize(path.posix.join(path.posix.dirname(name),match[1]));
+  const dependency=path.posix.normalize(path.posix.join(path.posix.dirname(name),match[1].split('?')[0]));
   if(!staticFiles.includes(dependency))throw Error('Missing preview dependency '+name+' -> '+dependency);
  }
  await write('preview/'+name,body);
