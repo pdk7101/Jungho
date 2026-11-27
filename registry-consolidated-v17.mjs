@@ -54,7 +54,7 @@ export function readLegacyBasis(storage){
  }
  return records;
 }
-export function consolidated(model,{legacyBasis={},newBasis={},inputs={},legacyConfirmed=false,newConfirmed=false}={}){
+export function consolidated(model,{legacyBasis={},newBasis={},inputs={},legacyConfirmed=false,newConfirmed=false,registryConfirmed=false}={}){
  const legacyIds=new Set(aliases.map(a=>holdingId(a.account,instrument(a))));
  const rows=[];
  for(const h of Object.values(model.state.holdings)){
@@ -74,9 +74,9 @@ export function consolidated(model,{legacyBasis={},newBasis={},inputs={},legacyC
  // Missing legacy registration is not silently treated as zero.
  for(const a of aliases){const id=holdingId(a.account,instrument(a));if(!rows.some(r=>r.id===id))rows.push({id,account:a.account,kind:'legacy',cost:null,value:null,netDistributionsKRW:null,quoteDate:null});}
  const summarize=r=>{
-  const cost=sum(r,'cost'),value=sum(r,'value'),profit=cost!==null&&value!==null?value-cost:null;
+  const cost=registryConfirmed?sum(r,'cost'):null,value=registryConfirmed?sum(r,'value'):null,profit=cost!==null&&value!==null?value-cost:null;
   return {count:r.length,cost,value,profit,returnPct:profit!==null&&cost>0?profit/cost*100:null,missing:r.filter(x=>x.cost===null||x.value===null).length,
-   dates:[...new Set(r.map(x=>x.quoteDate).filter(Boolean))].sort(),newNetDistributionsKRW:sum(r.filter(x=>x.kind==='new'),'netDistributionsKRW'),
+   dates:[...new Set(r.map(x=>x.quoteDate).filter(Boolean))].sort(),newNetDistributionsKRW:registryConfirmed&&newConfirmed?sum(r.filter(x=>x.kind==='new'),'netDistributionsKRW'):null,
    combinedNetDistributionsKRW:null};
  };
  return {accounts:Object.fromEntries(accounts.map(a=>[a,summarize(rows.filter(r=>r.account===a))])),all:summarize(rows),rows};
