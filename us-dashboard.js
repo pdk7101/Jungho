@@ -327,7 +327,7 @@ async function refresh(){
   const extraCount=spcx&&fresh(spcx)&&spcx.date===expected?1:0;
   const time=loadTime?new Date(loadTime).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'미확인';
   const dated=FUNDS.map(f=>market(f)?.date).filter(Boolean).sort();
-  el.textContent='최신 거래일 일봉 '+(expected?count+extraCount+'/5 · 필요 '+date(expected):'확인 대기')+' · 수집 기준 '+(dated.length?date(dated[0])+(dated[0]!==dated.at(-1)?'~'+date(dated.at(-1)):''):'미확인')+' · 조회 '+time;
+  el.textContent='기술 분석용 확정 일봉 · 최신 거래일 '+(expected?count+extraCount+'/5 · 필요 '+date(expected):'확인 대기')+' · 수집 기준 '+(dated.length?date(dated[0])+(dated[0]!==dated.at(-1)?'~'+date(dated.at(-1)):''):'미확인')+' · 조회 '+time;
  }catch(e){if(el)el.textContent='미국장 새 자료 조회 실패 · 마지막 확인 자료 유지: '+String(e.message||e);}
  render();
  window.dispatchEvent(new Event('isa-us-quotes-refreshed'));
