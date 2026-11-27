@@ -5,6 +5,12 @@ import {spawn} from 'node:child_process';
 import path from 'node:path';
 const root=path.resolve('v17-validation-bundle/preview');
 const checks={
+ 'index.html':`const $=id=>document.getElementById(id);
+ if(!$('v17-auto-status')||!$('v17-unified-panel')||!$('v17-unified-payout'))throw Error('integrated dashboard missing');
+ if(!$('portfolio-sync-panel')||$('dashboard-settings').open)throw Error('sync or collapsed settings missing');
+ if(!window.ISA_ACCOUNT_SUMMARY||!window.ISA_SHARED_QUOTES)throw Error('existing modules not initialized');
+ if(!$('v17-auto-sync').textContent.includes('투자기록'))throw Error('automatic status missing');
+ if(document.documentElement.scrollWidth>window.innerWidth+2)throw Error('mobile horizontal overflow');`,
  'registry-preview-v17.html':`const $=id=>document.getElementById(id);
  if(!$('counts').textContent.includes('15/100'))throw Error('initial render');
  $('account').value='toss-us';$('account').dispatchEvent(new Event('change'));
@@ -31,7 +37,7 @@ const server=createServer(async(req,res)=>{
   const file=path.resolve(root,name);
   if(!file.startsWith(root+path.sep))throw Error('path');
   let body=await fs.readFile(file,'utf8');
-  const type=name.endsWith('.mjs')?'text/javascript':name.endsWith('.json')?'application/json':'text/html';
+  const type=/\\.(mjs|js)$/.test(name)?'text/javascript':name.endsWith('.json')?'application/json':'text/html';
   if(Object.hasOwn(checks,name))body=body.replace('</body>',`<script>window.addEventListener('load',()=>{try{${checks[name]}document.body.setAttribute('data-smoke','PASS')}catch(e){document.body.setAttribute('data-smoke','FAIL:'+String(e.message))}});</script></body>`);
   res.writeHead(200,{'Content-Type':type+'; charset=utf-8','Cache-Control':'no-store'});res.end(body);
  }catch(_){res.writeHead(404);res.end();}
