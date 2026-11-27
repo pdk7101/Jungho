@@ -541,7 +541,7 @@ function mount(){
  };
  lastAuto=0;
  // Initial foreground refresh; the existing guarded refresh owns all provider requests.
- setTimeout(auto,1000);
+ if(typeof setTimeout==='function')setTimeout(auto,1000);
  if(typeof setInterval==='function')setInterval(auto,60000);
  document.addEventListener('visibilitychange',auto);
  window.addEventListener('pageshow',auto);
