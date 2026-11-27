@@ -539,7 +539,9 @@ function mount(){
   const preOpen=!['Sat','Sun'].includes(clock.weekday)&&Number(clock.hour)===8;
   if(now-lastAuto>=(preOpen?60000:5*60000))refreshAll().catch(()=>{});
  };
- lastAuto=Date.now();
+ lastAuto=0;
+ // Initial foreground refresh; the existing guarded refresh owns all provider requests.
+ setTimeout(auto,1000);
  if(typeof setInterval==='function')setInterval(auto,60000);
  document.addEventListener('visibilitychange',auto);
  window.addEventListener('pageshow',auto);
