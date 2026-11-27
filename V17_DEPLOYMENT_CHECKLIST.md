@@ -29,3 +29,8 @@
 - 첫 실제 클라우드 실험은 별도 개발 Worker 및 별도 D1(무료 한도 확인)으로 수행. DB binding 이름 DB. FINNHUB_API_KEY는 기존 운영 수집기와 병행 사용하지 않는다. VIEW_TOKEN, REGISTRY_WRITE_TOKEN, POSITION_RECORD_TOKEN은 서로 다른 비밀값. US_DAILY_AUTHORIZED는 공급원 권한 확인 전 설정하지 않는다. KRX_DYNAMIC_ENABLED는 개발 KRX Worker에서 실응답 및 이용 승인 확인 전 설정하지 않는다. 최초에는 실제 투자기록 없이 합성 신규 종목 등록/기록 저장/조회/충돌만 확인한다.
 - 증권사 허용 IP 및 키움 ISA 등록 조건은 독립적인 미해결 과제다. 기존 무료 Workers/GitHub Actions에서 고정 출구 IP를 보장하지 못하므로 잔고 자동 조회를 출시 완료 조건으로 착각하지 않는다. 직접 입력·동기화·시세 조회는 별도로 검증하고, 실제 사용자 데이터 이관/운영 전환은 명시적 승인 후 진행한다.
 - 미국 신규 종목 일봉 자동화 공급원 허용, 국내 당일 종가, 배당 중복 확인, 양방향 실기기 동기화는 아직 미완료. 개발 코드 및 합성 검증 결과를 실제 시세 수집/운영 성공으로 표시하지 않는다.
+
+## 6. 실제 격리 Worker 연결 점검
+- 사용자 화면에서 jungho-v17 D1 및 동명 Worker 생성, DB 바인딩 및 세 별도 Secret 등록 확인. Cron/FINNHUB_API_KEY 추가하지 않음.
+- Chrome DevTools 붙여넣기 경고를 우회하지 않는다. 개발 Worker 전용 https://jungho-v17.pdk7101.workers.dev/connection-test 경로의 암호 입력폼으로 GET /watchlist, /quotes, 선택 GET /position-records를 확인한다. 해당 페이지용 같은 origin GET만 추가 허용하며 기존 토큰 인증, 운영 origin 정책과 POST 제한 유지.
+- 결과는 HTTP 상태 및 개수만 표시한다. 비밀값 저장·출력 금지. DB 테이블 초기화 가능하지만 보유기록 쓰기나 시세 공급원 호출 없음. 시세 0건은 미수집 상태로 정상일 수 있다. 실제 저장·두 기기 검증은 후속 단계. main 및 기존 운영 Worker 변경 없음.
