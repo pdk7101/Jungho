@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import {closeContext,tradingDate,chooseCompletedBar} from './us-close-calendar.mjs';
+import {consecutiveBars,retainedClose,preferFx} from './us-close-retention.mjs';
 const funds=[['schd','SCHD'],['agnc','AGNC'],['spym','SPYM'],['cony','CONY']];
 const out=new URL('../us-quotes.json',import.meta.url);
 const now=new Date();
@@ -16,7 +17,7 @@ function make([id,ticker],raw,source,dividends,splits){
   .filter(x=>context.expected&&x.date<=context.expected&&tradingDate(x.date))
   .sort((a,b)=>a.date.localeCompare(b.date));
  const bars=[...new Map(sorted.map(x=>[x.date,x])).values()].slice(-40);
- if(bars.length!==40)throw Error('완료된 미국장 40거래일 일봉 부족 ('+bars.length+')');
+ if(!consecutiveBars(bars))throw Error('연속 완료된 미국장 40거래일 일봉 부족 ('+bars.length+')');
  const last=bars.slice(-20),avg=a=>a.reduce((s,x)=>s+x.close,0)/a.length;
  const ma5=avg(bars.slice(-5)),ma20=avg(last),prev5=avg(bars.slice(-6,-1)),prev20=avg(bars.slice(-21,-1));
  const low20=Math.min(...last.map(x=>x.low)),high20=Math.max(...last.map(x=>x.high));
@@ -59,11 +60,19 @@ async function stooq(ticker){
  const raw=lines.slice(1).map(l=>{const [date,o,h,low,c,vol]=l.split(',');return {date:date.replace(/-/g,''),open:Number(o),high:Number(h),low:Number(low),close:Number(c),volume:Number(vol)};});
  return {raw,source:'Stooq 비공식 일봉 · 배당/병합 이벤트 미제공',dividends:[],splits:[]};
 }
+let previousPromise;
+function previousPublished(){
+ if(!previousPromise)previousPromise=(async()=>{
+  try{const r=await fetch('https://pdk7101.github.io/Jungho/us-quotes.json',{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('HTTP '+r.status);return await r.json();}
+  catch(_){console.warn('직전 공개 일봉 조회 불가 · 대체 기록 미확인');return null;}
+ })();
+ return previousPromise;
+}
 async function eachFund(f){
  const [id,ticker]=f;
  if(!context.expected)return {id,ticker,ok:false,reason:'거래일 달력 미확인',date:null,close:null,currency:'USD',bars:[],dividends:[],splits:[],closeStatus:'unavailable',expectedDate:null};
  const from=load=>async()=>{const data=await load(ticker);return make(f,data.raw,data.source,data.dividends,data.splits)};
- const result=await chooseCompletedBar(context.expected,[['Yahoo Finance',from(yahoo)],['Stooq',from(stooq)]]);
+ const result=await chooseCompletedBar(context.expected,[['Yahoo Finance',from(yahoo)],['Stooq',from(stooq)],['마지막 정상 게시자료',async()=>{const old=retainedClose(await previousPublished(),f,context.expected);if(!old)throw Error('retention_unavailable');return {...make(f,old.raw,old.source,old.dividends,old.splits),retained:true};}]]);
  console.log(ticker,'expected',context.expected,'actual',result.date,'status',result.closeStatus,'source',result.source||'none','attempts',JSON.stringify(result.attempts));
  return {id,ticker,currency:'USD',bars:[],dividends:[],splits:[],...result,...(!result.ok?{reason:'완료 일봉 수집 실패'}:{})};
 }
@@ -86,12 +95,12 @@ async function readFx(){
  console.warn('USD/KRW 환율 조회 실패:',errors.join(' / '));
  return {ok:false,reason:'공개 환율 조회 실패 · 직접 환율 입력 가능'};
 }
-const fx=await readFx();
+const fx=preferFx(await readFx(),await previousPublished(),now.getTime());
 const items=[];
 for(const f of funds)items.push(await eachFund(f));
 const extra=await eachFund(['spacex','SPCX']);
 // The symbol previously belonged to a different security: only post-IPO bars are eligible.
 const spcx=extra.ok&&extra.bars.every(b=>b.date>='20260612')?extra:null;
 await fs.writeFile(out,JSON.stringify({fetchedAt:now.toISOString(),market:'US',currency:'USD',isRealtime:false,expectedDate:context.expected,calendarKnown:context.calendarKnown,fx,extraQuotes:spcx?{spacex:spcx}:{},
- sourceNote:'미국장 확정 일봉만 사용하며 실시간 호가가 아닙니다. 조회 실패 시 가격을 만들어 표시하지 않습니다.',items},null,2)+'\n');
+ sourceNote:'미국장 확정 일봉만 사용하며 실시간 호가가 아닙니다. 조회 실패 시 검증된 마지막 게시자료만 원래 기준일로 유지합니다. 최신 자료가 아니면 신규 판단은 보류합니다.',items},null,2)+'\n');
 console.log('US 최신 거래일 일봉',items.filter(x=>x.closeStatus==='current').length+'/4','SPCX',spcx?.closeStatus||'unavailable','expected',context.expected);
