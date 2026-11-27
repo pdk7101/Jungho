@@ -2,22 +2,16 @@
 // Never adds to old account totals, writes storage, or creates orders.
 import {aliases} from './legacy-registry-preview.mjs';
 import {instrument,holdingId} from './instrument-registry.mjs';
-import {readLegacyBasis,consolidated,loadPublishedReference,mergeReferenceDaily} from './registry-consolidated-v17.mjs';
+import {confirmedLegacy,consolidated,loadPublishedReference,mergeReferenceDaily} from './registry-consolidated-v17.mjs';
 import {sharedRegistryRead,watchClient} from './registry-cloud-client-v17.mjs';
 import {positionClient} from './registry-position-client-v17.mjs';
-const TARGET='https://jungho-v17.pdk7101.workers.dev',SYNC='https://jungho-portfolio-sync.pdk7101.workers.dev/sync';
+const TARGET='https://jungho-v17.pdk7101.workers.dev';
 const basisKeys=['isa-private-positions-v1','isa-private-toss-domestic-holdings-v1','isa-us-holdings-v1'];
 const names={'kiwoom-isa':'키움 ISA','toss-kr':'토스 국내','toss-us':'토스 미국',all:'전체'};
 const krIds={tsofr:'sofr',treit:'reit',ttr:'tr',tspace:'space',trobot:'robot'};
 const positive=n=>typeof n==='number'&&Number.isFinite(n)&&n>0;
 const day=(now)=>{const x=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(now)).map(p=>[p.type,p.value]));return x.year+x.month+x.day;};
-export function confirmedLegacy(storage){
- try{
-  const c=JSON.parse(storage.getItem('isa-portfolio-sync-config-v1')||'null'),b=JSON.parse(storage.getItem('isa-portfolio-sync-base-v1')||'null');
-  if(c?.url!==SYNC||b?.url!==SYNC||!Number.isSafeInteger(b.revision)||b.revision<1||!b.data||!basisKeys.every(k=>Object.hasOwn(b.data,k)&&storage.getItem(k)===b.data[k]))return null;
-  return {revision:b.revision,basis:readLegacyBasis(storage)};
- }catch(_){return null;}
-}
+export {confirmedLegacy};
 export function commonKR(common,now=Date.now()){
  const byId={},today=day(now);let asOfCandidate=null;
  if(common?.version!==1)return {byId,asOfCandidate};
@@ -75,7 +69,7 @@ export function mountUnified(doc,win){
  }
  form.addEventListener('submit',e=>{e.preventDefault();if(busy)return;const token=input.value;input.value='';try{position=positionClient({url:TARGET,token});load();}catch(_){status.textContent='투자기록 전용 암호 확인 필요';}});
  refresh.addEventListener('click',load);
- win.addEventListener('storage',e=>{if(e.key===null||basisKeys.includes(e.key)||['isa-portfolio-sync-config-v1','isa-portfolio-sync-base-v1'].includes(e.key)){epoch++;registryConfirmed=false;positionConfirmed=false;records=null;render();status.textContent='기존 기록 변경 감지 · 다시 조회하세요.';}});
+ win.addEventListener('storage',e=>{if(e.oldValue===e.newValue&&e.key!==null)return;if(e.key===null||basisKeys.includes(e.key)||['isa-portfolio-sync-config-v1','isa-portfolio-sync-base-v1'].includes(e.key)){epoch++;registryConfirmed=false;positionConfirmed=false;records=null;render();status.textContent='기존 기록 변경 감지 · 자동 재조회 대기';}});
  win.addEventListener('isa-personal-us-quote-refreshed',()=>{live=win.ISA_PERSONAL_US?.scheduledSnapshot?.()||null;render();if(!model&&!busy&&Date.now()-lastLoad>60000&&confirmedLegacy(win.localStorage))load();});
  // Read cached records only, at most once per five minutes while visible.
  const auto=()=>{render();if(!doc.hidden&&!busy&&Date.now()-lastLoad>=300000&&confirmedLegacy(win.localStorage))load();};
