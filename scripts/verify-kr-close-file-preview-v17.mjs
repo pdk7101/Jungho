@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {previewKRCloseFiles,decodeKRCloseCSV} from '../kr-close-file-preview-v17.mjs';
+const opts={selectedDate:'2026-11-27',now:new Date('2026-11-27T12:00:00Z'),symbols:['329200','0229F0','003280','329200']};
+const h='종목코드,종목명,종가\n';
+const a=previewKRCloseFiles({...opts,files:[h+'329200,"리츠,테스트","5,010"\n0229F0,ETF,10000\n',h+'003280,주식,900\n']});
+assert.equal(a.matched,3);assert.equal(a.requested,3);assert.equal(a.items[0].close,5010);
+assert.equal(a.signalEligible,false);assert.ok(a.items.every(x=>x.officialConfirmed===false&&!x.signalEligible&&x.rowDate===null));
+const b=previewKRCloseFiles({...opts,files:[h+'329200,ETF,5010\n329200,ETF,5010\n0229F0,ETF,-1\n']});
+assert.equal(b.matched,0);assert.equal(b.items[0].error,'duplicate_or_invalid');
+const c=previewKRCloseFiles({...opts,files:['종목코드,종가,기준일\n329200,5010,20261126\n0229F0,10000,20261127\n']});
+assert.equal(c.matched,1);assert.equal(c.items[1].rowDate,'2026-11-27');assert.equal(c.items[1].signalEligible,false);
+assert.throws(()=>previewKRCloseFiles({...opts,selectedDate:'2026-11-28',files:[h]}));
+assert.throws(()=>previewKRCloseFiles({...opts,files:['종목코드,현재가\n329200,5010']}));
+assert.throws(()=>previewKRCloseFiles({...opts,files:[h+'329200,"unterminated']}));
+assert.throws(()=>previewKRCloseFiles({...opts,files:[h+'329200,ETF,5010,extra']}));
+assert.equal(decodeKRCloseCSV(new TextEncoder().encode(h)),h);
+console.log('Korean CSV preview: synthetic-only parser, duplicate/date/format checks, no signals');
