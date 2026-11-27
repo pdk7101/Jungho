@@ -23,7 +23,7 @@ export function commonKR(common,now=Date.now()){
  if(common?.version!==1)return {byId,asOfCandidate};
  for(const a of aliases.filter(x=>x.market==='KR')){
   const id=instrument(a).id,q=common.kr?.[krIds[a.legacyId]||a.legacyId];
-  const date=q?.date?.replaceAll('-',''),stamp=Date.parse(q?.date||'');
+  const date=typeof q?.date==='string'?q.date.replaceAll('-',''):null,stamp=Date.parse(q?.date||'');
   if(q?.source!=='KRX 공식 확정 종가'||!positive(q.amount)||!/^\d{8}$/.test(date||'')||date>=today||!Number.isFinite(stamp)||now-stamp>14*86400000)continue;
   byId[id]={id,symbol:a.symbol,venue:a.venue,currency:'KRW',date,close:q.amount};
   if(!asOfCandidate||date>asOfCandidate)asOfCandidate=date;
@@ -44,7 +44,7 @@ export function unifiedReference(model,{legacy,records,registryConfirmed=false,p
 const won=n=>n===null?'미확인':Math.round(n).toLocaleString('ko-KR')+'원';
 export function mountUnified(doc,win){
  const $=id=>doc.getElementById(id),root=$('v17-unified-rows');if(!root)return;
- let busy=false,position=null,model=null,records=null,reference=null,daily=null,live=null,registryConfirmed=false,positionConfirmed=false;
+ let busy=false,position=null,model=null,records=null,reference=null,daily=null,live=null,registryConfirmed=false,positionConfirmed=false,epoch=0,lastLoad=0;
  const status=$('v17-unified-status'),form=$('v17-unified-auth'),input=$('v17-unified-token'),refresh=$('v17-unified-refresh');
  const render=()=>{
   root.replaceChildren();if(!model)return;
@@ -58,12 +58,13 @@ export function mountUnified(doc,win){
   root.append(p);
  };
  async function load(){
-  if(busy||doc.hidden)return;busy=true;refresh.disabled=true;registryConfirmed=false;positionConfirmed=false;render();
+  if(busy||doc.hidden)return;busy=true;lastLoad=Date.now();const start=epoch;refresh.disabled=true;registryConfirmed=false;positionConfirmed=false;render();
   try{
    const reader=sharedRegistryRead(win.localStorage);if(!reader)throw Error('sync_required');
    const client=watchClient({url:TARGET,sharedRead:reader});
-   model=await client.load();registryConfirmed=true;
+   const next=await client.load();if(start!==epoch)throw Error('changed');model=next;
    const results=await Promise.allSettled([loadPublishedReference(),client.quotes(),client.daily(),position?position.load(model):Promise.resolve(null)]);
+   if(start!==epoch)throw Error('changed');registryConfirmed=true;
    reference=results[0].status==='fulfilled'?results[0].value:null;live=results[1].status==='fulfilled'?results[1].value:null;daily=results[2].status==='fulfilled'?results[2].value:null;
    records=results[3].status==='fulfilled'&&results[3].value!==null?Object.fromEntries(Object.entries(results[3].value).map(([id,r])=>[id,r.data])):{};
    positionConfirmed=model.added.length===0||!!position&&results[3].status==='fulfilled'&&results[3].value!==null;
@@ -73,9 +74,10 @@ export function mountUnified(doc,win){
  }
  form.addEventListener('submit',e=>{e.preventDefault();if(busy)return;const token=input.value;input.value='';try{position=positionClient({url:TARGET,token});load();}catch(_){status.textContent='투자기록 전용 암호 확인 필요';}});
  refresh.addEventListener('click',load);
- win.addEventListener('storage',e=>{if(e.key===null||basisKeys.includes(e.key)||['isa-portfolio-sync-config-v1','isa-portfolio-sync-base-v1'].includes(e.key)){registryConfirmed=false;positionConfirmed=false;records=null;render();status.textContent='기존 기록 변경 감지 · 다시 조회하세요.';}});
- win.addEventListener('isa-personal-us-quote-refreshed',()=>{live=win.ISA_PERSONAL_US?.scheduledSnapshot?.()||null;render();});
- // No continuous provider calls: refresh only when explicitly requested; recheck freshness locally.
+ win.addEventListener('storage',e=>{if(e.key===null||basisKeys.includes(e.key)||['isa-portfolio-sync-config-v1','isa-portfolio-sync-base-v1'].includes(e.key)){epoch++;registryConfirmed=false;positionConfirmed=false;records=null;render();status.textContent='기존 기록 변경 감지 · 다시 조회하세요.';}});
+ win.addEventListener('isa-personal-us-quote-refreshed',()=>{live=win.ISA_PERSONAL_US?.scheduledSnapshot?.()||null;render();if(!model&&!busy&&Date.now()-lastLoad>60000&&confirmedLegacy(win.localStorage))load();});
+ // Initial confirmed connection or manual refresh only; no extra provider polling.
  win.setInterval(render,60000);
+ if(confirmedLegacy(win.localStorage))load();
 }
 if(typeof window!=='undefined'&&typeof document!=='undefined')mountUnified(document,window);
