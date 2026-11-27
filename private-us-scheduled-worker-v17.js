@@ -139,6 +139,49 @@ async function registryFromDB(db){
  activeUS(data.catalog,data.holdings);
  return data;
 }
+// Add-only registry writer. Does not accept holdings, cost basis or trading instructions.
+// A compare-and-swap on the exact previous payload prevents lost updates across devices.
+async function registerSymbol(db,symbol){
+ if(!validSymbol(symbol))throw Error('invalid_symbol');
+ await registryFromDB(db);
+ for(let attempt=0;attempt<5;attempt++){
+  const row=await db.prepare('SELECT payload FROM us_collect_registry_v17 WHERE id=1').first();
+  const state=row?JSON.parse(row.payload):seedRegistry();
+  const id='US:US:'+symbol;
+  if(activeUS(state.catalog,state.holdings).includes(symbol))return {status:'already_registered',symbol};
+  if(Object.keys(state.catalog).length>=100&&!Object.hasOwn(state.catalog,id))throw Error('registry_limit');
+  state.catalog[id]={id,market:'US',venue:'US',symbol};
+  state.holdings['toss-us|'+id]={instrumentId:id,archived:false};
+  const payload=JSON.stringify(state);
+  const result=row
+   ?await db.prepare('UPDATE us_collect_registry_v17 SET payload=? WHERE id=1 AND payload=?').bind(payload,row.payload).run()
+   :await db.prepare('INSERT OR IGNORE INTO us_collect_registry_v17(id,payload) VALUES(1,?)').bind(payload).run();
+  if(result.meta.changes===1)return {status:'registered',symbol};
+ }
+ throw Error('registry_conflict');
+}
+async function readSmallJSON(request){
+ if(!request.headers.get('Content-Type')?.toLowerCase().startsWith('application/json')||!request.body)throw Error('invalid_body');
+ const reader=request.body.getReader(),decoder=new TextDecoder();
+ let size=0,raw='';
+ try{
+  for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>256)throw Error('invalid_body');raw+=decoder.decode(value,{stream:true});}
+  raw+=decoder.decode();
+  return JSON.parse(raw);
+ }finally{await reader.cancel().catch(()=>{});}
+}
+async function registrationRoute(request,env){
+ if(request.method!=='POST')return response(405,{error:'method'});
+ const secret=env.REGISTRY_WRITE_TOKEN;
+ if(typeof secret!=='string'||secret.length<32||secret===env.VIEW_TOKEN)return response(503,{error:'registry_write_disabled'});
+ if(!await authorized(request,secret))return response(401,{error:'unauthorized'});
+ if(!env.DB)return response(503,{error:'missing database binding'});
+ let data;
+ try{data=await readSmallJSON(request)}catch(_){return response(400,{error:'invalid_body'});}
+ if(!data||Object.keys(data).length!==1||!validSymbol(data.symbol))return response(400,{error:'invalid_symbol'});
+ try{return response(200,await registerSymbol(env.DB,data.symbol));}
+ catch(e){return response(e.message==='registry_limit'?409:e.message==='registry_conflict'?409:503,{error:['registry_limit','registry_conflict'].includes(e.message)?e.message:'registry_unavailable'});}
+}
 async function tick({store,readRegistry,fetchQuote,now=Date.now(),clock=Date.now}){
  if(!session(now).open)return {status:'closed',attempted:0};
  const state=await readRegistry();
@@ -158,7 +201,7 @@ function cachedPayload(symbols,records,now){
  return {source:'Finnhub personal use · shared scheduled cache',workerVersion:'20261127-v17-scheduled-candidate',
   fetchedAt:new Date(now).toISOString(),quotes,bySymbol,session:session(now),cachedOnly:true};
 }
-const response=(status,body)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json','Cache-Control':'private, no-store, max-age=0','Access-Control-Allow-Origin':ORIGIN,'Access-Control-Allow-Methods':'GET, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type','Vary':'Origin, Authorization','X-Content-Type-Options':'nosniff'}});
+const response=(status,body)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json','Cache-Control':'private, no-store, max-age=0','Access-Control-Allow-Origin':ORIGIN,'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type','Vary':'Origin, Authorization','X-Content-Type-Options':'nosniff'}});
 async function authorized(request,secret){
  if(typeof secret!=='string'||secret.length<20)return false;
  const enc=new TextEncoder(),a=new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode(request.headers.get('Authorization')||''))),b=new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode('Bearer '+secret)));
@@ -175,8 +218,9 @@ export default {
  async fetch(request,env){
   if(request.headers.get('Origin')!==ORIGIN)return new Response(null,{status:403});
   const url=new URL(request.url);
-  if(url.pathname!=='/quotes'||url.search)return response(404,{error:'not_found'});
+  if(!['/quotes','/registry'].includes(url.pathname)||url.search)return response(404,{error:'not_found'});
   if(request.method==='OPTIONS')return response(200,{ok:true});
+  if(url.pathname==='/registry')return registrationRoute(request,env);
   if(request.method!=='GET')return response(405,{error:'method'});
   if(!await authorized(request,env.VIEW_TOKEN))return response(401,{error:'unauthorized'});
   if(!env.DB)return response(503,{error:'missing database binding'});
