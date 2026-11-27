@@ -60,6 +60,9 @@ jobs:
         run: |
           mkdir -p site
           cp index.html insights.js live-prices.js private-krx-client.js personal-us-live.js us-dashboard.js us-krw.js us-signals.js unattended-orders.js portfolio-import.js intraday-signals.js portfolio-totals.js personal-toss-client.js account-summary.js kr-dividends.js portfolio-sync.js quotes.json intraday-quotes.json metrics.json us-quotes.json site/
+          cp dashboard-v17-extension.mjs registry-preview-v17.html registry-ui-page.mjs registry-ui-preview.mjs instrument-registry.mjs legacy-registry-preview.mjs registry-cloud-client-v17.mjs registry-krx-client-v17.mjs registry-valuation-v17.mjs registry-position-client-v17.mjs registry-consolidated-v17.mjs site/
+          mkdir -p site/scripts
+          cp scripts/us-close-calendar.mjs site/scripts/
           cp data/metric-history.json site/metric-history.json
           node scripts/stamp-assets.js site/index.html
       - uses: actions/configure-pages@v5
