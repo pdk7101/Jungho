@@ -30,9 +30,10 @@ export function chooseValuationQuote(i,{live,daily,kr,fx,now=Date.now()}={}){
  if(!validFx(fx,now))return null;
  const q=live?.bySymbol?.[i.symbol],t=Date.parse(q?.tradeAt),r=Date.parse(q?.receivedAt),session=live?.session;
  const et=dateKey(now,'America/New_York');
- const minute=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(now)).split(':')[0])*60+Number(new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(now)).split(':')[1]);
+ const minuteET=stamp=>{const p=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(stamp)).map(x=>[x.type,x.value]));return Number(p.hour)*60+Number(p.minute);};
+ const minute=minuteET(now),tradeMinute=Number.isFinite(t)?minuteET(t):-1;
  const tradeDay=Number.isFinite(t)?dateKey(t,'America/New_York'):null;
- if(session?.open===true&&session.date===et&&[780,960].includes(session.close)&&minute>=570&&minute<session.close&&tradeDay===et&&q?.symbol===i.symbol&&positive(q.usd)&&t<=now&&now-t<=45*60000&&r<=now&&now-r<=7*60000)
+ if(session?.open===true&&session.date===et&&[780,960].includes(session.close)&&minute>=570&&minute<session.close&&tradeDay===et&&tradeMinute>=570&&tradeMinute<session.close&&q?.symbol===i.symbol&&positive(q.usd)&&t<=now&&now-t<=45*60000&&r<=now&&now-r<=7*60000)
   return {amountKRW:q.usd*fx.rate,date:et,kind:'us-live-reference-fx',fxDate:fx.date,reference:true};
  const d=daily?.bySymbol?.[i.symbol],expected=closeContext(new Date(now)).expected;
  if(d?.symbol===i.symbol&&d.currency==='USD'&&positive(d.close)&&day(d.date)&&expected&&d.date===expected&&daily.expectedDate===expected)
