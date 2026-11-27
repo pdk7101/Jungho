@@ -81,3 +81,13 @@ export function consolidated(model,{legacyBasis={},newBasis={},inputs={},legacyC
  };
  return {accounts:Object.fromEntries(accounts.map(a=>[a,summarize(rows.filter(r=>r.account===a))])),all:summarize(rows),rows};
 }
+
+// Read only: automatic legacy totals require the exact confirmed synced basis.
+export function confirmedLegacy(storage){
+ const sync='https://jungho-portfolio-sync.pdk7101.workers.dev/sync';
+ try{
+  const c=JSON.parse(storage.getItem('isa-portfolio-sync-config-v1')||'null'),b=JSON.parse(storage.getItem('isa-portfolio-sync-base-v1')||'null');
+  if(c?.url!==sync||b?.url!==sync||!Number.isSafeInteger(b.revision)||b.revision<1||!b.data||!Object.values(keys).every(k=>Object.hasOwn(b.data,k)&&storage.getItem(k)===b.data[k]))return null;
+  return {revision:b.revision,basis:readLegacyBasis(storage)};
+ }catch(_){return null;}
+}
