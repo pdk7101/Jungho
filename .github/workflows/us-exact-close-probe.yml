@@ -1,0 +1,58 @@
+name: US exact-date close probe (isolated)
+on:
+  push:
+    branches: [architecture-v17]
+    paths: ['.github/workflows/us-exact-close-probe.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    if: github.ref == 'refs/heads/architecture-v17'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact session from both providers without publishing
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import {closeContext} from './scripts/us-close-calendar.mjs';
+          const expected='20261127';
+          const context=closeContext(new Date('2026-11-28T02:07:00Z'));
+          if(context.expected!==expected) throw Error('Calendar mismatch');
+          const fmt=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+          const date=t=>{const p=Object.fromEntries(fmt.formatToParts(new Date(t)).map(x=>[x.type,x.value]));return p.year+p.month+p.day};
+          const valid=x=>typeof x==='number'&&Number.isFinite(x)&&x>0;
+          const get=async url=>{const r=await fetch(url,{signal:AbortSignal.timeout(15000),headers:{'User-Agent':'ISA-Research-Daily-Watchlist/1.0','Cache-Control':'no-cache'}});if(!r.ok)throw Error('HTTP '+r.status);return r};
+          let count=0;
+          for(const ticker of ['SCHD','AGNC','SPYM','CONY','SPCX']){
+            let found=false;
+            for(const host of ['query2.finance.yahoo.com','query1.finance.yahoo.com','stooq.com']){
+              try{
+                let rows;
+                if(host==='stooq.com'){
+                  const csv=await (await get('https://stooq.com/q/d/l/?s='+ticker.toLowerCase()+'.us&i=d&d1=20261120&d2='+expected)).text();
+                  const lines=csv.trim().split(/\r?\n/);
+                  if(!/^Date,Open,High,Low,Close,Volume$/i.test(lines[0]))throw Error('CSV format unavailable');
+                  rows=lines.slice(1).map(l=>{const [d,o,h,lo,c]=l.split(',');return {date:d.replaceAll('-',''),o:+o,h:+h,lo:+lo,c:+c}});
+                }else{
+                  const j=await (await get('https://'+host+'/v8/finance/chart/'+ticker+'?range=1mo&interval=1d')).json();
+                  const v=j?.chart?.result?.[0],q=v?.indicators?.quote?.[0];
+                  if(v?.meta?.symbol?.toUpperCase()!==ticker||!q||!Array.isArray(v.timestamp))throw Error('Symbol or schema mismatch');
+                  rows=v.timestamp.map((t,i)=>({date:date(t*1000),o:q.open?.[i],h:q.high?.[i],lo:q.low?.[i],c:q.close?.[i]}));
+                }
+                const last=rows.filter(x=>x.date<=expected&&[x.o,x.h,x.lo,x.c].every(valid)&&x.h>=Math.max(x.o,x.c)&&x.lo<=Math.min(x.o,x.c)).sort((a,b)=>a.date.localeCompare(b.date)).at(-1);
+                const ok=last?.date===expected;
+                found ||= ok;
+                console.log(ticker,host,'expected',expected,'actual',last?.date??'none','status',ok?'exact-date':'missing-or-stale');
+              }catch(e){console.log(ticker,host,'unavailable',String(e.message).slice(0,160))}
+            }
+            if(found)count++;
+          }
+          console.log('Exact-date OHLC coverage',count+'/5','Stooq adjustment and security identity not independently verified');
+          if(count!==5)process.exitCode=1;
+          JS
