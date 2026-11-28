@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import {tradingDate,chooseCompletedBar} from './us-close-calendar.mjs';
+import {consecutiveBars,retainedClose,retainedFx,preferFx} from './us-close-retention.mjs';
+const expected='20261127';
+const bars=[];for(let t=Date.parse('2026-09-01');t<=Date.parse('2026-11-25');t+=86400000){const date=new Date(t).toISOString().slice(0,10).replaceAll('-','');if(tradingDate(date))bars.push({date,open:9,high:11,low:8,close:10,volume:100});}
+const last=bars.slice(-40),q={ok:true,id:'schd',ticker:'SCHD',currency:'USD',date:'20261125',close:10,bars:last,source:'fixture',dividends:[{date:'20261120',perShare:0.1}],splits:[]};
+const fx={ok:true,usdKrw:1400,observedAt:'2026-11-26T00:00:00Z',source:'fixture',realTime:false};
+const payload={market:'US',currency:'USD',isRealtime:false,items:[q],fx};
+assert.equal(consecutiveBars(last),true);
+assert.equal(consecutiveBars([...last.slice(0,10),last[9],...last.slice(11)]),false);
+assert.equal(consecutiveBars([...bars.slice(-41,-40),...last.slice(0,10),...last.slice(11)]),false);
+assert.equal(retainedClose(payload,['schd','SCHD'],expected).raw.at(-1).date,'20261125');
+assert.equal(retainedClose(payload,['schd','SCHD'],'20261124'),null);
+assert.equal(retainedClose(payload,['schd','AGNC'],expected),null);
+assert.equal(retainedClose(payload,['schd','SCHD'],'20261210'),null);
+assert.equal(retainedClose({...payload,items:[{...q,close:99}]},['schd','SCHD'],expected),null);
+assert.equal(retainedClose({...payload,isRealtime:true},['schd','SCHD'],expected),null);
+const result=await chooseCompletedBar(expected,[['unavailable',async()=>{throw Error('fail')}],['retained',async()=>({...q,retained:true})]]);
+assert.equal(result.date,'20261125');assert.equal(result.closeStatus,'stale');assert.equal(result.retained,true);
+const good=await chooseCompletedBar(expected,[['fresh',async()=>({...q,date:expected})],['retained',async()=>{throw Error('should not call')}]]);assert.equal(good.closeStatus,'current');
+const now=Date.parse('2026-11-27T12:00:00Z');
+assert.equal(retainedFx(payload,now).observedAt,fx.observedAt);
+assert.equal(preferFx({ok:false},payload,now).retained,true);
+assert.equal(preferFx({...fx,observedAt:'2026-11-25T00:00:00Z'},payload,now).observedAt,fx.observedAt);
+assert.equal(retainedFx(payload,now+4*86400000),null);
+console.log('PASS: retained daily data preserves actual dates and identity, rejects gaps, stale/invalid fallback, and retains dated FX only within limits');

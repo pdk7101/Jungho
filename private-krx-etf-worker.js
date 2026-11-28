@@ -57,7 +57,7 @@ function headers(origin){
  if(origin===ORIGIN){
   h['Access-Control-Allow-Origin']=ORIGIN;
   h['Access-Control-Allow-Headers']='Authorization, Content-Type';
-  h['Access-Control-Allow-Methods']='GET, OPTIONS';
+  h['Access-Control-Allow-Methods']='GET, POST, OPTIONS';
   h['Access-Control-Max-Age']='600';
  }
  return h;
@@ -121,18 +121,87 @@ async function pageRows(page,key){
  return {rows:rows.sort((a,b)=>a.date.localeCompare(b.date)),errors:errs,
   latestExpected:targetDay().toISOString().slice(0,10).replace(/-/g,'')};
 }
+// v17 dynamic daily-close route, independent of the existing history route.
+// Authorized private request only: no database, public storage, or shared price cache.
+const MARKETS=Object.freeze({'KRX-ETF':'etp/etf_bydd_trd','KOSPI':'sto/stk_bydd_trd','KOSDAQ':'sto/ksq_bydd_trd'});
+function dynamicPlan(input){
+ if(!input||Object.keys(input).join(',')!=='instruments'||!Array.isArray(input.instruments)||input.instruments.length<1||input.instruments.length>100)throw Error('invalid_request');
+ const groups=new Map();
+ for(const i of input.instruments){
+  if(!i||Object.keys(i).sort().join(',')!=='symbol,venue'||!Object.hasOwn(MARKETS,i.venue)||typeof i.symbol!=='string'||!/^[0-9A-Z]{6}$/.test(i.symbol))throw Error('invalid_request');
+  if(!groups.has(i.venue))groups.set(i.venue,new Set());
+  groups.get(i.venue).add(i.symbol);
+ }
+ return [...groups].map(([venue,codes])=>({venue,codes:[...codes].sort()}));
+}
+function candidateDays(now=new Date()){
+ // Existing KRX daily feed may only publish the prior session on the next business day.
+ // Do not presume today is published, or infer holidays from weekdays alone.
+ const p=kst(now),d=new Date(p.year+'-'+p.month+'-'+p.day+'T12:00:00Z');
+ d.setUTCDate(d.getUTCDate()-1);
+ const days=[];
+ while(days.length<3){if(![0,6].includes(d.getUTCDay()))days.push(d.toISOString().slice(0,10).replace(/-/g,''));d.setUTCDate(d.getUTCDate()-1);}
+ return days;
+}
+function extractDynamic(group,day,body){
+ if(!Array.isArray(body?.OutBlock_1))throw Error('invalid_response');
+ const wanted=new Set(group.codes),found=new Map(),ambiguous=new Set();
+ for(const r of body.OutBlock_1){
+  const code=[r.ISU_SRT_CD,r.ISU_CD,r.ISU_SHORT_CD,r.SRT_CD].map(x=>String(x??'').trim().toUpperCase().replace(/^A(?=[0-9A-Z]{6}$)/,'')).find(x=>wanted.has(x));
+  // For the new route require a matching source date, never assume a requested date was returned.
+  if(!code||String(r.BAS_DD??'').replace(/-/g,'')!==day)continue;
+  const close=pos(r.TDD_CLSPRC);
+  if(!close||ambiguous.has(code))continue;
+  if(found.has(code)&&found.get(code).close!==close){found.delete(code);ambiguous.add(code);continue;}
+  found.set(code,{id:'KR:'+group.venue+':'+code,venue:group.venue,symbol:code,date:day,close,currency:'KRW',source:'KRX 공식 일별매매정보'});
+ }
+ return [...found.values()];
+}
+async function dynamicCloses({groups,days,key,fetchImpl=fetch}){
+ const byId={},errors=[];let requests=0,rateLimited=false;
+ for(const group of groups){
+  const pending=new Set(group.codes);
+  for(const day of days){
+   if(!pending.size||rateLimited)break;
+   requests++;
+   try{
+    const url='https://data-dbg.krx.co.kr/svc/apis/'+MARKETS[group.venue]+'?basDd='+day;
+    const r=await fetchImpl(url,{headers:{AUTH_KEY:key,Accept:'application/json'},redirect:'manual',signal:AbortSignal.timeout(10000)});
+    if(!r.ok){errors.push({venue:group.venue,date:day,status:r.status});if(r.status===429)rateLimited=true;if([401,403,429].includes(r.status))break;continue;}
+    const rows=extractDynamic({...group,codes:[...pending]},day,await r.json());
+    for(const q of rows){byId[q.id]=q;pending.delete(q.symbol);}
+   }catch(_){errors.push({venue:group.venue,date:day,status:'unavailable'});break;}
+  }
+  for(const symbol of pending)byId['KR:'+group.venue+':'+symbol]={symbol,venue:group.venue,error:'official_close_unconfirmed'};
+ }
+ return {schema:'krx-dynamic-close-v17',source:'KRX 공식 일별매매정보',asOfCandidate:days[0],byId,errors,requests,realTime:false};
+}
+async function dynamicRequest(request,env,origin){
+ if(env.KRX_DYNAMIC_ENABLED!=='true')return reply(503,{error:'dynamic_route_disabled'},origin);
+ if(!request.headers.get('Content-Type')?.toLowerCase().startsWith('application/json')||!request.body)return reply(400,{error:'invalid_request'},origin);
+ let raw='',size=0,groups;
+ const reader=request.body.getReader(),decoder=new TextDecoder();
+ try{
+  for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>8192)throw Error('too_large');raw+=decoder.decode(value,{stream:true});}
+  groups=dynamicPlan(JSON.parse(raw+decoder.decode()));
+ }catch(_){return reply(400,{error:'invalid_request'},origin);}
+ finally{await reader.cancel().catch(()=>{});}
+ return reply(200,await dynamicCloses({groups,days:candidateDays(),key:String(env.KRX_AUTH_KEY)}),origin);
+}
 export default {
  async fetch(request,env){
   const origin=request.headers.get('Origin')||'';
   if(origin!==ORIGIN)return reply(403,{error:'허용되지 않은 접근 경로'},origin);
   const u=new URL(request.url);
   if(request.method==='OPTIONS')return new Response(null,{status:204,headers:headers(origin)});
-  if(request.method!=='GET'||u.pathname!=='/api/krx-history')
+  const dynamic=u.pathname==='/api/krx-dynamic-close'&&request.method==='POST'&&!u.search;
+  if(!dynamic&&(request.method!=='GET'||u.pathname!=='/api/krx-history'))
    return reply(404,{error:'지원하지 않는 요청'},origin);
   const expected=String(env.KRX_VIEW_TOKEN||'');
   const given=(request.headers.get('Authorization')||'').replace(/^Bearer /,'');
   if(!tokenMatches(given,expected))return reply(401,{error:'개인 접근 토큰 확인 실패'},origin);
   if(!env.KRX_AUTH_KEY)return reply(503,{error:'KRX 인증키 Worker Secret 미설정'},origin);
+  if(dynamic)return dynamicRequest(request,env,origin);
   const page=int(u.searchParams.get('page'));
   if(page===null||page<0||page>4)return reply(400,{error:'조회 범위 오류'},origin);
   try{

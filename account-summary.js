@@ -57,6 +57,7 @@ function dividendTotals(){
  return {us,usKnown,domestic:domestic?.amount??null,kiwoom:kiwoom?.amount??null,
   toss:us+(domestic?.amount||0),all:us+(domestic?.amount||0)+(kiwoom?.amount||0),
   complete:!missing.length&&!provisional.length,missing,provisional,
+  scope:{'toss-us':'legacy-symbols','toss-kr':domesticBase&&domesticBase.amount>0?'account-opening':domesticItem?.kind==='partial'||domesticItem?.kind==='account-baseline'&&domesticBase?.amount===0?'legacy-symbols':'unknown','kiwoom-isa':kiwoomBase&&kiwoomBase.amount>0?'account-opening':kiwoomItem?.kind==='partial'||kiwoomItem?.kind==='account-baseline'&&kiwoomBase?.amount===0?'legacy-symbols':'unknown'},
   dates:[domestic?.date,kiwoom?.date].filter(Boolean),
   afterBase:[domesticItem?.added||0,kiwoomItem?.added||0]};
 }
@@ -539,7 +540,9 @@ function mount(){
   const preOpen=!['Sat','Sun'].includes(clock.weekday)&&Number(clock.hour)===8;
   if(now-lastAuto>=(preOpen?60000:5*60000))refreshAll().catch(()=>{});
  };
- lastAuto=Date.now();
+ lastAuto=0;
+ // Initial foreground refresh; the existing guarded refresh owns all provider requests.
+ if(typeof setTimeout==='function')setTimeout(auto,1000);
  if(typeof setInterval==='function')setInterval(auto,60000);
  document.addEventListener('visibilitychange',auto);
  window.addEventListener('pageshow',auto);

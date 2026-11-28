@@ -115,6 +115,7 @@ function apply(data,original,initial){
  }
  return true;
 }
+function sameConnection(config){const c=read(CONFIG);return c?.url===config.url&&c?.token===config.token;}
 async function sync(choice=null){
  const config=read(CONFIG);
  if(!config||busy||document.visibilityState==='hidden'||editing())return;
@@ -123,6 +124,7 @@ async function sync(choice=null){
  busy=true;checkingAt=Date.now();
  try{
   const original=snapshot(),base=read(BASE),server=await api(config,'GET');
+  if(!sameConnection(config))return status('연결 설정 변경 감지 · 다시 확인합니다');
   if(!equal(snapshot(),original)||editing())return status('입력 중 · 저장 후 자동 동기화');
   if(!valid(original))throw Error('기기 기록 형식 확인 필요 · 변경하지 않았습니다');
   let data,initial=!base||base.url!==config.url||!valid(base.data);
@@ -139,9 +141,13 @@ async function sync(choice=null){
    if(merged.conflicts.length&&!choice){conflict=true;choices(true);status('동시 수정 충돌 '+merged.conflicts.length+'개 기록 · 선택하기 전 양쪽 데이터 유지');return;}
    data=merged.data;
   }
-  if(!equal(snapshot(),original)||editing())return;
+  if(!sameConnection(config)||!equal(snapshot(),original)||editing())return;
   const final=server.revision===0||!equal(data,server.data)?await api(config,'PUT',{revision:server.revision,data}):server;
+  if(!sameConnection(config))return status('연결 설정 변경 감지 · 기존 기기 기록 유지');
   if(!equal(snapshot(),original)||editing())return status('추가 입력 감지 · 다음 조회에서 다시 비교합니다');
+  // Another tab may already have accepted a newer revision. Do not regress it.
+  const currentBase=read(BASE);
+  if(currentBase?.url===config.url&&Number.isSafeInteger(currentBase.revision)&&currentBase.revision>final.revision)return status('다른 탭의 최신 동기화 유지 · 다시 확인합니다');
   const nextBase={url:config.url,revision:final.revision,data:final.data};
   // If browser storage is full, stop before changing editor records.
   const oldBase=localStorage.getItem(BASE);

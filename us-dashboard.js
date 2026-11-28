@@ -95,15 +95,10 @@ function fmtQty(n){
  return Number(n).toLocaleString('ko-KR',{maximumFractionDigits:6})+'주';
 }
 function pendingUSCloseUpdate(x,now=new Date()){
- // Informational only: US exchange holidays may have no new completed bar.
  if(!x?.date||!/^[0-9]{8}$/.test(String(x.date)))return false;
- const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{
-  timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',
-  hour:'2-digit',hourCycle:'h23',weekday:'short'
- }).formatToParts(now).map(v=>[v.type,v.value]));
- const today=String(parts.year)+String(parts.month)+String(parts.day);
- return ['Mon','Tue','Wed','Thu','Fri'].includes(parts.weekday)&&
-  Number(parts.hour)>=17&&String(x.date)<today;
+ const session=window.ISA_US_SIGNAL?.session?.(now);
+ const expected=session?.calendarKnown?session.expected:(typeof data!=='undefined'?data?.expectedDate:null);
+ return typeof expected==='string'&&/^\d{8}$/.test(expected)&&x.date<expected;
 }
 function priceSource(f,x,wonQuote){
  const state=window.ISA_PERSONAL_US?.state?.();
@@ -295,6 +290,28 @@ function details(){
  host.innerHTML=section;
 }
 function render(){cards();details();}
+// A partial refresh must not erase a good dated candle or regress to an older
+// source. Retained prices stay dated; the signal engine checks required session.
+function mergeDaily(previous,next,now=Date.now()){
+ const tickers={schd:'SCHD',agnc:'AGNC',spym:'SPYM',cony:'CONY',spacex:'SPCX'};
+ const good=(q,id)=>q?.id===id&&q.ticker===tickers[id]&&q.ok===true&&
+  /^\d{8}$/.test(q.date)&&Number.isFinite(q.close)&&q.close>0&&
+  Array.isArray(q.bars)&&q.bars.length>=40&&q.bars.at(-1)?.date===q.date&&
+  q.bars.at(-1)?.close===q.close&&(id!=='spacex'||q.bars.every(b=>b.date>='20260612'));
+ const choose=(id,old,fresh)=>{
+  if(good(fresh,id)&&(!good(old,id)||fresh.date>=old.date))return fresh;
+  return good(old,id)?old:{id,ticker:tickers[id],ok:false,reason:'유효한 일봉 없음'};
+ };
+ const items=Object.keys(tickers).filter(id=>id!=='spacex').map(id=>
+  choose(id,previous?.items?.find(q=>q.id===id),next.items.find(q=>q.id===id)));
+ const spcx=choose('spacex',previous?.extraQuotes?.spacex,next.extraQuotes?.spacex);
+ const fxOK=fx=>fx?.ok===true&&Number.isFinite(fx.usdKrw)&&fx.usdKrw>=700&&fx.usdKrw<=3000&&
+  Number.isFinite(Date.parse(fx.observedAt))&&now-Date.parse(fx.observedAt)>=0&&now-Date.parse(fx.observedAt)<=8*86400000;
+ const oldFX=previous?.fx,newFX=next.fx;
+ const fx=fxOK(newFX)&&(!fxOK(oldFX)||Date.parse(newFX.observedAt)>=Date.parse(oldFX.observedAt))?
+  newFX:fxOK(oldFX)?oldFX:{ok:false,reason:'유효한 환율 없음'};
+ return {...next,items,extraQuotes:spcx.ok?{spacex:spcx}:{},fx};
+}
 async function refresh(){
  const el=$('us-updated');
  if(el)el.textContent='미국장 일봉을 확인 중…';
@@ -302,11 +319,15 @@ async function refresh(){
   const r=await fetch('./us-quotes.json?refresh='+Date.now(),{cache:'no-store'});
   if(!r.ok)throw Error('HTTP '+r.status);
   const d=await r.json();
-  if(!Array.isArray(d.items))throw Error('미국장 일봉 형식 미확인');
-  data=d;loadTime=d.fetchedAt;
-  const count=FUNDS.filter(f=>market(f)).length;
+  if(d.market!=='US'||d.currency!=='USD'||!Array.isArray(d.items))throw Error('미국장 일봉 형식 미확인');
+  data=mergeDaily(data,d);loadTime=d.fetchedAt;
+  const expected=window.ISA_US_SIGNAL?.session?.()?.expected||data.expectedDate;
+  const count=FUNDS.filter(f=>market(f)?.date===expected).length;
+  const spcx=data.extraQuotes?.spacex;
+  const extraCount=spcx&&fresh(spcx)&&spcx.date===expected?1:0;
   const time=loadTime?new Date(loadTime).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}):'미확인';
-  el.textContent='기술 분석용 확정 일봉 '+count+'/4 · 마지막 수집 '+time;
+  const dated=FUNDS.map(f=>market(f)?.date).filter(Boolean).sort();
+  el.textContent='기술 분석용 확정 일봉 · 최신 거래일 '+(expected?count+extraCount+'/5 · 필요 '+date(expected):'확인 대기')+' · 수집 기준 '+(dated.length?date(dated[0])+(dated[0]!==dated.at(-1)?'~'+date(dated.at(-1)):''):'미확인')+' · 조회 '+time;
  }catch(e){if(el)el.textContent='미국장 새 자료 조회 실패 · 마지막 확인 자료 유지: '+String(e.message||e);}
  render();
  window.dispatchEvent(new Event('isa-us-quotes-refreshed'));
