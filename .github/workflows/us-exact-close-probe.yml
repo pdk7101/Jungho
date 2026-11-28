@@ -34,7 +34,7 @@ jobs:
                 const bars=(j.bars||[]).filter(b=>fmt.format(new Date(b.t))==='2026-11-27'&&[b.o,b.h,b.l,b.c].every(valid)&&b.h>=Math.max(b.o,b.c)&&b.l<=Math.min(b.o,b.c)&&b.h>=b.l);
                 const ok=j.symbol===symbol&&bars.length===1&&!j.next_page_token;
                 console.log(symbol,feed,'expected 2026-11-27',ok?'exact-date OHLC present':'missing or invalid');
-                if(ok)count++;
+                if(ok){count++;console.log(symbol,feed,'date',fmt.format(new Date(bars[0].t)),'close USD',bars[0].c);}
               }catch{console.log(symbol,feed,'request or schema failure');}
             }
             console.log(feed,'coverage',count+'/5');
