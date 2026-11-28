@@ -329,7 +329,7 @@ function alpacaDaily(key,secret,fetchImpl=fetch){
   const start=new Date(day+'T12:00:00Z');start.setUTCDate(start.getUTCDate()-100);
   const url=new URL('https://data.alpaca.markets/v2/stocks/'+encodeURIComponent(symbol)+'/bars');
   for(const [k,v] of Object.entries({timeframe:'1Day',start:start.toISOString().slice(0,10)+'T04:00:00Z',end:day+'T19:00:00Z',feed:'sip',adjustment:'raw',limit:'1000'}))url.searchParams.set(k,v);
-  const r=await fetchImpl(url,{headers:{Accept:'application/json','APCA-API-KEY-ID':key,'APCA-API-SECRET-KEY':secret},redirect:'error',signal:AbortSignal.timeout(10000)});
+  const r=await fetchImpl(url,{headers:{Accept:'application/json','APCA-API-KEY-ID':key,'APCA-API-SECRET-KEY':secret},redirect:'manual',signal:AbortSignal.timeout(10000)});
   if(!r.ok)return {status:r.status};
   const j=await r.json();
   if(j.symbol!==symbol||!Array.isArray(j.bars)||j.next_page_token)throw Error('daily_identity');
