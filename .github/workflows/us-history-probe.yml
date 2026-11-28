@@ -1,0 +1,47 @@
+name: US 40-session SIP probe (isolated)
+on:
+  push:
+    branches: [architecture-v17]
+    paths: ['.github/workflows/us-history-probe.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    if: github.ref == 'refs/heads/architecture-v17'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify 40 completed sessions without publishing
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        run: |
+          node --input-type=module <<'JS'
+          const headers={'APCA-API-KEY-ID':process.env.ALPACA_API_KEY,'APCA-API-SECRET-KEY':process.env.ALPACA_SECRET_KEY};
+          const fmt=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+          const valid=x=>typeof x==='number'&&Number.isFinite(x)&&x>0;
+          const dates=[];
+          for(let d=new Date('2026-11-27T12:00:00Z');dates.length<40;d.setUTCDate(d.getUTCDate()-1)){
+            const s=d.toISOString().slice(0,10);
+            if(![0,6].includes(d.getUTCDay())&&s!=='2026-11-26')dates.unshift(s);
+          }
+          let count=0;
+          for(const symbol of ['SCHD','AGNC','SPYM','CONY','SPCX']){
+            try{
+              const url=new URL('https://data.alpaca.markets/v2/stocks/'+symbol+'/bars');
+              for(const [k,v] of Object.entries({timeframe:'1Day',start:dates[0]+'T04:00:00Z',end:'2026-11-27T19:00:00Z',feed:'sip',adjustment:'raw',limit:'100'}))url.searchParams.set(k,v);
+              const r=await fetch(url,{headers,signal:AbortSignal.timeout(15000),redirect:'error'});
+              if(!r.ok){console.log(symbol,'HTTP',r.status);continue;}
+              const j=await r.json();
+              const rows=(j.bars||[]).map(b=>({...b,date:fmt.format(new Date(b.t))})).sort((a,b)=>a.date.localeCompare(b.date));
+              const ok=j.symbol===symbol&&!j.next_page_token&&rows.length===40&&rows.every((b,i)=>b.date===dates[i]&&[b.o,b.h,b.l,b.c].every(valid)&&b.h>=Math.max(b.o,b.c)&&b.l<=Math.min(b.o,b.c)&&b.h>=b.l);
+              if(!ok){console.log(symbol,'invalid history',rows.length,'missing',dates.filter(d=>!rows.some(b=>b.date===d)).join(','));continue;}
+              const avg=n=>rows.slice(-n).reduce((s,b)=>s+b.c,0)/n;
+              console.log(symbol,'40/40',dates[0],dates.at(-1),'close',rows.at(-1).c,'MA5',avg(5),'MA20',avg(20),'low20',Math.min(...rows.slice(-20).map(b=>b.l)),'high20',Math.max(...rows.slice(-20).map(b=>b.h)));
+              count++;
+            }catch{console.log(symbol,'request or schema failure');}
+          }
+          console.log('SIP history coverage',count+'/5');
+          if(count!==5)process.exitCode=1;
+          JS
