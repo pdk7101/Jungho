@@ -264,7 +264,7 @@ async function tick({store,readRegistry,fetchQuote,now=Date.now(),clock=Date.now
  return collectUS({...state,store,fetchQuote,now,clock,sessionOpen:true});
 }
 // Private dynamic daily history. Disabled unless the operator confirms permitted
-// automated personal use of the existing Yahoo chart source. No paid API calls.
+// automated personal use of Alpaca historical SIP data.
 function dailyContext(now){
  const p=ET.formatToParts(new Date(now)),x=Object.fromEntries(p.map(v=>[v.type,v.value]));
  const day=new Date(x.year+'-'+x.month+'-'+x.day+'T12:00:00Z'),minute=Number(x.hour)*60+Number(x.minute);
@@ -322,6 +322,21 @@ function yahooDaily(fetchImpl=fetch){
   return {status:200,rows};
  };
 }
+function alpacaDaily(key,secret,fetchImpl=fetch){
+ return async (symbol,expected)=>{
+  if(!validSymbol(symbol)||!dailyTradingDate(expected)||!key||!secret)throw Error('daily_input');
+  const day=expected.slice(0,4)+'-'+expected.slice(4,6)+'-'+expected.slice(6,8);
+  const start=new Date(day+'T12:00:00Z');start.setUTCDate(start.getUTCDate()-100);
+  const url=new URL('https://data.alpaca.markets/v2/stocks/'+encodeURIComponent(symbol)+'/bars');
+  for(const [k,v] of Object.entries({timeframe:'1Day',start:start.toISOString().slice(0,10)+'T04:00:00Z',end:day+'T19:00:00Z',feed:'sip',adjustment:'raw',limit:'1000'}))url.searchParams.set(k,v);
+  const r=await fetchImpl(url,{headers:{Accept:'application/json','APCA-API-KEY-ID':key,'APCA-API-SECRET-KEY':secret},redirect:'error',signal:AbortSignal.timeout(10000)});
+  if(!r.ok)return {status:r.status};
+  const j=await r.json();
+  if(j.symbol!==symbol||!Array.isArray(j.bars)||j.next_page_token)throw Error('daily_identity');
+  const rows=j.bars.map(b=>{const p=Object.fromEntries(ET.formatToParts(new Date(b.t)).map(x=>[x.type,x.value]));return {date:p.year+p.month+p.day,open:b.o,high:b.h,low:b.l,close:b.c};});
+  return {status:200,rows,source:'Alpaca SIP raw daily'};
+ };
+}
 function dailyStore(db){
  return {
   async init(){
@@ -351,8 +366,8 @@ async function collectDaily({symbols,store,fetchDaily,now=Date.now()}){
  for(const symbol of batch){
   if(!await store.reserve(symbol,expected,now))continue;
   attempted++;
-  let result;try{result=await fetchDaily(symbol)}catch(_){result={status:0};}
-  let q=null;try{if(result.status===200)q=analyzeDaily(symbol,result.rows,expected);}catch(_){}
+  let result;try{result=await fetchDaily(symbol,expected)}catch(_){result={status:0};}
+  let q=null;try{if(result.status===200){q=analyzeDaily(symbol,result.rows,expected);if(q&&result.source==='Alpaca SIP raw daily')q.source=result.source;}}catch(_){}
   const old=records[symbol]?.q;
   const usable=q&&(!old||q.date>=old.date)?q:null;
   await store.save(symbol,expected,now,usable,result.status===429?'rate_limited':q?null:'unavailable');
@@ -471,7 +486,7 @@ export default {
   // Use the actual invocation time, not an old scheduledTime after platform delay.
   const now=Date.now();
   if(!session(now).open){
-   if(env.US_DAILY_AUTHORIZED==='true'&&env.DB)ctx.waitUntil((async()=>{const state=await registryFromDB(env.DB);return collectDaily({symbols:activeUS(state.catalog,state.holdings),store:dailyStore(env.DB),fetchDaily:yahooDaily(),now});})());
+   if(env.US_DAILY_AUTHORIZED==='true'&&env.DB&&env.ALPACA_API_KEY&&env.ALPACA_SECRET_KEY)ctx.waitUntil((async()=>{const state=await registryFromDB(env.DB);return collectDaily({symbols:activeUS(state.catalog,state.holdings),store:dailyStore(env.DB),fetchDaily:alpacaDaily(env.ALPACA_API_KEY,env.ALPACA_SECRET_KEY),now});})());
    return;
   }
   if(!env.DB||!env.FINNHUB_API_KEY)throw Error('missing collector bindings');
