@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
 import {webcrypto} from 'node:crypto';
 const code=fs.readFileSync(new URL('../private-us-scheduled-worker-v17.js',import.meta.url),'utf8');
-const api=new Function('crypto',code.replace('export default {','const worker={')+'\nreturn {worker,dailyContext,dailyTradingDate,analyzeDaily,dailyStore,collectDaily,dailyPayload,yahooDaily};')(webcrypto);
+const api=new Function('crypto',code.replace('export default {','const worker={')+'\nreturn {worker,dailyContext,dailyTradingDate,analyzeDaily,dailyStore,collectDaily,dailyPayload,yahooDaily,alpacaDaily};')(webcrypto);
 const now=Date.parse('2026-11-27T19:00:00Z'),expected='20261127';
 assert.equal(api.dailyContext(now),expected);
 assert.equal(api.dailyContext(Date.parse('2026-11-27T18:29:00Z')),'20261125');
@@ -42,3 +42,25 @@ assert.equal((await api.worker.fetch(req(env.VIEW_TOKEN),{...env,US_DAILY_AUTHOR
 const wrongSource=api.yahooDaily(async()=>({ok:true,json:async()=>({chart:{result:[{meta:{symbol:'WRONG',currency:'USD'},indicators:{quote:[{}]},timestamp:[]}]}})}));
 await assert.rejects(wrongSource('QQQM'));
 console.log('PASS: dynamic US daily session, contiguous history, stale analysis guard, SQLite gate, rate limit and authorized cache route');
+
+let requested=false;
+const adapter=api.alpacaDaily('synthetic-key','synthetic-secret',async(url,opts)=>{
+ requested=true;
+ assert.equal(url.hostname,'data.alpaca.markets');
+ assert.equal(url.searchParams.get('feed'),'sip');
+ assert.equal(url.searchParams.get('adjustment'),'raw');
+ assert.equal(url.searchParams.get('end'),'2026-11-27T19:00:00Z');
+ assert.equal(opts.headers['APCA-API-KEY-ID'],'synthetic-key');
+ assert.equal(opts.headers['APCA-API-SECRET-KEY'],'synthetic-secret');
+ return {ok:true,json:async()=>({symbol:'QQQM',bars:raw.map(b=>({t:b.date.slice(0,4)+'-'+b.date.slice(4,6)+'-'+b.date.slice(6,8)+'T12:00:00Z',o:b.open,h:b.high,l:b.low,c:b.close})),next_page_token:null})};
+});
+const result=await adapter('QQQM',expected);
+assert.equal(requested,true);
+assert.equal(result.rows.length,40);
+assert.equal(result.source,'Alpaca SIP raw daily');
+assert.equal(api.analyzeDaily('QQQM',result.rows,expected).status,'ready');
+const denied=api.alpacaDaily('k','s',async()=>({ok:false,status:403}));
+assert.equal((await denied('QQQM',expected)).status,403);
+const wrong=api.alpacaDaily('k','s',async()=>({ok:true,json:async()=>({symbol:'WRONG',bars:[]})}));
+await assert.rejects(wrong('QQQM',expected));
+console.log('PASS: Alpaca SIP adapter request, identity, date mapping and HTTP denial');
