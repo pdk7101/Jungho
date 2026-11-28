@@ -27,7 +27,7 @@ jobs:
             for(const symbol of ['SCHD','AGNC','SPYM','CONY','SPCX']){
               try{
                 const url=new URL('https://data.alpaca.markets/v2/stocks/'+symbol+'/bars');
-                for(const [k,v] of Object.entries({timeframe:'1Day',start:'2026-11-27T05:00:00Z',end:'2026-11-28T05:00:00Z',feed,adjustment:'raw',limit:'10'}))url.searchParams.set(k,v);
+                for(const [k,v] of Object.entries({timeframe:'1Day',start:'2026-11-27T05:00:00Z',end:'2026-11-27T19:00:00Z',feed,adjustment:'raw',limit:'10'}))url.searchParams.set(k,v);
                 const r=await fetch(url,{headers:{'APCA-API-KEY-ID':process.env.ALPACA_API_KEY,'APCA-API-SECRET-KEY':process.env.ALPACA_SECRET_KEY},signal:AbortSignal.timeout(15000),redirect:'error'});
                 if(!r.ok){console.log(symbol,feed,'HTTP',r.status);continue;}
                 const j=await r.json();
